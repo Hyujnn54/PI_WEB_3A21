@@ -1,24 +1,64 @@
-{% extends 'shared/module_layout.html.twig' %}
+{% extends 'base.html.twig' %}
 
-{% set roleLabel = authUser.role|default('candidate')|capitalize %}
-{% set module_title = 'Job Offers' %}
-{% set module_subtitle = 'Browse and track opportunities relevant to your profile.' %}
-{% set module_scope = roleLabel %}
-{% set module_actions = [
-    { label: 'Browse Offers', href: '#', style: 'btn-primary' },
-    { label: roleLabel == 'Recruiter' ? 'Publish Offer' : 'Saved Offers', href: '#' },
-    { label: roleLabel == 'Recruiter' ? 'Offer Performance' : 'Apply Now', href: '#' }
-] %}
-{% set module_metrics = [
-    { label: 'Open Offers', value: '76' },
-    { label: roleLabel == 'Recruiter' ? 'Your Offers' : 'Recommended', value: roleLabel == 'Recruiter' ? '14' : '22' },
-    { label: 'New Today', value: '9' },
-    { label: 'Remote Roles', value: '17' }
-] %}
-{% set table_title = 'Offer Feed' %}
-{% set table_headers = ['Offer', 'Location', 'Status'] %}
-{% set table_rows = [
-    ['Backend Developer', 'Tunis', 'Open'],
-    ['HR Specialist', 'Sfax', 'Open'],
-    ['Data Analyst', 'Remote', 'Open']
-] %}
+{% block title %}Talent Bridge | Job Offers{% endblock %}
+
+{% block body %}
+{% set role = authUser.role|default('candidate') %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="page-title"><i class="ti ti-briefcase-2 me-1"></i>Job Offers</h2>
+                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Manage your offers and monitor candidate interest.' : 'Explore detailed roles and apply directly.' }}</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Create Offer' : 'Recommended For You' }}</a>
+                <a href="#" class="btn btn-outline-primary">{{ role == 'recruiter' ? 'Offer Analytics' : 'Saved Jobs' }}</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="row row-cards">
+                <div class="col-lg-4">
+                    <div class="tb-module-card h-100">
+                        <div class="tb-module-meta">Tunis | Full-time</div>
+                        <h3>Senior Backend Engineer</h3>
+                        <p>Build scalable APIs, improve hiring intelligence services, and work with data and AI pipelines.</p>
+                        <div class="tb-tags"><span>Symfony</span><span>MySQL</span><span>REST</span></div>
+                        <div class="tb-module-actions">
+                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Edit Offer' : 'Apply Now' }}</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Details</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="tb-module-card h-100">
+                        <div class="tb-module-meta">Sfax | Hybrid</div>
+                        <h3>HR Data Analyst</h3>
+                        <p>Analyze pipeline metrics, improve conversion ratios, and support recruiter decision-making with dashboards.</p>
+                        <div class="tb-tags"><span>Analytics</span><span>SQL</span><span>BI</span></div>
+                        <div class="tb-module-actions">
+                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Manage Applicants' : 'Quick Apply' }}</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Compare</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="tb-module-card h-100">
+                        <div class="tb-module-meta">Remote | Contract</div>
+                        <h3>Interview Coordinator</h3>
+                        <p>Coordinate interview schedules, collect feedback, and streamline communication across candidate stages.</p>
+                        <div class="tb-tags"><span>Coordination</span><span>Communication</span><span>ATS</span></div>
+                        <div class="tb-module-actions">
+                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Duplicate Offer' : 'Apply Now' }}</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Share</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

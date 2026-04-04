@@ -29,9 +29,19 @@ class BackOfficeController extends AbstractController
             'interviews' => $doctrine->getRepository(Interview::class)->count([]),
         ];
 
+        $usersPreview = [];
+        try {
+            $usersPreview = $doctrine->getConnection()->executeQuery(
+                "SELECT id, email, first_name, last_name, is_active FROM users ORDER BY id DESC LIMIT 8"
+            )->fetchAllAssociative();
+        } catch (\Throwable) {
+            $usersPreview = [];
+        }
+
         return $this->render('back/index.html.twig', [
             'stats' => $stats,
             'authUser' => ['role' => 'admin'],
+            'usersPreview' => $usersPreview,
         ]);
     }
 }

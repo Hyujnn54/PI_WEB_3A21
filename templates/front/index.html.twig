@@ -3,23 +3,24 @@
 {% block title %}Talent Bridge | Front Office{% endblock %}
 
 {% block body %}
+{% set role = authUser.role|default('candidate') %}
 <div class="page-wrapper">
     <div class="page-header d-print-none tb-hero">
         <div class="container-xl">
             <div class="row g-3 align-items-center">
                 <div class="col-lg-8">
-                    <h2 class="page-title">Smart Hiring Workspace</h2>
-                    <p class="tb-hero-subtitle">Talent Bridge connects candidates, recruiters, and admins with one clean hiring flow from offer to interview.</p>
+                    <h2 class="page-title">{{ role == 'recruiter' ? 'Recruiter Control Hub' : 'Candidate Career Hub' }}</h2>
+                    <p class="tb-hero-subtitle">{{ role == 'recruiter' ? 'Review applications, track interviews, and manage offer quality from one dashboard.' : 'Discover opportunities, track your applications, and follow interview progress in real time.' }}</p>
                     <div class="mt-3 d-flex flex-wrap gap-2">
-                        <a class="btn btn-primary" href="{{ path('front_job_offers') }}">Browse Opportunities</a>
-                        <a class="btn btn-outline-primary" href="{{ path('front_job_applications') }}">My Applications</a>
+                        <a class="btn btn-primary" href="{{ path('front_job_offers', {role: role}) }}"><i class="ti ti-briefcase-2 me-1"></i>{{ role == 'recruiter' ? 'Manage Offers' : 'Browse Opportunities' }}</a>
+                        <a class="btn btn-outline-primary" href="{{ path('front_job_applications', {role: role}) }}"><i class="ti ti-file-check me-1"></i>{{ role == 'recruiter' ? 'Review Applications' : 'My Applications' }}</a>
                     </div>
                 </div>
                 <div class="col-lg-4 ms-lg-auto">
-                    <div class="card tb-glass-card">
+                    <div class="card tb-glass-card tb-highlight-card">
                         <div class="card-body">
-                            <div class="h3 mb-1">{{ stats.jobOffers }}</div>
-                            <div class="text-secondary">Active offers in platform</div>
+                            <div class="h3 mb-1"><i class="ti ti-sparkles me-1"></i>{{ stats.jobOffers }}</div>
+                            <div class="text-secondary">{{ role == 'recruiter' ? 'Open offers you can monitor' : 'Active offers you can apply to' }}</div>
                             <div class="progress progress-sm mt-3">
                                 <div class="progress-bar bg-blue" style="width: 78%" role="progressbar" aria-valuenow="78" aria-valuemin="0" aria-valuemax="100"></div>
                             </div>
@@ -34,16 +35,16 @@
         <div class="container-xl">
             <div class="row row-deck row-cards mb-3">
                 <div class="col-sm-6 col-lg-3">
-                    <div class="card card-sm"><div class="card-body"><div class="h2 m-0">{{ stats.candidates }}</div><div class="text-secondary">Candidates</div></div></div>
+                    <div class="card card-sm"><div class="card-body"><div class="h2 m-0">{{ stats.candidates }}</div><div class="text-secondary"><i class="ti ti-user"></i> Candidates</div></div></div>
                 </div>
                 <div class="col-sm-6 col-lg-3">
-                    <div class="card card-sm"><div class="card-body"><div class="h2 m-0">{{ stats.recruiters }}</div><div class="text-secondary">Recruiters</div></div></div>
+                    <div class="card card-sm"><div class="card-body"><div class="h2 m-0">{{ stats.recruiters }}</div><div class="text-secondary"><i class="ti ti-user-star"></i> Recruiters</div></div></div>
                 </div>
                 <div class="col-sm-6 col-lg-3">
-                    <div class="card card-sm"><div class="card-body"><div class="h2 m-0">{{ stats.applications }}</div><div class="text-secondary">Applications</div></div></div>
+                    <div class="card card-sm"><div class="card-body"><div class="h2 m-0">{{ stats.applications }}</div><div class="text-secondary"><i class="ti ti-file-check"></i> Applications</div></div></div>
                 </div>
                 <div class="col-sm-6 col-lg-3">
-                    <div class="card card-sm"><div class="card-body"><div class="h2 m-0">{{ stats.interviews }}</div><div class="text-secondary">Interviews</div></div></div>
+                    <div class="card card-sm"><div class="card-body"><div class="h2 m-0">{{ stats.interviews }}</div><div class="text-secondary"><i class="ti ti-message-2"></i> Interviews</div></div></div>
                 </div>
             </div>
 
@@ -54,12 +55,38 @@
                             <h3 class="card-title mb-0">Team Navigation</h3>
                         </div>
                         <div class="card-body d-flex flex-wrap gap-2">
-                            <a class="btn btn-outline-primary" href="{{ path('front_job_offers') }}">Job Offers</a>
-                            <a class="btn btn-outline-primary" href="{{ path('front_job_applications') }}">Job Applications</a>
-                            <a class="btn btn-outline-primary" href="{{ path('front_events') }}">Events</a>
-                            <a class="btn btn-outline-primary" href="{{ path('front_interviews') }}">Interviews</a>
+                            <a class="btn btn-outline-primary" href="{{ path('front_job_offers', {role: role}) }}"><i class="ti ti-briefcase-2 me-1"></i>Job Offers</a>
+                            <a class="btn btn-outline-primary" href="{{ path('front_job_applications', {role: role}) }}"><i class="ti ti-file-check me-1"></i>Job Applications</a>
+                            <a class="btn btn-outline-primary" href="{{ path('front_events', {role: role}) }}"><i class="ti ti-calendar-event me-1"></i>Events</a>
+                            <a class="btn btn-outline-primary" href="{{ path('front_interviews', {role: role}) }}"><i class="ti ti-message-2 me-1"></i>Interviews</a>
                             <a class="btn btn-outline-primary" href="{{ path('app_logout') }}" onclick="event.preventDefault(); this.nextElementSibling.submit();">Logout</a>
                             <form method="post" action="{{ path('app_logout') }}" class="d-none"></form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row row-cards mb-3">
+                <div class="col-lg-7">
+                    <div class="card h-100">
+                        <div class="card-header"><h3 class="card-title mb-0">{{ role == 'recruiter' ? 'Recruiter Statistics' : 'Candidate Statistics' }}</h3></div>
+                        <div class="card-body">
+                            <div class="progress mb-3"><div class="progress-bar bg-indigo" style="width: 64%"></div></div>
+                            <div class="progress mb-3"><div class="progress-bar bg-azure" style="width: 48%"></div></div>
+                            <div class="progress"><div class="progress-bar bg-cyan" style="width: 79%"></div></div>
+                            <p class="small text-secondary mt-3 mb-0">{{ role == 'recruiter' ? 'Acceptance rate, interview completion, and offer quality trend.' : 'Application progress, interview readiness, and profile strength trend.' }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="card h-100">
+                        <div class="card-header"><h3 class="card-title mb-0">{{ role == 'recruiter' ? 'Recruiter Calendar' : 'Candidate Calendar' }}</h3></div>
+                        <div class="card-body">
+                            <div class="tb-mini-calendar">
+                                <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+                                <div>7</div><div class="is-active">8</div><div>9</div><div>10</div><div class="is-accent">11</div><div>12</div><div>13</div>
+                            </div>
+                            <p class="small text-secondary mb-0 mt-3">{{ role == 'recruiter' ? '8: Application review, 11: Interview panel' : '8: Interview prep, 11: Follow-up result' }}</p>
                         </div>
                     </div>
                 </div>

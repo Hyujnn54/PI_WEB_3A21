@@ -1,24 +1,60 @@
-{% extends 'shared/module_layout.html.twig' %}
+{% extends 'base.html.twig' %}
 
-{% set roleLabel = authUser.role|default('candidate')|capitalize %}
-{% set module_title = 'Job Applications' %}
-{% set module_subtitle = roleLabel == 'Recruiter' ? 'Review candidate submissions and update application statuses.' : 'Track your applications and progress through stages.' %}
-{% set module_scope = roleLabel %}
-{% set module_actions = [
-    { label: roleLabel == 'Recruiter' ? 'Incoming Applications' : 'My Applications', href: '#', style: 'btn-primary' },
-    { label: roleLabel == 'Recruiter' ? 'Shortlist' : 'Withdraw', href: '#' },
-    { label: 'Status Timeline', href: '#' }
-] %}
-{% set module_metrics = [
-    { label: roleLabel == 'Recruiter' ? 'Pending Review' : 'Submitted', value: roleLabel == 'Recruiter' ? '27' : '12' },
-    { label: 'In Process', value: '8' },
-    { label: 'Interview Stage', value: '5' },
-    { label: roleLabel == 'Recruiter' ? 'Accepted' : 'Offers Received', value: '3' }
-] %}
-{% set table_title = 'Application Queue' %}
-{% set table_headers = ['Candidate/Offer', 'Stage', 'Updated'] %}
-{% set table_rows = [
-    ['Fullstack Position', 'Screening', 'Today'],
-    ['HR Coordinator', 'Interview', 'Yesterday'],
-    ['QA Engineer', 'Decision', '2 days ago']
-] %}
+{% block title %}Talent Bridge | Job Applications{% endblock %}
+
+{% block body %}
+{% set role = authUser.role|default('candidate') %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="page-title"><i class="ti ti-file-check me-1"></i>Job Applications</h2>
+                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Evaluate applicant profiles and move them through your pipeline.' : 'Track each application and monitor your progress.' }}</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Review Queue' : 'My Pipeline' }}</a>
+                <a href="#" class="btn btn-outline-primary">Status Timeline</a>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="row row-cards">
+                <div class="col-md-6 col-xl-4">
+                    <div class="tb-module-card h-100">
+                        <div class="tb-module-meta">Application #A-101</div>
+                        <h3>{{ role == 'recruiter' ? 'Candidate: Aya Trabelsi' : 'Position: Backend Engineer' }}</h3>
+                        <p>{{ role == 'recruiter' ? 'Strong API and SQL experience, currently at interview stage.' : 'Your application is currently under technical review.' }}</p>
+                        <div class="tb-module-actions">
+                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Shortlist' : 'View Status' }}</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">History</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-4">
+                    <div class="tb-module-card h-100">
+                        <div class="tb-module-meta">Application #A-102</div>
+                        <h3>{{ role == 'recruiter' ? 'Candidate: Mehdi Gharbi' : 'Position: HR Data Analyst' }}</h3>
+                        <p>{{ role == 'recruiter' ? 'Needs follow-up on interview scheduling and profile completion.' : 'Recruiter requested an additional profile update.' }}</p>
+                        <div class="tb-module-actions">
+                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Contact Candidate' : 'Update Profile' }}</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Notes</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-4">
+                    <div class="tb-module-card h-100">
+                        <div class="tb-module-meta">Application #A-103</div>
+                        <h3>{{ role == 'recruiter' ? 'Candidate: Sara Ben Amor' : 'Position: Interview Coordinator' }}</h3>
+                        <p>{{ role == 'recruiter' ? 'Interview feedback pending from panel member.' : 'Decision expected after final panel review.' }}</p>
+                        <div class="tb-module-actions">
+                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Request Feedback' : 'Follow Up' }}</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Details</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

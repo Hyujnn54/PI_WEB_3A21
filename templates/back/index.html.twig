@@ -4,15 +4,12 @@
 
 {% block body %}
 <div class="page-wrapper">
-    <div class="page-header d-print-none">
+    <div class="page-header d-print-none tb-admin-hero">
         <div class="container-xl">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title">Back Office Dashboard</h2>
+                    <h2 class="page-title"><i class="ti ti-layout-dashboard me-1"></i>Admin Dashboard</h2>
                     <div class="text-secondary">Control panel for admin, recruiter, candidate, events and interview pipelines.</div>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('front_home') }}" class="btn btn-outline-primary">Open Front Office</a>
                 </div>
             </div>
         </div>
@@ -52,22 +49,47 @@
                 <div class="col-xl-8">
                     <div class="card h-100">
                         <div class="card-header">
-                            <h3 class="card-title">Platform Overview</h3>
+                            <h3 class="card-title"><i class="ti ti-chart-bar me-1"></i>Statistics Section</h3>
                         </div>
+                        <div class="card-body">
+                            <div class="progress mb-3"><div class="progress-bar bg-blue" style="width: 71%"></div></div>
+                            <div class="progress mb-3"><div class="progress-bar bg-indigo" style="width: 52%"></div></div>
+                            <div class="progress"><div class="progress-bar bg-cyan" style="width: 84%"></div></div>
+                            <p class="small text-secondary mt-3 mb-0">Applications conversion, event engagement, and interview quality trends at a glance.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6">
+                    <div class="card h-100">
+                        <div class="card-header"><h3 class="card-title"><i class="ti ti-calendar-event me-1"></i>Calendar Section</h3></div>
+                        <div class="card-body">
+                            <div class="tb-mini-calendar">
+                                <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+                                <div>14</div><div class="is-active">15</div><div>16</div><div>17</div><div class="is-accent">18</div><div>19</div><div>20</div>
+                            </div>
+                            <p class="small text-secondary mt-3 mb-0">15: Candidate event campaign, 18: interview calibration board.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6">
+                    <div class="card h-100">
+                        <div class="card-header"><h3 class="card-title"><i class="ti ti-users me-1"></i>All Users Overview</h3></div>
                         <div class="table-responsive">
                             <table class="table table-vcenter card-table">
-                                <thead>
-                                    <tr>
-                                        <th>Module</th>
-                                        <th class="text-end">Records</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
+                                <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Status</th></tr></thead>
                                 <tbody>
-                                    <tr><td>Job Offers</td><td class="text-end">{{ stats.jobOffers }}</td><td><span class="badge bg-blue-lt">Active</span></td></tr>
-                                    <tr><td>Applications</td><td class="text-end">{{ stats.applications }}</td><td><span class="badge bg-azure-lt">Tracking</span></td></tr>
-                                    <tr><td>Events</td><td class="text-end">{{ stats.events }}</td><td><span class="badge bg-indigo-lt">Planning</span></td></tr>
-                                    <tr><td>Candidates</td><td class="text-end">{{ stats.candidates }}</td><td><span class="badge bg-cyan-lt">Live</span></td></tr>
+                                {% for user in usersPreview %}
+                                    <tr>
+                                        <td>#{{ user.id }}</td>
+                                        <td>{{ user.first_name }} {{ user.last_name }}</td>
+                                        <td>{{ user.email }}</td>
+                                        <td><span class="badge {{ user.is_active ? 'bg-green-lt' : 'bg-red-lt' }}">{{ user.is_active ? 'Active' : 'Inactive' }}</span></td>
+                                    </tr>
+                                {% else %}
+                                    <tr><td colspan="4" class="text-secondary">No users found in table preview.</td></tr>
+                                {% endfor %}
                                 </tbody>
                             </table>
                         </div>

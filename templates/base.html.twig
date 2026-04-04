@@ -10,6 +10,7 @@
         <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
         <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
         {% block stylesheets %}
         {% endblock %}
 
@@ -25,14 +26,25 @@
         {% endif %}
     </head>
     <body class="tb-body">
+        {% set queryRole = app.request.query.get('role') %}
+        {% set currentRole = queryRole in ['candidate', 'recruiter'] ? queryRole : 'candidate' %}
+        {% set routeName = app.request.attributes.get('_route') %}
+        {% set isAdminPage = routeName starts with 'management_' or routeName == 'back_dashboard' %}
         <div class="page tb-page-shell">
             <header class="navbar navbar-expand-md navbar-light d-print-none tb-topbar">
                 <div class="container-xl">
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#tbMainNav" aria-controls="tbMainNav" aria-expanded="false" aria-label="Toggle navigation">
                         <span class="navbar-toggler-icon"></span>
                     </button>
-                    <h1 class="navbar-brand navbar-brand-autodark mb-0">Talent Bridge</h1>
+                    <h1 class="navbar-brand navbar-brand-autodark mb-0 d-flex align-items-center">
+                        <img src="{{ asset('team_uploads/logo.png') }}" alt="Talent Bridge logo" class="tb-logo me-2">
+                        Talent Bridge
+                    </h1>
                     <div class="navbar-nav flex-row order-md-last">
+                        <div class="btn-list me-2">
+                            <a class="btn btn-sm {{ currentRole == 'candidate' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({role: 'candidate'})) }}">Candidate</a>
+                            <a class="btn btn-sm {{ currentRole == 'recruiter' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({role: 'recruiter'})) }}">Recruiter</a>
+                        </div>
                         <div class="nav-item d-none d-md-flex me-2">
                             <a class="btn btn-sm btn-outline-primary" href="{{ path('app_login') }}">Login</a>
                         </div>
@@ -52,20 +64,16 @@
                     <div class="navbar navbar-light">
                         <div class="container-xl">
                             <ul class="navbar-nav">
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{{ path('front_home') }}">
-                                        <span class="nav-link-title">Front Office</span>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{{ path('back_dashboard') }}">
-                                        <span class="nav-link-title">Back Office</span>
-                                    </a>
-                                </li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers') }}"><span class="nav-link-title">Job Offers</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications') }}"><span class="nav-link-title">Applications</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_events') }}"><span class="nav-link-title">Events</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews') }}"><span class="nav-link-title">Interviews</span></a></li>
+                                {% if isAdminPage %}
+                                    <li class="nav-item"><a class="nav-link" href="{{ path('management_users') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
+                                {% endif %}
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-check"></i></span><span class="nav-link-title">Applications</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_events', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-message-2"></i></span><span class="nav-link-title">Interviews</span></a></li>
+                                {% if isAdminPage %}
+                                    <li class="nav-item"><a class="nav-link" href="{{ path('back_dashboard') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span><span class="nav-link-title">Admin Dashboard</span></a></li>
+                                {% endif %}
                             </ul>
                         </div>
                     </div>
