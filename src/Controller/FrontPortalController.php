@@ -11,6 +11,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Throwable;
 
 class FrontPortalController extends AbstractController
 {
@@ -91,17 +92,27 @@ class FrontPortalController extends AbstractController
         $role = (string) $request->query->get('role', 'candidate');
         $interviews = $this->doctrine->getRepository(Interview::class)->findBy([], ['id' => 'DESC']);
 
-        $cards = array_map(static function (Interview $interview): array {
-            $application = $interview->getApplication_id();
-            $offer = $application->getOffer_id();
-            $notes = trim((string) $interview->getNotes());
+        $cards = [];
+        foreach ($interviews as $interview) {
+            try {
+                $application = $interview->getApplication_id();
+                $offer = $application->getOffer_id();
 
-            return [
-                'meta' => sprintf('%s | %s', $interview->getScheduled_at()->format('d M Y | H:i'), (string) $interview->getStatus()),
-                'title' => sprintf('Interview: %s', (string) $offer->getTitle()),
-                'text' => $notes === '' ? 'No interview notes available yet.' : substr($notes, 0, 190),
-            ];
-        }, $interviews);
+                $scheduledAt = $interview->getScheduled_at();
+                $status = (string) $interview->getStatus();
+                $title = (string) $offer->getTitle();
+                $notes = trim((string) $interview->getNotes());
+
+                $cards[] = [
+                    'meta' => sprintf('%s | %s', $scheduledAt->format('d M Y | H:i'), $status === '' ? 'Pending' : $status),
+                    'title' => sprintf('Interview: %s', $title === '' ? 'Untitled offer' : $title),
+                    'text' => $notes === '' ? 'No interview notes available yet.' : substr($notes, 0, 190),
+                ];
+            } catch (Throwable) {
+                // Skip malformed rows so one broken interview does not break the page.
+                continue;
+            }
+        }
 
         return $this->render('front/modules/interviews.html.twig', [
             'authUser' => ['role' => $role],
