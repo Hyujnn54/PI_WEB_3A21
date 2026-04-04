@@ -51,22 +51,6 @@ class FrontPortalController extends AbstractController
     {
         $role = (string) $request->query->get('role', 'candidate');
         $applications = $this->doctrine->getRepository(Job_application::class)->findBy([], ['id' => 'DESC']);
-        $recruiterUserId = $this->resolveRecruiterUserId($request);
-        $candidateUserId = $this->resolveCandidateUserId($request);
-
-        if ($role === 'recruiter' && $recruiterUserId !== null) {
-            $applications = array_values(array_filter($applications, fn (Job_application $application): bool => $this->isRecruiterApplicationOwner($application, $recruiterUserId)));
-        }
-
-        if ($role === 'candidate' && $candidateUserId !== null) {
-            $applications = array_values(array_filter($applications, function (Job_application $application) use ($candidateUserId): bool {
-                try {
-                    return (string) $application->getCandidate_id()->getUser_id() === $candidateUserId;
-                } catch (Throwable) {
-                    return false;
-                }
-            }));
-        }
 
         $cards = array_map(function (Job_application $application) use ($request, $role): array {
             $offer = $application->getOffer_id();
@@ -121,16 +105,6 @@ class FrontPortalController extends AbstractController
     {
         $role = (string) $request->query->get('role', 'candidate');
         $interviews = $this->doctrine->getRepository(Interview::class)->findBy([], ['id' => 'DESC']);
-        $recruiterUserId = $this->resolveRecruiterUserId($request);
-        $candidateUserId = $this->resolveCandidateUserId($request);
-
-        if ($role === 'recruiter' && $recruiterUserId !== null) {
-            $interviews = array_values(array_filter($interviews, fn (Interview $interview): bool => $this->isRecruiterInterviewOwner($interview, $recruiterUserId)));
-        }
-
-        if ($role === 'candidate' && $candidateUserId !== null) {
-            $interviews = array_values(array_filter($interviews, fn (Interview $interview): bool => $this->isCandidateInterviewOwner($interview, $candidateUserId)));
-        }
 
         $cards = [];
         $upcomingInterviews = [];
@@ -232,12 +206,6 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_job_applications', $request->query->all());
         }
 
-        $recruiterUserId = $this->resolveRecruiterUserId($request);
-        if ($recruiterUserId === null || !$this->isRecruiterApplicationOwner($application, $recruiterUserId)) {
-            $this->addFlash('warning', 'You can only manage applications for your own offers.');
-            return $this->redirectToRoute('front_job_applications', $request->query->all());
-        }
-
         $application->setCurrent_status($status);
         $this->doctrine->getManager()->flush();
         $this->addFlash('success', 'Application status updated.');
@@ -254,9 +222,8 @@ class FrontPortalController extends AbstractController
             throw $this->createNotFoundException('Application not found.');
         }
 
-        $recruiterUserId = $this->resolveRecruiterUserId($request);
-        if ($role !== 'recruiter' || $recruiterUserId === null || !$this->isRecruiterApplicationOwner($application, $recruiterUserId)) {
-            $this->addFlash('warning', 'Only the owner recruiter can schedule this interview.');
+        if ($role !== 'recruiter') {
+            $this->addFlash('warning', 'Only recruiters can schedule interviews.');
             return $this->redirectToRoute('front_job_applications', $request->query->all());
         }
 
@@ -327,9 +294,8 @@ class FrontPortalController extends AbstractController
             throw $this->createNotFoundException('Interview not found.');
         }
 
-        $recruiterUserId = $this->resolveRecruiterUserId($request);
-        if ($role !== 'recruiter' || $recruiterUserId === null || !$this->isRecruiterInterviewOwner($interview, $recruiterUserId)) {
-            $this->addFlash('warning', 'Only the owner recruiter can edit this interview.');
+        if ($role !== 'recruiter') {
+            $this->addFlash('warning', 'Only recruiters can edit interviews.');
             return $this->redirectToRoute('front_interviews', $request->query->all());
         }
 
@@ -392,9 +358,8 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_interviews', $request->query->all());
         }
 
-        $recruiterUserId = $this->resolveRecruiterUserId($request);
-        if ($role !== 'recruiter' || $recruiterUserId === null || !$this->isRecruiterInterviewOwner($interview, $recruiterUserId)) {
-            $this->addFlash('warning', 'Only the owner recruiter can delete this interview.');
+        if ($role !== 'recruiter') {
+            $this->addFlash('warning', 'Only recruiters can delete interviews.');
             return $this->redirectToRoute('front_interviews', $request->query->all());
         }
 
@@ -420,9 +385,8 @@ class FrontPortalController extends AbstractController
             throw $this->createNotFoundException('Interview not found.');
         }
 
-        $recruiterUserId = $this->resolveRecruiterUserId($request);
-        if ($role !== 'recruiter' || $recruiterUserId === null || !$this->isRecruiterInterviewOwner($interview, $recruiterUserId)) {
-            $this->addFlash('warning', 'Only the owner recruiter can submit feedback.');
+        if ($role !== 'recruiter') {
+            $this->addFlash('warning', 'Only recruiters can submit feedback.');
             return $this->redirectToRoute('front_interviews', $request->query->all());
         }
 
@@ -488,53 +452,6 @@ class FrontPortalController extends AbstractController
             'interviewId' => $id,
             'formData' => $formData,
         ]);
-    }
-
-    private function resolveRecruiterUserId(Request $request): ?string
-    {
-        $fromQuery = trim((string) $request->query->get('recruiter', ''));
-        if ($fromQuery !== '') {
-            return $fromQuery;
-        }
-
-        return null;
-    }
-
-    private function resolveCandidateUserId(Request $request): ?string
-    {
-        $fromQuery = trim((string) $request->query->get('candidate', ''));
-        if ($fromQuery !== '') {
-            return $fromQuery;
-        }
-
-        return null;
-    }
-
-    private function isRecruiterApplicationOwner(Job_application $application, string $recruiterUserId): bool
-    {
-        try {
-            return (string) $application->getOffer_id()->getRecruiter_id()->getUser_id() === $recruiterUserId;
-        } catch (Throwable) {
-            return false;
-        }
-    }
-
-    private function isRecruiterInterviewOwner(Interview $interview, string $recruiterUserId): bool
-    {
-        try {
-            return (string) $interview->getApplication_id()->getOffer_id()->getRecruiter_id()->getUser_id() === $recruiterUserId;
-        } catch (Throwable) {
-            return false;
-        }
-    }
-
-    private function isCandidateInterviewOwner(Interview $interview, string $candidateUserId): bool
-    {
-        try {
-            return (string) $interview->getApplication_id()->getCandidate_id()->getUser_id() === $candidateUserId;
-        } catch (Throwable) {
-            return false;
-        }
     }
 
     private function validateInterviewPayload(array $data): array
