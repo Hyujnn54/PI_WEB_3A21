@@ -29,7 +29,28 @@ class FrontOfficeController extends AbstractController
             'interviews' => $doctrine->getRepository(Interview::class)->count([]),
         ];
 
-        $latestOffers = $doctrine->getRepository(Job_offer::class)->findBy([], ['id' => 'DESC'], 6);
+        $latestOffersEntities = $doctrine->getRepository(Job_offer::class)->findBy([], ['id' => 'DESC'], 6);
+        $latestOffers = [];
+
+        foreach ($latestOffersEntities as $offer) {
+            $qualityScore = 0;
+
+            try {
+                $qualityScore = $offer->getQuality_score();
+            } catch (\Error) {
+                $qualityScore = 0;
+            }
+
+            $latestOffers[] = [
+                'id' => $offer->getId(),
+                'title' => $offer->getTitle(),
+                'description' => $offer->getDescription(),
+                'location' => $offer->getLocation(),
+                'contract_type' => $offer->getContract_type(),
+                'status' => $offer->getStatus(),
+                'quality_score' => $qualityScore,
+            ];
+        }
 
         return $this->render('front/index.html.twig', [
             'stats' => $stats,

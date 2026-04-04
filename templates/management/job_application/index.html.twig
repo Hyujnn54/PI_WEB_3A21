@@ -1,0 +1,27 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | Job Application Management{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <h2 class="page-title">{{ module }}</h2>
+            <p class="text-secondary mb-0">{{ description }}</p>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-primary" href="#">All Applications</a>
+                        <a class="btn btn-outline-primary" href="#">In Review</a>
+                        <a class="btn btn-outline-primary" href="#">Status Timeline</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

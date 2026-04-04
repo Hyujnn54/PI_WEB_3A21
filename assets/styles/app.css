@@ -1,7 +1,6 @@
 :root {
     --tb-primary: #0d5bd7;
     --tb-primary-dark: #0a43a1;
-    --tb-surface: #ffffff;
     --tb-soft: #eef5ff;
     --tb-text: #10243e;
 }
@@ -10,80 +9,80 @@
     box-sizing: border-box;
 }
 
-body {
+.tb-body {
     font-family: "Manrope", sans-serif;
     color: var(--tb-text);
-    background: radial-gradient(circle at 20% -20%, #dbeafe 0%, #f8fbff 45%, #ffffff 100%);
+    background: radial-gradient(circle at 15% -10%, #dce9ff 0%, #f5f9ff 40%, #ffffff 100%);
     min-height: 100vh;
 }
 
-.app-nav {
+.tb-page-shell {
+    min-height: 100vh;
+}
+
+.tb-topbar {
     background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid #dce8ff;
 }
 
-.navbar-brand,
-.nav-link {
-    color: var(--tb-primary-dark);
+.tb-topbar .navbar-brand,
+.navbar-nav .nav-link-title {
+    color: var(--tb-primary-dark) !important;
 }
 
-.hero-wrap {
+.tb-hero {
     position: relative;
+    padding-top: 1.2rem;
 }
 
-.hero-wrap::before {
+.tb-hero::before {
     content: "";
     position: absolute;
-    inset: 0;
-    background: linear-gradient(120deg, rgba(13, 91, 215, 0.1), rgba(13, 91, 215, 0));
+    inset: 0 0 15% 0;
+    background: linear-gradient(130deg, rgba(13, 91, 215, 0.17), rgba(13, 91, 215, 0.02));
     pointer-events: none;
+    border-bottom-left-radius: 24px;
+    border-bottom-right-radius: 24px;
 }
 
-.metric-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+.tb-hero-subtitle {
+    color: #4b638a;
+    max-width: 640px;
+    margin: 0;
 }
 
-.metric-card,
-.panel,
-.job-card {
-    background: var(--tb-surface);
-    border: 1px solid #d9e6ff;
-    border-radius: 14px;
-    box-shadow: 0 12px 24px rgba(16, 36, 62, 0.06);
+.tb-glass-card {
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid #d5e5ff;
+    box-shadow: 0 16px 32px rgba(16, 36, 62, 0.1);
 }
 
-.metric-card {
-    padding: 16px;
+.card {
+    border-color: #dbe7ff;
+    box-shadow: 0 10px 28px rgba(14, 47, 95, 0.05);
 }
 
-.metric-label {
-    font-size: 0.85rem;
-    color: #5b7091;
+.tb-offer-card {
+    background: #fff;
+    border: 1px solid #dce8ff;
+    border-radius: 12px;
+    padding: 1rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.metric-value {
-    font-size: 1.7rem;
-    font-weight: 800;
-    color: var(--tb-primary-dark);
+.tb-offer-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(13, 91, 215, 0.12);
 }
 
-.job-card,
-.panel {
-    padding: 18px;
+.tb-admin-list .list-group-item {
+    border-left: 0;
+    border-right: 0;
+    border-color: #edf3ff;
 }
 
-.panel.stat {
-    padding: 14px 16px;
-}
-
-.admin-links .list-group-item {
-    border: none;
-    border-radius: 10px;
-    margin-bottom: 8px;
-    color: var(--tb-primary-dark);
+.tb-admin-list .list-group-item:hover {
     background: var(--tb-soft);
 }
 
@@ -98,7 +97,7 @@ body {
 }
 
 @media (max-width: 767px) {
-    .metric-grid {
-        grid-template-columns: 1fr;
+    .tb-hero-subtitle {
+        font-size: 0.95rem;
     }
 }
