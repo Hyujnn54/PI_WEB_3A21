@@ -112,23 +112,29 @@ class FrontPortalController extends AbstractController
             try {
                 $application = $interview->getApplication_id();
                 $offer = $application->getOffer_id();
-                $candidate = $application->getCandidate_id();
 
                 $scheduledAt = $interview->getScheduled_at();
                 $status = (string) $interview->getStatus();
                 $title = (string) $offer->getTitle();
                 $notes = trim((string) $interview->getNotes());
-                $mode = (string) $interview->getMode();
+                $mode = $this->normalizeInterviewMode((string) $interview->getMode());
                 $duration = (string) $interview->getDuration_minutes();
                 $location = trim((string) $interview->getLocation());
                 $meetingLink = trim((string) $interview->getMeeting_link());
-                $applicationId = (string) $application->getId();
-                $candidateId = (string) $candidate->getUser_id();
+                $normalizedStatus = strtoupper(trim($status));
+                if ($normalizedStatus === '') {
+                    $normalizedStatus = 'SCHEDULED';
+                }
+                $latestFeedback = $this->findLatestInterviewFeedback($interview);
+                $hasFeedback = $latestFeedback instanceof Interview_feedback;
 
-                $displayStatus = $status;
+                $displayStatus = 'Scheduled';
                 $statusClass = 'bg-blue-lt';
+                $statusKey = 'scheduled';
                 if ($role === 'candidate') {
-                    [$displayStatus, $statusClass] = $this->computeCandidateInterviewStatus($interview);
+                    [$displayStatus, $statusClass, $statusKey] = $this->computeCandidateInterviewStatus($interview, $latestFeedback);
+                } else {
+                    [$displayStatus, $statusClass, $statusKey] = $this->computeRecruiterInterviewStatus($interview, $normalizedStatus, $latestFeedback);
                 }
 
                 $canModify = $this->canModifyInterview($interview);
@@ -136,46 +142,62 @@ class FrontPortalController extends AbstractController
                 $deleteUrl = $this->generateUrl('front_interview_delete', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all());
                 $feedbackUrl = $this->generateUrl('front_interview_feedback', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all());
 
+                $detailExtra = [
+                    'Date & Time: ' . $scheduledAt->format('d M Y H:i'),
+                    'Duration: ' . $duration . ' min',
+                    'Mode: ' . strtoupper($mode),
+                ];
+                if ($mode === 'onsite') {
+                    $detailExtra[] = 'Location: ' . ($location === '' ? 'N/A' : $location);
+                } else {
+                    $detailExtra[] = 'Meeting Link: ' . ($meetingLink === '' ? 'N/A' : $meetingLink);
+                }
+                $detailExtra[] = 'Status: ' . $displayStatus;
+
                 $cards[] = [
                     'id' => (string) $interview->getId(),
-                    'meta' => sprintf('%s | %s', $scheduledAt->format('d M Y | H:i'), $status === '' ? 'Pending' : $status),
+                    'meta' => sprintf('%s | %s', $scheduledAt->format('d M Y | H:i'), $displayStatus),
                     'title' => sprintf('Interview: %s', $title === '' ? 'Untitled offer' : $title),
                     'text' => $notes === '' ? 'No interview notes available yet.' : substr($notes, 0, 190),
-                    'detail_extra' => [
-                        'Date & Time: ' . $scheduledAt->format('d M Y H:i'),
-                        'Duration: ' . $duration . ' min',
-                        'Mode: ' . strtoupper($mode),
-                        'Location: ' . ($location === '' ? 'N/A' : $location),
-                        'Meeting Link: ' . ($meetingLink === '' ? 'N/A' : $meetingLink),
-                        'Application ID: #' . $applicationId,
-                        'Candidate ID: ' . $candidateId,
-                        'Status: ' . $displayStatus,
-                    ],
+                    'scheduled_ts' => (string) $scheduledAt->getTimestamp(),
+                    'full_notes' => $notes,
+                    'form_scheduled_at' => $scheduledAt->format('Y-m-d\TH:i'),
+                    'form_duration_minutes' => $duration,
+                    'form_mode' => $mode,
+                    'form_meeting_link' => $meetingLink,
+                    'form_location' => $location,
+                    'detail_extra' => $detailExtra,
                     'status_label' => $displayStatus,
                     'status_class' => $statusClass,
+                    'status_key' => $statusKey,
+                    'status_sort' => strtolower($displayStatus),
+                    'review_score' => $hasFeedback ? (string) $latestFeedback->getOverall_score() : '80',
+                    'review_decision' => $hasFeedback ? (string) $latestFeedback->getDecision() : 'accepted',
+                    'review_comment' => $hasFeedback ? (string) $latestFeedback->getComment() : '',
                     'can_modify' => $canModify,
                     'can_feedback' => $this->canSubmitFeedback($interview),
+                    'review_label' => $hasFeedback ? 'Update Review' : 'Create Review',
                     'edit_url' => $editUrl,
                     'delete_url' => $deleteUrl,
                     'feedback_url' => $feedbackUrl,
                 ];
 
-                if ($scheduledAt > new \DateTimeImmutable()) {
-                    $upcomingInterviews[] = [
-                        'timestamp' => $scheduledAt->getTimestamp(),
-                        'date' => $scheduledAt->format('d M Y H:i'),
-                        'title' => $title === '' ? 'Untitled offer' : $title,
-                        'mode' => strtoupper($mode),
-                        'status' => $displayStatus,
-                    ];
-                }
+                $upcomingInterviews[] = [
+                    'timestamp' => $scheduledAt->getTimestamp(),
+                    'date' => $scheduledAt->format('d M Y H:i'),
+                    'ymd' => $scheduledAt->format('Y-m-d'),
+                    'title' => $title === '' ? 'Untitled offer' : $title,
+                    'mode' => strtoupper($mode),
+                    'status' => $displayStatus,
+                    'location' => $location === '' ? 'N/A' : $location,
+                ];
             } catch (Throwable) {
                 // Skip malformed rows so one broken interview does not break the page.
                 continue;
             }
         }
 
-        usort($upcomingInterviews, static fn (array $a, array $b): int => $a['timestamp'] <=> $b['timestamp']);
+        usort($upcomingInterviews, static fn (array $a, array $b): int => $b['timestamp'] <=> $a['timestamp']);
         $upcomingInterviews = array_slice($upcomingInterviews, 0, 8);
 
         return $this->render('front/modules/interviews.html.twig', [
@@ -246,6 +268,11 @@ class FrontPortalController extends AbstractController
                 'notes' => trim((string) $request->request->get('notes', '')),
             ];
 
+            if ($this->hasActiveInterviewForApplication($application)) {
+                $this->addFlash('warning', 'This application already has an active interview. Update the existing one or complete/cancel it first.');
+                return $this->redirectToRoute('front_job_applications', $request->query->all() + ['openCreateFor' => $applicationId]);
+            }
+
             $validation = $this->validateInterviewPayload($formData);
             if ($validation['ok']) {
                 $offer = $application->getOffer_id();
@@ -265,16 +292,22 @@ class FrontPortalController extends AbstractController
                 $interview->setCreated_at(new \DateTime());
                 $interview->setReminder_sent(false);
 
-                $entityManager = $this->doctrine->getManager();
-                $entityManager->persist($interview);
-                $application->setCurrent_status('interview_scheduled');
-                $entityManager->flush();
+                try {
+                    $entityManager = $this->doctrine->getManager();
+                    $entityManager->persist($interview);
+                    $application->setCurrent_status('interview_scheduled');
+                    $entityManager->flush();
 
-                $this->addFlash('success', 'Interview created successfully.');
-                return $this->redirectToRoute('front_interviews', $request->query->all());
+                    $this->addFlash('success', 'Interview created successfully.');
+                    return $this->redirectToRoute('front_interviews', $request->query->all());
+                } catch (Throwable) {
+                    $this->addFlash('warning', 'Could not create interview. Please check if one already exists for this application.');
+                    return $this->redirectToRoute('front_job_applications', $request->query->all() + ['openCreateFor' => $applicationId]);
+                }
             }
 
             $this->addFlash('warning', (string) $validation['error']);
+            return $this->redirectToRoute('front_job_applications', $request->query->all() + ['openCreateFor' => $applicationId]);
         }
 
         return $this->render('front/modules/interview_form.html.twig', [
@@ -338,6 +371,7 @@ class FrontPortalController extends AbstractController
             }
 
             $this->addFlash('warning', (string) $validation['error']);
+            return $this->redirectToRoute('front_interviews', $request->query->all() + ['openEditFor' => $id]);
         }
 
         return $this->render('front/modules/interview_form.html.twig', [
@@ -398,60 +432,55 @@ class FrontPortalController extends AbstractController
         $existingFeedback = $this->doctrine->getRepository(Interview_feedback::class)->findBy(['interview_id' => $interview], ['created_at' => 'DESC'], 1);
         $feedback = $existingFeedback[0] ?? null;
 
-        $formData = [
-            'overall_score' => $feedback ? (string) $feedback->getOverall_score() : '80',
-            'decision' => $feedback ? (string) $feedback->getDecision() : 'accepted',
-            'comment' => $feedback ? (string) $feedback->getComment() : '',
-        ];
-
-        if ($request->isMethod('POST')) {
-            $formData = [
-                'overall_score' => (string) $request->request->get('overall_score', '80'),
-                'decision' => (string) $request->request->get('decision', 'accepted'),
-                'comment' => trim((string) $request->request->get('comment', '')),
-            ];
-
-            $score = (int) $formData['overall_score'];
-            $decision = $formData['decision'];
-            $comment = $formData['comment'];
-
-            if ($score < 0 || $score > 100) {
-                $this->addFlash('warning', 'Score must be between 0 and 100.');
-            } elseif (!in_array($decision, ['accepted', 'rejected'], true)) {
-                $this->addFlash('warning', 'Decision must be accepted or rejected.');
-            } elseif ($comment === '') {
-                $this->addFlash('warning', 'Comment is required.');
-            } else {
-                $entityManager = $this->doctrine->getManager();
-                if (!$feedback instanceof Interview_feedback) {
-                    $feedback = new Interview_feedback();
-                    $feedback->setId($this->nextNumericId(Interview_feedback::class));
-                    $feedback->setInterview_id($interview);
-                    $feedback->setRecruiter_id($interview->getRecruiter_id());
-                    $entityManager->persist($feedback);
-                }
-
-                $feedback->setOverall_score($score);
-                $feedback->setDecision($decision);
-                $feedback->setComment($comment);
-                $feedback->setCreated_at(new \DateTime());
-
-                $interview->setStatus('completed');
-                $application = $interview->getApplication_id();
-                $application->setCurrent_status($decision === 'accepted' ? 'accepted' : 'declined');
-
-                $entityManager->flush();
-                $this->addFlash('success', 'Interview review saved.');
-
-                return $this->redirectToRoute('front_interviews', $request->query->all());
-            }
+        if ($request->isMethod('GET')) {
+            return $this->redirectToRoute('front_interviews', $request->query->all() + ['openReviewFor' => $id]);
         }
 
-        return $this->render('front/modules/interview_feedback_form.html.twig', [
-            'authUser' => ['role' => $role],
-            'interviewId' => $id,
-            'formData' => $formData,
-        ]);
+        $formData = [
+            'overall_score' => (string) $request->request->get('overall_score', '80'),
+            'decision' => (string) $request->request->get('decision', 'accepted'),
+            'comment' => trim((string) $request->request->get('comment', '')),
+        ];
+
+        $score = (int) $formData['overall_score'];
+        $decision = $formData['decision'];
+        $comment = $formData['comment'];
+
+        if ($score < 0 || $score > 100) {
+            $this->addFlash('warning', 'Score must be between 0 and 100.');
+            return $this->redirectToRoute('front_interviews', $request->query->all() + ['openReviewFor' => $id]);
+        }
+        if (!in_array($decision, ['accepted', 'rejected'], true)) {
+            $this->addFlash('warning', 'Decision must be accepted or rejected.');
+            return $this->redirectToRoute('front_interviews', $request->query->all() + ['openReviewFor' => $id]);
+        }
+        if ($comment === '') {
+            $this->addFlash('warning', 'Comment is required.');
+            return $this->redirectToRoute('front_interviews', $request->query->all() + ['openReviewFor' => $id]);
+        }
+
+        $entityManager = $this->doctrine->getManager();
+        if (!$feedback instanceof Interview_feedback) {
+            $feedback = new Interview_feedback();
+            $feedback->setId($this->nextNumericId(Interview_feedback::class));
+            $feedback->setInterview_id($interview);
+            $feedback->setRecruiter_id($interview->getRecruiter_id());
+            $entityManager->persist($feedback);
+        }
+
+        $feedback->setOverall_score($score);
+        $feedback->setDecision($decision);
+        $feedback->setComment($comment);
+        $feedback->setCreated_at(new \DateTime());
+
+        $interview->setStatus('completed');
+        $application = $interview->getApplication_id();
+        $application->setCurrent_status($decision === 'accepted' ? 'accepted' : 'declined');
+
+        $entityManager->flush();
+        $this->addFlash('success', 'Interview review saved.');
+
+        return $this->redirectToRoute('front_interviews', $request->query->all());
     }
 
     private function validateInterviewPayload(array $data): array
@@ -522,35 +551,98 @@ class FrontPortalController extends AbstractController
         }
     }
 
-    private function computeCandidateInterviewStatus(Interview $interview): array
+    private function computeCandidateInterviewStatus(Interview $interview, ?Interview_feedback $latestFeedback = null): array
     {
         try {
             $now = new \DateTime();
             $start = $interview->getScheduled_at();
             $end = (clone $start)->modify('+' . $interview->getDuration_minutes() . ' minutes');
-            if ($now < $start) {
-                return ['Upcoming Interview', 'bg-blue-lt'];
+            if (!$latestFeedback instanceof Interview_feedback) {
+                $latestFeedback = $this->findLatestInterviewFeedback($interview);
             }
 
-            $feedback = $this->doctrine->getRepository(Interview_feedback::class)->findBy(['interview_id' => $interview], ['created_at' => 'DESC'], 1);
-            if (!empty($feedback)) {
-                $decision = strtolower((string) $feedback[0]->getDecision());
+            if ($latestFeedback instanceof Interview_feedback) {
+                $decision = strtolower((string) $latestFeedback->getDecision());
                 if ($decision === 'accepted') {
-                    return ['Accepted', 'bg-green-lt'];
+                    return ['Accepted', 'bg-green-lt', 'accepted'];
                 }
 
                 if ($decision === 'rejected') {
-                    return ['Rejected', 'bg-red-lt'];
+                    return ['Rejected', 'bg-red-lt', 'rejected'];
                 }
             }
 
             if ($now >= $end) {
-                return ['Under Review', 'bg-orange-lt'];
+                return ['Under Review', 'bg-orange-lt', 'pending'];
+            }
+
+            return ['Pending', 'bg-blue-lt', 'pending'];
+        } catch (Throwable) {
+        }
+
+        return ['Pending', 'bg-blue-lt', 'pending'];
+    }
+
+    private function computeRecruiterInterviewStatus(Interview $interview, string $normalizedStatus, ?Interview_feedback $latestFeedback = null): array
+    {
+        try {
+            if (!$latestFeedback instanceof Interview_feedback) {
+                $latestFeedback = $this->findLatestInterviewFeedback($interview);
+            }
+
+            if ($latestFeedback instanceof Interview_feedback) {
+                $decision = strtolower((string) $latestFeedback->getDecision());
+                if ($decision === 'accepted') {
+                    return ['Accepted', 'bg-green-lt', 'accepted'];
+                }
+
+                if ($decision === 'rejected') {
+                    return ['Rejected', 'bg-red-lt', 'rejected'];
+                }
+            }
+
+            $endTime = (clone $interview->getScheduled_at())->modify('+' . $interview->getDuration_minutes() . ' minutes');
+            if (new \DateTime() >= $endTime) {
+                return ['Pending', 'bg-orange-lt', 'pending'];
             }
         } catch (Throwable) {
         }
 
-        return ['Under Review', 'bg-orange-lt'];
+        if ($normalizedStatus === 'CANCELLED') {
+            return ['Rejected', 'bg-red-lt', 'rejected'];
+        }
+
+        return ['Scheduled', 'bg-blue-lt', 'scheduled'];
+    }
+
+    private function findLatestInterviewFeedback(Interview $interview): ?Interview_feedback
+    {
+        $rows = $this->doctrine->getRepository(Interview_feedback::class)->findBy(['interview_id' => $interview], ['created_at' => 'DESC'], 1);
+        $latest = $rows[0] ?? null;
+        return $latest instanceof Interview_feedback ? $latest : null;
+    }
+
+    private function normalizeInterviewMode(?string $mode): string
+    {
+        $value = strtolower(trim((string) $mode));
+        if ($value === 'onsite' || $value === 'on_site') {
+            return 'onsite';
+        }
+
+        return 'online';
+    }
+
+    private function hasActiveInterviewForApplication(Job_application $application): bool
+    {
+        $existing = $this->doctrine->getRepository(Interview::class)->findBy(['application_id' => $application], ['id' => 'DESC']);
+        foreach ($existing as $interview) {
+            $status = strtolower(trim((string) $interview->getStatus()));
+            if (!in_array($status, ['cancelled', 'done', 'completed'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function nextNumericId(string $entityClass): string

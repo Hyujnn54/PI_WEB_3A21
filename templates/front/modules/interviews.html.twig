@@ -9,7 +9,7 @@
         <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h2 class="page-title"><i class="ti ti-message-2 me-1"></i>Interviews</h2>
-                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Organize panels, evaluate candidates, and finalize outcomes.' : 'Stay prepared with schedules and decision updates.' }}</p>
+                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Organize panels, evaluate candidates, and finalize outcomes.' : 'Track all interview outcomes and decision progress.' }}</p>
             </div>
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#interviewCalendarModal">Calendar</button>
@@ -17,84 +17,105 @@
         </div>
     </div>
     <div class="page-body">
-        <div class="container-xl">
-            <div class="card tb-admin-card mb-3 tb-filter-bar">
-                <div class="card-body py-2">
-                    <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#interviewCardsGrid">
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                            <input type="text" class="form-control" placeholder="Search interviews by title, date, status..." data-filter-search>
+        <div class="container-xl tb-interviews-page">
+            <div class="row g-3 tb-interviews-layout">
+                <div class="col-12 col-xl-8">
+                    <div class="card tb-admin-card mb-3 tb-filter-bar">
+                        <div class="card-body py-2">
+                            <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#interviewCardsGrid">
+                                <div class="input-icon">
+                                    <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                                    <input type="text" class="form-control" placeholder="Search interviews by title, date, status..." data-filter-search>
+                                </div>
+                                <select class="form-select" style="max-width: 220px;" data-filter-criteria>
+                                    <option value="all">Search In: All</option>
+                                    <option value="title">Title</option>
+                                    <option value="meta">Meta</option>
+                                    <option value="description">Description</option>
+                                    <option value="status">Status</option>
+                                </select>
+                                <select class="form-select" style="max-width: 230px;" data-filter-sort>
+                                    <option value="default">Default Order</option>
+                                    <option value="date_desc">Date Newest</option>
+                                    <option value="date_asc">Date Oldest</option>
+                                    <option value="status_asc">Status A-Z</option>
+                                    <option value="status_desc">Status Z-A</option>
+                                    <option value="title_asc">Title A-Z</option>
+                                    <option value="title_desc">Title Z-A</option>
+                                    <option value="meta_asc">Meta A-Z</option>
+                                    <option value="meta_desc">Meta Z-A</option>
+                                </select>
+                                <div class="small text-secondary ms-auto" data-filter-results></div>
+                            </div>
                         </div>
-                        <select class="form-select" style="max-width: 220px;" data-filter-criteria>
-                            <option value="all">Search In: All</option>
-                            <option value="title">Title</option>
-                            <option value="meta">Meta</option>
-                            <option value="description">Description</option>
-                        </select>
-                        <select class="form-select" style="max-width: 230px;" data-filter-sort>
-                            <option value="default">Default Order</option>
-                            <option value="title_asc">Title A-Z</option>
-                            <option value="title_desc">Title Z-A</option>
-                            <option value="meta_asc">Meta A-Z</option>
-                            <option value="meta_desc">Meta Z-A</option>
-                        </select>
-                        <div class="small text-secondary ms-auto" data-filter-results></div>
+                    </div>
+
+                    <div id="interviewCardsGrid" class="row row-cards">
+                        {% for card in cards %}
+                            <div class="{{ role == 'candidate' ? 'col-12' : 'col-md-6 col-xl-4' }} tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text ~ ' ' ~ card.status_label)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-filter-status="{{ card.status_label|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}" data-sort-status="{{ card.status_sort|default(card.status_label|lower) }}" data-sort-date="{{ card.scheduled_ts|default('0') }}">
+                                <div class="tb-module-card h-100 {{ role == 'candidate' ? 'tb-candidate-card tb-status-' ~ card.status_key|default('pending') : '' }}" data-interview-id="{{ card.id }}" data-edit-url="{{ card.edit_url }}" data-edit-scheduled-at="{{ card.form_scheduled_at }}" data-edit-duration="{{ card.form_duration_minutes }}" data-edit-mode="{{ card.form_mode }}" data-edit-meeting-link="{{ card.form_meeting_link|e('html_attr') }}" data-edit-location="{{ card.form_location|e('html_attr') }}" data-edit-notes="{{ card.full_notes|e('html_attr') }}" data-review-score="{{ card.review_score|default('80') }}" data-review-decision="{{ card.review_decision|default('accepted') }}" data-review-comment="{{ card.review_comment|default('')|e('html_attr') }}" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-detail-extra="{{ card.detail_extra|join('||')|e('html_attr') }}" data-action-primary="Modify" data-action-primary-href="#" data-action-primary-disabled="{{ card.can_modify ? '0' : '1' }}" data-action-secondary="Delete" data-action-secondary-href="{{ card.delete_url }}" data-action-secondary-disabled="{{ card.can_modify ? '0' : '1' }}" data-action-tertiary="{{ card.review_label|default('Review') }}" data-action-tertiary-href="{{ card.feedback_url }}" data-action-tertiary-disabled="{{ card.can_feedback ? '0' : '1' }}">
+                                    <div class="d-flex align-items-start justify-content-between gap-2">
+                                        <div class="tb-module-meta mb-0">{{ card.meta }}</div>
+                                        <span class="badge tb-interview-status tb-status-anchor {{ card.status_class|default('bg-blue-lt') }}">{{ card.status_label|default('Pending') }}</span>
+                                    </div>
+                                    <h3>{{ card.title }}</h3>
+                                    <p>{{ card.text }}</p>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="col-12">
+                                <div class="card tb-admin-card">
+                                    <div class="card-body text-secondary">No interviews found in the database.</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-4">
+                    <div id="interviewDetailPanel" class="card tb-detail-panel tb-detail-panel-side">
+                        <div class="card-header">
+                            <div>
+                                <div class="small text-secondary tb-detail-meta"></div>
+                                <h3 class="card-title mb-0 tb-detail-title">Interview Details</h3>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-3 tb-detail-text">Select an interview card to display details here.</p>
+                            <div class="tb-detail-extra small text-secondary mb-0"></div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div id="interviewCardsGrid" class="row row-cards">
-                {% for card in cards %}
-                    <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-detail-extra="{{ card.detail_extra|join('||')|e('html_attr') }}" data-action-primary="Modify" data-action-primary-href="{{ card.edit_url }}" data-action-primary-disabled="{{ card.can_modify ? '0' : '1' }}" data-action-secondary="Delete" data-action-secondary-href="{{ card.delete_url }}" data-action-secondary-disabled="{{ card.can_modify ? '0' : '1' }}" data-action-tertiary="Review" data-action-tertiary-href="{{ card.feedback_url }}" data-action-tertiary-disabled="{{ card.can_feedback ? '0' : '1' }}">
-                            <div class="tb-module-meta">{{ card.meta }}</div>
-                            <h3>{{ card.title }}</h3>
-                            <p>{{ card.text }}</p>
-                            <div class="mt-2"><span class="badge {{ card.status_class|default('bg-blue-lt') }}">{{ card.status_label|default('Scheduled') }}</span></div>
+            {% if role == 'recruiter' %}
+                <div id="interviewActionDock" class="tb-interview-action-dock d-none">
+                    <div class="container-xl">
+                        <div class="tb-interview-action-dock-inner">
+                            <div class="small text-secondary">Selected interview actions</div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <a href="#" class="btn btn-primary tb-dock-primary tb-detail-primary"><i class="ti ti-edit me-1"></i>Modify</a>
+                                <form method="post" action="#" class="d-inline tb-dock-delete-form">
+                                    <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Delete</button>
+                                </form>
+                                <a href="#" class="btn btn-outline-primary tb-dock-tertiary tb-open-review-modal"><i class="ti ti-message-2-check me-1"></i>Review</a>
+                            </div>
                         </div>
                     </div>
-                {% else %}
-                    <div class="col-12">
-                        <div class="card tb-admin-card">
-                            <div class="card-body text-secondary">No interviews found in the database.</div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-
-            <div id="interviewDetailPanel" class="card tb-detail-panel mt-4 d-none">
-                <div class="card-header">
-                    <div>
-                        <div class="small text-secondary tb-detail-meta"></div>
-                        <h3 class="card-title mb-0 tb-detail-title">Interview Details</h3>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary tb-detail-close tb-detail-close-icon ms-auto" aria-label="Close details panel"><i class="ti ti-x"></i></button>
                 </div>
-                <div class="card-body">
-                    <p class="mb-3 tb-detail-text">Select an interview card to open detailed actions and workflow controls.</p>
-                    <div class="tb-detail-extra small text-secondary mb-3"></div>
-                    {% if role == 'recruiter' %}
-                        <div class="d-flex flex-wrap gap-2">
-                            <a href="#" class="btn btn-primary tb-detail-primary">Modify</a>
-                            <form id="tbDeleteInterviewForm" method="post" action="#" class="d-inline">
-                                <button type="submit" class="btn btn-outline-danger tb-detail-secondary">Delete</button>
-                            </form>
-                            <a href="#" class="btn btn-outline-primary tb-detail-tertiary">Review</a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+            {% endif %}
 
             <div class="modal fade" id="interviewCalendarModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                     <div class="modal-content tb-admin-card">
                         <div class="modal-header">
-                            <h5 class="modal-title"><i class="ti ti-calendar-event me-1"></i>Upcoming Interviews Calendar</h5>
+                            <h5 class="modal-title"><i class="ti ti-calendar-event me-1"></i>Interviews Calendar</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
                             <div class="tb-calendar" id="tbInterviewCalendar" data-events='{{ upcomingInterviews|json_encode|e('html_attr') }}'></div>
-                            <div class="small text-secondary mt-3">Highlighted dates contain upcoming interviews.</div>
+                            <div id="tbCalendarDayDetails" class="tb-calendar-day-details mt-3"></div>
+                            <div class="small text-secondary mt-3">Highlighted dates contain interviews from your current list.</div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
@@ -102,13 +123,97 @@
                     </div>
                 </div>
             </div>
+
+            {% if role == 'recruiter' %}
+                <div class="modal fade" id="editInterviewModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content tb-admin-card">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="ti ti-edit me-1"></i>Modify Interview</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form id="editInterviewForm" method="post">
+                                <div class="modal-body row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Scheduled At</label>
+                                        <input type="datetime-local" name="scheduled_at" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Duration</label>
+                                        <input type="number" min="15" max="240" name="duration_minutes" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Mode</label>
+                                        <select name="mode" class="form-select" required>
+                                            <option value="online">Online</option>
+                                            <option value="onsite">Onsite</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6" data-online-field>
+                                        <label class="form-label">Meeting Link (online)</label>
+                                        <input type="url" name="meeting_link" class="form-control" placeholder="https://...">
+                                    </div>
+                                    <div class="col-md-6" data-onsite-field>
+                                        <label class="form-label">Room (onsite)</label>
+                                        <input type="text" name="location" class="form-control" placeholder="Room / Office location">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Additional Notes</label>
+                                        <textarea name="notes" rows="3" class="form-control"></textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Confirm</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="reviewInterviewModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content tb-admin-card">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="ti ti-message-2-check me-1"></i>Interview Review</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form id="reviewInterviewForm" method="post">
+                                <div class="modal-body row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Overall Score</label>
+                                        <input type="number" name="overall_score" min="0" max="100" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label">Decision</label>
+                                        <select name="decision" class="form-select" required>
+                                            <option value="accepted">Accepted</option>
+                                            <option value="rejected">Rejected</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Comment</label>
+                                        <textarea name="comment" rows="4" class="form-control" required></textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Review</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const params = new URLSearchParams(window.location.search);
         const calendarRoot = document.getElementById('tbInterviewCalendar');
+        const dayDetails = document.getElementById('tbCalendarDayDetails');
         if (calendarRoot) {
             const raw = calendarRoot.getAttribute('data-events') || '[]';
             let events = [];
@@ -121,14 +226,14 @@
             const monthEnd = new Date(year, month + 1, 0);
             const firstDay = (monthStart.getDay() + 6) % 7;
             const totalDays = monthEnd.getDate();
-            const eventDays = new Set(events.map(function (e) {
-                const parts = String(e.date || '').split(' ')[0].split('-');
-                if (parts.length === 3) {
-                    return new Date(parts[0], Number(parts[1]) - 1, parts[2]).toDateString();
-                }
-                const d = new Date(e.timestamp * 1000);
-                return d.toDateString();
-            }));
+            const eventsByDay = {};
+            events.forEach(function (e) {
+                const dateObj = e.ymd ? new Date(e.ymd + 'T00:00:00') : new Date(e.timestamp * 1000);
+                const key = dateObj.toDateString();
+                if (!eventsByDay[key]) eventsByDay[key] = [];
+                eventsByDay[key].push(e);
+            });
+            const eventDays = new Set(Object.keys(eventsByDay));
 
             const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
             const monthName = monthStart.toLocaleString('en-US', { month: 'long', year: 'numeric' });
@@ -144,10 +249,197 @@
                 const date = new Date(year, month, d);
                 const key = date.toDateString();
                 const hasEvent = eventDays.has(key);
-                html += '<div class="tb-calendar-cell ' + (hasEvent ? 'tb-has-event' : '') + '">' + d + (hasEvent ? '<span class="tb-dot"></span>' : '') + '</div>';
+                html += '<button type="button" class="tb-calendar-cell ' + (hasEvent ? 'tb-has-event' : '') + '" data-calendar-date="' + key + '">' + d + (hasEvent ? '<span class="tb-dot"></span>' : '') + '</button>';
             }
             html += '</div>';
             calendarRoot.innerHTML = html;
+
+            const renderDayDetails = function (key) {
+                if (!dayDetails) return;
+                const dayEvents = eventsByDay[key] || [];
+                if (dayEvents.length === 0) {
+                    dayDetails.innerHTML = '<div class="text-secondary small">No interviews on selected date.</div>';
+                    return;
+                }
+
+                let block = '<div class="tb-calendar-day-title">Interviews on ' + key + '</div>';
+                dayEvents.forEach(function (e) {
+                    block += '<div class="tb-calendar-event-item"><div><strong>' + e.title + '</strong></div><div class="small text-secondary">' + e.date + ' | ' + e.mode + ' | ' + e.status + ' | ' + (e.location || 'N/A') + '</div></div>';
+                });
+                dayDetails.innerHTML = block;
+            };
+
+            calendarRoot.querySelectorAll('[data-calendar-date]').forEach(function (cell) {
+                cell.addEventListener('click', function () {
+                    calendarRoot.querySelectorAll('.tb-calendar-cell.is-selected').forEach(function (c) { c.classList.remove('is-selected'); });
+                    cell.classList.add('is-selected');
+                    renderDayDetails(cell.getAttribute('data-calendar-date'));
+                });
+            });
+
+            const firstEventKey = Object.keys(eventsByDay)[0];
+            if (firstEventKey) {
+                const firstCell = calendarRoot.querySelector('[data-calendar-date="' + firstEventKey + '"]');
+                if (firstCell) firstCell.classList.add('is-selected');
+                renderDayDetails(firstEventKey);
+            } else {
+                renderDayDetails('');
+            }
+        }
+
+        const now = new Date();
+        const minValue = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
+        const editModalEl = document.getElementById('editInterviewModal');
+        const editForm = document.getElementById('editInterviewForm');
+        if (editModalEl && editForm && typeof bootstrap !== 'undefined') {
+            const editModal = new bootstrap.Modal(editModalEl);
+            const modeSelect = editForm.querySelector('select[name="mode"]');
+            const scheduleInput = editForm.querySelector('input[name="scheduled_at"]');
+            const meetingInput = editForm.querySelector('input[name="meeting_link"]');
+            const locationInput = editForm.querySelector('input[name="location"]');
+            const onlineField = editForm.querySelector('[data-online-field]');
+            const onsiteField = editForm.querySelector('[data-onsite-field]');
+
+            if (scheduleInput) scheduleInput.min = minValue;
+
+            const applyModeFields = function () {
+                const mode = modeSelect ? modeSelect.value : 'online';
+                if (mode === 'onsite') {
+                    if (onlineField) onlineField.classList.add('d-none');
+                    if (onsiteField) onsiteField.classList.remove('d-none');
+                    if (meetingInput) { meetingInput.required = false; }
+                    if (locationInput) { locationInput.required = true; }
+                } else {
+                    if (onsiteField) onsiteField.classList.add('d-none');
+                    if (onlineField) onlineField.classList.remove('d-none');
+                    if (locationInput) { locationInput.required = false; }
+                    if (meetingInput) { meetingInput.required = true; }
+                }
+            };
+
+            if (modeSelect) modeSelect.addEventListener('change', applyModeFields);
+
+            const openEditModalForCard = function (card) {
+                if (!card) return;
+                editForm.setAttribute('action', card.getAttribute('data-edit-url') || '#');
+                const scheduledAt = card.getAttribute('data-edit-scheduled-at') || '';
+                const duration = card.getAttribute('data-edit-duration') || '60';
+                const mode = card.getAttribute('data-edit-mode') || 'online';
+                const meetingLink = card.getAttribute('data-edit-meeting-link') || '';
+                const location = card.getAttribute('data-edit-location') || '';
+                const notes = card.getAttribute('data-edit-notes') || '';
+
+                const durationInput = editForm.querySelector('input[name="duration_minutes"]');
+                const notesInput = editForm.querySelector('textarea[name="notes"]');
+
+                if (scheduleInput) scheduleInput.value = scheduledAt;
+                if (durationInput) durationInput.value = duration;
+                if (modeSelect) modeSelect.value = mode;
+                if (meetingInput) meetingInput.value = meetingLink;
+                if (locationInput) locationInput.value = location;
+                if (notesInput) notesInput.value = notes;
+                applyModeFields();
+                editModal.show();
+            };
+
+            const modifyBtn = document.querySelector('.tb-detail-primary');
+            if (modifyBtn) {
+                modifyBtn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    if (modifyBtn.classList.contains('disabled')) return;
+                    const card = document.querySelector('.tb-module-card.is-selected');
+                    openEditModalForCard(card);
+                });
+            }
+
+            const openEditFor = params.get('openEditFor');
+            if (openEditFor) {
+                const card = document.querySelector('.tb-module-card[data-interview-id="' + openEditFor + '"]');
+                if (card) openEditModalForCard(card);
+            }
+        }
+
+        const reviewModalEl = document.getElementById('reviewInterviewModal');
+        const reviewForm = document.getElementById('reviewInterviewForm');
+        if (reviewModalEl && reviewForm && typeof bootstrap !== 'undefined') {
+            const reviewModal = new bootstrap.Modal(reviewModalEl);
+            const reviewScore = reviewForm.querySelector('input[name="overall_score"]');
+            const reviewDecision = reviewForm.querySelector('select[name="decision"]');
+            const reviewComment = reviewForm.querySelector('textarea[name="comment"]');
+
+            const openReviewModalForCard = function (card) {
+                if (!card) return;
+                const actionUrl = card.getAttribute('data-action-tertiary-href') || '#';
+                reviewForm.setAttribute('action', actionUrl);
+                if (reviewScore) reviewScore.value = card.getAttribute('data-review-score') || '80';
+                if (reviewDecision) reviewDecision.value = card.getAttribute('data-review-decision') || 'accepted';
+                if (reviewComment) reviewComment.value = card.getAttribute('data-review-comment') || '';
+                reviewModal.show();
+            };
+
+            const reviewBtn = document.querySelector('.tb-open-review-modal');
+            if (reviewBtn) {
+                reviewBtn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    if (reviewBtn.classList.contains('disabled')) return;
+                    const card = document.querySelector('.tb-module-card.is-selected');
+                    openReviewModalForCard(card);
+                });
+            }
+
+            const openReviewFor = params.get('openReviewFor');
+            if (openReviewFor) {
+                const card = document.querySelector('.tb-module-card[data-interview-id="' + openReviewFor + '"]');
+                if (card) openReviewModalForCard(card);
+            }
+        }
+
+        const actionDock = document.getElementById('interviewActionDock');
+        if (actionDock) {
+            const dockPrimary = actionDock.querySelector('.tb-dock-primary');
+            const dockSecondary = actionDock.querySelector('.tb-dock-secondary');
+            const dockTertiary = actionDock.querySelector('.tb-dock-tertiary');
+            const dockDeleteForm = actionDock.querySelector('.tb-dock-delete-form');
+
+            const syncDockWithCard = function (card) {
+                if (!card) {
+                    actionDock.classList.add('d-none');
+                    return;
+                }
+
+                actionDock.classList.remove('d-none');
+
+                if (dockPrimary) {
+                    dockPrimary.textContent = card.getAttribute('data-action-primary') || 'Modify';
+                    dockPrimary.insertAdjacentHTML('afterbegin', '<i class="ti ti-edit me-1"></i>');
+                    dockPrimary.setAttribute('href', card.getAttribute('data-action-primary-href') || '#');
+                    const isDisabled = card.getAttribute('data-action-primary-disabled') === '1';
+                    dockPrimary.classList.toggle('disabled', isDisabled);
+                    dockPrimary.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
+                }
+
+                if (dockSecondary && dockDeleteForm) {
+                    dockDeleteForm.setAttribute('action', card.getAttribute('data-action-secondary-href') || '#');
+                    const isDisabled = card.getAttribute('data-action-secondary-disabled') === '1';
+                    dockSecondary.toggleAttribute('disabled', isDisabled);
+                }
+
+                if (dockTertiary) {
+                    dockTertiary.textContent = card.getAttribute('data-action-tertiary') || 'Review';
+                    dockTertiary.insertAdjacentHTML('afterbegin', '<i class="ti ti-message-2-check me-1"></i>');
+                    dockTertiary.setAttribute('href', card.getAttribute('data-action-tertiary-href') || '#');
+                    const isDisabled = card.getAttribute('data-action-tertiary-disabled') === '1';
+                    dockTertiary.classList.toggle('disabled', isDisabled);
+                    dockTertiary.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
+                }
+            };
+
+            document.querySelectorAll('#interviewCardsGrid .tb-module-card').forEach(function (card) {
+                card.addEventListener('click', function () {
+                    setTimeout(function () { syncDockWithCard(card); }, 0);
+                });
+            });
         }
 
     });

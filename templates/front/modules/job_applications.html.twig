@@ -59,7 +59,7 @@
                                     <form method="post" action="{{ card.decline_url }}">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Decline</button>
                                     </form>
-                                    <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal" data-create-url="{{ card.create_interview_url }}">Create Interview</button>
+                                    <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal" data-application-id="{{ card.id }}" data-create-url="{{ card.create_interview_url }}">Create Interview</button>
                                 </div>
                             {% endif %}
                         </div>
@@ -150,10 +150,17 @@
 
         const modal = new bootstrap.Modal(modalEl);
         const modeSelect = formEl.querySelector('select[name="mode"]');
+        const scheduleInput = formEl.querySelector('input[name="scheduled_at"]');
         const meetingInput = formEl.querySelector('input[name="meeting_link"]');
         const locationInput = formEl.querySelector('input[name="location"]');
         const onlineField = formEl.querySelector('[data-online-field]');
         const onsiteField = formEl.querySelector('[data-onsite-field]');
+
+        const now = new Date();
+        const minValue = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        if (scheduleInput) {
+            scheduleInput.min = minValue;
+        }
 
         const applyModeFields = function () {
             const mode = modeSelect ? modeSelect.value : 'online';
@@ -180,16 +187,31 @@
             modeSelect.addEventListener('change', applyModeFields);
         }
 
+        const openCreateModalForBtn = function (btn) {
+            if (!btn) return;
+            const createUrl = btn.getAttribute('data-create-url');
+            if (!createUrl) return;
+            formEl.setAttribute('action', createUrl);
+            if (modeSelect) modeSelect.value = 'online';
+            if (scheduleInput) scheduleInput.min = minValue;
+            applyModeFields();
+            modal.show();
+        };
+
         document.querySelectorAll('.tb-open-interview-modal').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                const createUrl = btn.getAttribute('data-create-url');
-                if (!createUrl) return;
-                formEl.setAttribute('action', createUrl);
-                if (modeSelect) modeSelect.value = 'online';
-                applyModeFields();
-                modal.show();
+                openCreateModalForBtn(btn);
             });
         });
+
+        const params = new URLSearchParams(window.location.search);
+        const openCreateFor = params.get('openCreateFor');
+        if (openCreateFor) {
+            const btn = document.querySelector('.tb-open-interview-modal[data-application-id="' + openCreateFor + '"]');
+            if (btn) {
+                openCreateModalForBtn(btn);
+            }
+        }
 
         applyModeFields();
     });

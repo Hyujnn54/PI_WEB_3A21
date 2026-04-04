@@ -129,6 +129,8 @@
                             haystack = (item.dataset.filterMeta || '').toLowerCase();
                         } else if (criteria === 'description') {
                             haystack = (item.dataset.filterDescription || '').toLowerCase();
+                        } else if (criteria === 'status') {
+                            haystack = (item.dataset.filterStatus || '').toLowerCase();
                         }
 
                         const isMatch = query === '' || haystack.includes(query);
@@ -150,6 +152,18 @@
                         }
                         if (sortMode === 'meta_desc') {
                             return (b.dataset.sortMeta || '').localeCompare((a.dataset.sortMeta || ''));
+                        }
+                        if (sortMode === 'date_asc') {
+                            return Number(a.dataset.sortDate || 0) - Number(b.dataset.sortDate || 0);
+                        }
+                        if (sortMode === 'date_desc') {
+                            return Number(b.dataset.sortDate || 0) - Number(a.dataset.sortDate || 0);
+                        }
+                        if (sortMode === 'status_asc') {
+                            return (a.dataset.sortStatus || '').localeCompare((b.dataset.sortStatus || ''));
+                        }
+                        if (sortMode === 'status_desc') {
+                            return (b.dataset.sortStatus || '').localeCompare((a.dataset.sortStatus || ''));
                         }
 
                         return Number(a.dataset.originalIndex || 0) - Number(b.dataset.originalIndex || 0);
