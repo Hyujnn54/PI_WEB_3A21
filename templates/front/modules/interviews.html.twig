@@ -19,6 +19,31 @@
     </div>
     <div class="page-body">
         <div class="container-xl">
+            <div class="card tb-admin-card mb-3">
+                <div class="card-header"><h3 class="card-title"><i class="ti ti-calendar-event me-1"></i>Upcoming Interviews Calendar</h3></div>
+                <div class="card-body">
+                    {% if upcomingInterviews is not empty %}
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead><tr><th>Date & Time</th><th>Interview</th><th>Mode</th><th>Status</th></tr></thead>
+                                <tbody>
+                                {% for item in upcomingInterviews %}
+                                    <tr>
+                                        <td>{{ item.date }}</td>
+                                        <td>{{ item.title }}</td>
+                                        <td>{{ item.mode }}</td>
+                                        <td><span class="badge bg-blue-lt">{{ item.status }}</span></td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-secondary mb-0">No upcoming interviews currently scheduled.</p>
+                    {% endif %}
+                </div>
+            </div>
+
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
                     <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#interviewCardsGrid">
@@ -47,7 +72,7 @@
             <div id="interviewCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'Prepare Interview' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Notes' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Check Results' }}">
+                        <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-detail-extra="{{ card.detail_extra|join('||')|e('html_attr') }}" data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'Prepare Interview' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Notes' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Check Results' }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
@@ -82,6 +107,7 @@
                 </div>
                 <div class="card-body">
                     <p class="mb-3 tb-detail-text">Select an interview card to open detailed actions and workflow controls.</p>
+                    <ul class="tb-detail-extra small text-secondary mb-3"></ul>
                     <div class="d-flex flex-wrap gap-2">
                         <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
                         <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>

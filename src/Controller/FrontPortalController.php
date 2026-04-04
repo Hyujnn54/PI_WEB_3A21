@@ -135,15 +135,23 @@ class FrontPortalController extends AbstractController
         }
 
         $cards = [];
+        $upcomingInterviews = [];
         foreach ($interviews as $interview) {
             try {
                 $application = $interview->getApplication_id();
                 $offer = $application->getOffer_id();
+                $candidate = $application->getCandidate_id();
 
                 $scheduledAt = $interview->getScheduled_at();
                 $status = (string) $interview->getStatus();
                 $title = (string) $offer->getTitle();
                 $notes = trim((string) $interview->getNotes());
+                $mode = (string) $interview->getMode();
+                $duration = (string) $interview->getDuration_minutes();
+                $location = trim((string) $interview->getLocation());
+                $meetingLink = trim((string) $interview->getMeeting_link());
+                $applicationId = (string) $application->getId();
+                $candidateId = (string) $candidate->getUser_id();
 
                 $displayStatus = $status;
                 $statusClass = 'bg-blue-lt';
@@ -161,6 +169,16 @@ class FrontPortalController extends AbstractController
                     'meta' => sprintf('%s | %s', $scheduledAt->format('d M Y | H:i'), $status === '' ? 'Pending' : $status),
                     'title' => sprintf('Interview: %s', $title === '' ? 'Untitled offer' : $title),
                     'text' => $notes === '' ? 'No interview notes available yet.' : substr($notes, 0, 190),
+                    'detail_extra' => [
+                        'Date & Time: ' . $scheduledAt->format('d M Y H:i'),
+                        'Duration: ' . $duration . ' min',
+                        'Mode: ' . strtoupper($mode),
+                        'Location: ' . ($location === '' ? 'N/A' : $location),
+                        'Meeting Link: ' . ($meetingLink === '' ? 'N/A' : $meetingLink),
+                        'Application ID: #' . $applicationId,
+                        'Candidate ID: ' . $candidateId,
+                        'Status: ' . $displayStatus,
+                    ],
                     'status_label' => $displayStatus,
                     'status_class' => $statusClass,
                     'can_modify' => $canModify,
@@ -169,15 +187,29 @@ class FrontPortalController extends AbstractController
                     'delete_url' => $deleteUrl,
                     'feedback_url' => $feedbackUrl,
                 ];
+
+                if ($scheduledAt > new \DateTimeImmutable()) {
+                    $upcomingInterviews[] = [
+                        'timestamp' => $scheduledAt->getTimestamp(),
+                        'date' => $scheduledAt->format('d M Y H:i'),
+                        'title' => $title === '' ? 'Untitled offer' : $title,
+                        'mode' => strtoupper($mode),
+                        'status' => $displayStatus,
+                    ];
+                }
             } catch (Throwable) {
                 // Skip malformed rows so one broken interview does not break the page.
                 continue;
             }
         }
 
+        usort($upcomingInterviews, static fn (array $a, array $b): int => $a['timestamp'] <=> $b['timestamp']);
+        $upcomingInterviews = array_slice($upcomingInterviews, 0, 8);
+
         return $this->render('front/modules/interviews.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
+            'upcomingInterviews' => $upcomingInterviews,
         ]);
     }
 

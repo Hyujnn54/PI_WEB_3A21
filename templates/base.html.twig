@@ -31,6 +31,8 @@
         {% set currentRole = queryRole in ['candidate', 'recruiter'] ? queryRole : 'candidate' %}
         {% set routeName = app.request.attributes.get('_route') %}
         {% set isAdminPage = routeName starts with 'management_' or routeName == 'back_dashboard' %}
+        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status'] %}
+        {% set roleSwitchRoute = routeName in unsafeRoleRoutes ? 'front_interviews' : routeName %}
         <div class="page tb-page-shell">
             <header class="navbar navbar-expand-md navbar-light d-print-none tb-topbar">
                 <div class="container-xl">
@@ -57,8 +59,8 @@
                     </div>
                     <div class="navbar-nav flex-row order-md-last">
                         <div class="btn-list me-2">
-                            <a class="btn btn-sm {{ currentRole == 'candidate' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({role: 'candidate'})) }}">Candidate</a>
-                            <a class="btn btn-sm {{ currentRole == 'recruiter' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({role: 'recruiter'})) }}">Recruiter</a>
+                            <a class="btn btn-sm {{ currentRole == 'candidate' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(roleSwitchRoute, app.request.query.all|merge({role: 'candidate'})) }}">Candidate</a>
+                            <a class="btn btn-sm {{ currentRole == 'recruiter' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(roleSwitchRoute, app.request.query.all|merge({role: 'recruiter'})) }}">Recruiter</a>
                         </div>
                         <div class="nav-item d-none d-md-flex me-2">
                             {% if isAdminPage %}
@@ -211,6 +213,7 @@
                             const meta = panel.querySelector('.tb-detail-meta');
                             const title = panel.querySelector('.tb-detail-title');
                             const text = panel.querySelector('.tb-detail-text');
+                            const extra = panel.querySelector('.tb-detail-extra');
                             const primary = panel.querySelector('.tb-detail-primary');
                             const secondary = panel.querySelector('.tb-detail-secondary');
                             const tertiary = panel.querySelector('.tb-detail-tertiary');
@@ -218,6 +221,16 @@
                             if (meta) meta.textContent = card.getAttribute('data-detail-meta') || '';
                             if (title) title.textContent = card.getAttribute('data-detail-title') || 'Details';
                             if (text) text.textContent = card.getAttribute('data-detail-text') || '';
+
+                            if (extra) {
+                                const rawExtra = card.getAttribute('data-detail-extra') || '';
+                                extra.innerHTML = '';
+                                rawExtra.split('||').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (line) {
+                                    const li = document.createElement('li');
+                                    li.textContent = line;
+                                    extra.appendChild(li);
+                                });
+                            }
 
                             if (primary) {
                                 primary.textContent = card.getAttribute('data-action-primary') || 'Primary Action';
