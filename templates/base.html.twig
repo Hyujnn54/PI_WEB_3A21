@@ -45,6 +45,13 @@
                             <a class="btn btn-sm {{ currentRole == 'recruiter' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({role: 'recruiter'})) }}">Recruiter</a>
                         </div>
                         <div class="nav-item d-none d-md-flex me-2">
+                            {% if isAdminPage %}
+                                <a class="btn btn-sm btn-dark" href="{{ path('front_home', {role: currentRole}) }}">Front Portal</a>
+                            {% else %}
+                                <a class="btn btn-sm btn-dark" href="{{ path('back_dashboard') }}">Admin Panel</a>
+                            {% endif %}
+                        </div>
+                        <div class="nav-item d-none d-md-flex me-2">
                             <a class="btn btn-sm btn-outline-primary" href="{{ path('app_login') }}">Login</a>
                         </div>
                         <div class="nav-item d-none d-md-flex me-2">
