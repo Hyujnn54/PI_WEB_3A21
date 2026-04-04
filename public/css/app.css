@@ -353,6 +353,11 @@
     z-index: 1205;
 }
 
+.tb-interview-action-dock .container-xl {
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
 .tb-interview-action-dock-inner {
     display: flex;
     justify-content: space-between;
@@ -364,6 +369,19 @@
     backdrop-filter: blur(6px);
     box-shadow: 0 14px 30px rgba(16, 47, 94, 0.22);
     padding: 0.7rem 0.9rem;
+}
+
+.tb-interview-action-buttons {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    padding-bottom: 2px;
+}
+
+.tb-interview-action-buttons .btn,
+.tb-interview-action-buttons form {
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 /* Layering: page (base) < details panel (1100) < bars (1200+) < popups (1300+) */
@@ -384,8 +402,8 @@
 
 @media (max-width: 767px) {
     .tb-interview-action-dock-inner {
-        flex-direction: column;
-        align-items: stretch;
+        flex-direction: row;
+        align-items: center;
     }
 }
 
