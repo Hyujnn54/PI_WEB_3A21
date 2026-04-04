@@ -12,7 +12,6 @@
                 <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Organize panels, evaluate candidates, and finalize outcomes.' : 'Stay prepared with schedules and decision updates.' }}</p>
             </div>
             <div class="d-flex gap-2">
-                <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Interview Board' : 'Upcoming Slots' }}</a>
                 <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#interviewCalendarModal">Calendar</button>
             </div>
         </div>
@@ -47,20 +46,11 @@
             <div id="interviewCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-detail-extra="{{ card.detail_extra|join('||')|e('html_attr') }}" data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'Prepare Interview' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Notes' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Check Results' }}">
+                        <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-detail-extra="{{ card.detail_extra|join('||')|e('html_attr') }}" data-action-primary="Modify" data-action-primary-href="{{ card.edit_url }}" data-action-primary-disabled="{{ card.can_modify ? '0' : '1' }}" data-action-secondary="Delete" data-action-secondary-href="{{ card.delete_url }}" data-action-secondary-disabled="{{ card.can_modify ? '0' : '1' }}" data-action-tertiary="Review" data-action-tertiary-href="{{ card.feedback_url }}" data-action-tertiary-disabled="{{ card.can_feedback ? '0' : '1' }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
                             <div class="mt-2"><span class="badge {{ card.status_class|default('bg-blue-lt') }}">{{ card.status_label|default('Scheduled') }}</span></div>
-                            {% if role == 'recruiter' %}
-                                <div class="d-flex flex-wrap gap-2 mt-3">
-                                    <a href="{{ card.edit_url }}" class="btn btn-sm btn-outline-primary {{ not card.can_modify ? 'disabled' : '' }}">Modify</a>
-                                    <form method="post" action="{{ card.delete_url }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" {{ not card.can_modify ? 'disabled' : '' }}>Delete</button>
-                                    </form>
-                                    <a href="{{ card.feedback_url }}" class="btn btn-sm btn-primary {{ not card.can_feedback ? 'disabled' : '' }}">Review</a>
-                                </div>
-                            {% endif %}
                         </div>
                     </div>
                 {% else %}
@@ -82,12 +72,16 @@
                 </div>
                 <div class="card-body">
                     <p class="mb-3 tb-detail-text">Select an interview card to open detailed actions and workflow controls.</p>
-                    <ul class="tb-detail-extra small text-secondary mb-3"></ul>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
-                        <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
-                        <a href="#" class="btn btn-outline-secondary tb-detail-tertiary">Tertiary Action</a>
-                    </div>
+                    <div class="tb-detail-extra small text-secondary mb-3"></div>
+                    {% if role == 'recruiter' %}
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="#" class="btn btn-primary tb-detail-primary">Modify</a>
+                            <form id="tbDeleteInterviewForm" method="post" action="#" class="d-inline">
+                                <button type="submit" class="btn btn-outline-danger tb-detail-secondary">Delete</button>
+                            </form>
+                            <a href="#" class="btn btn-outline-primary tb-detail-tertiary">Review</a>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -99,25 +93,8 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
-                            {% if upcomingInterviews is not empty %}
-                                <div class="table-responsive">
-                                    <table class="table table-vcenter card-table">
-                                        <thead><tr><th>Date & Time</th><th>Interview</th><th>Mode</th><th>Status</th></tr></thead>
-                                        <tbody>
-                                        {% for item in upcomingInterviews %}
-                                            <tr>
-                                                <td>{{ item.date }}</td>
-                                                <td>{{ item.title }}</td>
-                                                <td>{{ item.mode }}</td>
-                                                <td><span class="badge bg-blue-lt">{{ item.status }}</span></td>
-                                            </tr>
-                                        {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            {% else %}
-                                <p class="text-secondary mb-0">No upcoming interviews currently scheduled.</p>
-                            {% endif %}
+                            <div class="tb-calendar" id="tbInterviewCalendar" data-events='{{ upcomingInterviews|json_encode|e('html_attr') }}'></div>
+                            <div class="small text-secondary mt-3">Highlighted dates contain upcoming interviews.</div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
@@ -128,4 +105,51 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const calendarRoot = document.getElementById('tbInterviewCalendar');
+        if (calendarRoot) {
+            const raw = calendarRoot.getAttribute('data-events') || '[]';
+            let events = [];
+            try { events = JSON.parse(raw); } catch (e) { events = []; }
+
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth();
+            const monthStart = new Date(year, month, 1);
+            const monthEnd = new Date(year, month + 1, 0);
+            const firstDay = (monthStart.getDay() + 6) % 7;
+            const totalDays = monthEnd.getDate();
+            const eventDays = new Set(events.map(function (e) {
+                const parts = String(e.date || '').split(' ')[0].split('-');
+                if (parts.length === 3) {
+                    return new Date(parts[0], Number(parts[1]) - 1, parts[2]).toDateString();
+                }
+                const d = new Date(e.timestamp * 1000);
+                return d.toDateString();
+            }));
+
+            const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const monthName = monthStart.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+            let html = '<div class="tb-calendar-title">' + monthName + '</div><div class="tb-calendar-grid tb-calendar-head">';
+            names.forEach(function (n) { html += '<div>' + n + '</div>'; });
+            html += '</div><div class="tb-calendar-grid">';
+
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div class="tb-calendar-cell tb-empty"></div>';
+            }
+            for (let d = 1; d <= totalDays; d++) {
+                const date = new Date(year, month, d);
+                const key = date.toDateString();
+                const hasEvent = eventDays.has(key);
+                html += '<div class="tb-calendar-cell ' + (hasEvent ? 'tb-has-event' : '') + '">' + d + (hasEvent ? '<span class="tb-dot"></span>' : '') + '</div>';
+            }
+            html += '</div>';
+            calendarRoot.innerHTML = html;
+        }
+
+    });
+</script>
 {% endblock %}

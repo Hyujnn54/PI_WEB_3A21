@@ -47,13 +47,12 @@
                         <ul class="navbar-nav tb-main-nav me-auto">
                             {% if isAdminPage %}
                                 <li class="nav-item"><a class="nav-link" href="{{ path('management_users') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
-                            {% endif %}
-                            <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
-                            <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-check"></i></span><span class="nav-link-title">Applications</span></a></li>
-                            <li class="nav-item"><a class="nav-link" href="{{ path('front_events', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
-                            <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-message-2"></i></span><span class="nav-link-title">Interviews</span></a></li>
-                            {% if isAdminPage %}
                                 <li class="nav-item"><a class="nav-link" href="{{ path('back_dashboard') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span><span class="nav-link-title">Admin Dashboard</span></a></li>
+                            {% else %}
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-check"></i></span><span class="nav-link-title">Applications</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_events', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-message-2"></i></span><span class="nav-link-title">Interviews</span></a></li>
                             {% endif %}
                         </ul>
                     </div>
@@ -226,22 +225,60 @@
                                 const rawExtra = card.getAttribute('data-detail-extra') || '';
                                 extra.innerHTML = '';
                                 rawExtra.split('||').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (line) {
-                                    const li = document.createElement('li');
-                                    li.textContent = line;
-                                    extra.appendChild(li);
+                                    const item = document.createElement('div');
+                                    item.className = 'tb-detail-row';
+                                    const splitIndex = line.indexOf(':');
+                                    if (splitIndex > -1) {
+                                        const key = document.createElement('strong');
+                                        key.textContent = line.slice(0, splitIndex + 1) + ' ';
+                                        const value = document.createElement('span');
+                                        value.textContent = line.slice(splitIndex + 1).trim();
+                                        item.appendChild(key);
+                                        item.appendChild(value);
+                                    } else {
+                                        item.textContent = line;
+                                    }
+                                    extra.appendChild(item);
                                 });
                             }
 
                             if (primary) {
                                 primary.textContent = card.getAttribute('data-action-primary') || 'Primary Action';
+                                const href = card.getAttribute('data-action-primary-href') || '#';
+                                if (primary.tagName === 'A') {
+                                    primary.setAttribute('href', href);
+                                }
+                                const disabled = card.getAttribute('data-action-primary-disabled') === '1';
+                                primary.classList.toggle('disabled', disabled);
+                                primary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
                             }
                             if (secondary) {
                                 secondary.textContent = card.getAttribute('data-action-secondary') || 'Secondary Action';
+                                const href = card.getAttribute('data-action-secondary-href') || '#';
+                                const secondaryForm = secondary.closest('form');
+                                if (secondaryForm) {
+                                    secondaryForm.setAttribute('action', href);
+                                } else if (secondary.tagName === 'A') {
+                                    secondary.setAttribute('href', href);
+                                }
+                                const disabled = card.getAttribute('data-action-secondary-disabled') === '1';
+                                secondary.classList.toggle('disabled', disabled);
+                                secondary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+                                if (secondary.tagName === 'BUTTON') {
+                                    secondary.toggleAttribute('disabled', disabled);
+                                }
                             }
                             if (tertiary) {
                                 const tertiaryLabel = card.getAttribute('data-action-tertiary');
                                 if (tertiaryLabel) {
                                     tertiary.textContent = tertiaryLabel;
+                                    const href = card.getAttribute('data-action-tertiary-href') || '#';
+                                    if (tertiary.tagName === 'A') {
+                                        tertiary.setAttribute('href', href);
+                                    }
+                                    const disabled = card.getAttribute('data-action-tertiary-disabled') === '1';
+                                    tertiary.classList.toggle('disabled', disabled);
+                                    tertiary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
                                     tertiary.classList.remove('d-none');
                                 } else {
                                     tertiary.classList.add('d-none');
