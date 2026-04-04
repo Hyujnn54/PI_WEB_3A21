@@ -35,11 +35,11 @@
                                 <option value="onsite" {{ formData.mode|default('online') == 'onsite' ? 'selected' : '' }}>Onsite</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6" data-online-field>
                             <label class="form-label">Meeting Link (required for online)</label>
                             <input type="url" name="meeting_link" class="form-control" placeholder="https://..." value="{{ formData.meeting_link|default('') }}">
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6" data-onsite-field>
                             <label class="form-label">Location (required for onsite)</label>
                             <input type="text" name="location" class="form-control" placeholder="Office / Room" value="{{ formData.location|default('') }}">
                         </div>
@@ -57,4 +57,44 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.querySelector('form');
+        if (!form) return;
+
+        const modeSelect = form.querySelector('select[name="mode"]');
+        const meetingInput = form.querySelector('input[name="meeting_link"]');
+        const locationInput = form.querySelector('input[name="location"]');
+        const onlineField = form.querySelector('[data-online-field]');
+        const onsiteField = form.querySelector('[data-onsite-field]');
+
+        const applyModeFields = function () {
+            const mode = modeSelect ? modeSelect.value : 'online';
+            if (mode === 'onsite') {
+                if (onlineField) onlineField.classList.add('d-none');
+                if (onsiteField) onsiteField.classList.remove('d-none');
+                if (meetingInput) {
+                    meetingInput.value = '';
+                    meetingInput.required = false;
+                }
+                if (locationInput) locationInput.required = true;
+            } else {
+                if (onsiteField) onsiteField.classList.add('d-none');
+                if (onlineField) onlineField.classList.remove('d-none');
+                if (locationInput) {
+                    locationInput.value = '';
+                    locationInput.required = false;
+                }
+                if (meetingInput) meetingInput.required = true;
+            }
+        };
+
+        if (modeSelect) {
+            modeSelect.addEventListener('change', applyModeFields);
+        }
+
+        applyModeFields();
+    });
+</script>
 {% endblock %}

@@ -115,11 +115,11 @@
                                         <option value="onsite">Onsite</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-6" data-online-field>
                                     <label class="form-label">Meeting Link (online)</label>
                                     <input type="url" name="meeting_link" class="form-control" placeholder="https://...">
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-6" data-onsite-field>
                                     <label class="form-label">Location (onsite)</label>
                                     <input type="text" name="location" class="form-control" placeholder="Office / Room">
                                 </div>
@@ -149,14 +149,49 @@
         }
 
         const modal = new bootstrap.Modal(modalEl);
+        const modeSelect = formEl.querySelector('select[name="mode"]');
+        const meetingInput = formEl.querySelector('input[name="meeting_link"]');
+        const locationInput = formEl.querySelector('input[name="location"]');
+        const onlineField = formEl.querySelector('[data-online-field]');
+        const onsiteField = formEl.querySelector('[data-onsite-field]');
+
+        const applyModeFields = function () {
+            const mode = modeSelect ? modeSelect.value : 'online';
+            if (mode === 'onsite') {
+                if (onlineField) onlineField.classList.add('d-none');
+                if (onsiteField) onsiteField.classList.remove('d-none');
+                if (meetingInput) {
+                    meetingInput.value = '';
+                    meetingInput.required = false;
+                }
+                if (locationInput) locationInput.required = true;
+            } else {
+                if (onsiteField) onsiteField.classList.add('d-none');
+                if (onlineField) onlineField.classList.remove('d-none');
+                if (locationInput) {
+                    locationInput.value = '';
+                    locationInput.required = false;
+                }
+                if (meetingInput) meetingInput.required = true;
+            }
+        };
+
+        if (modeSelect) {
+            modeSelect.addEventListener('change', applyModeFields);
+        }
+
         document.querySelectorAll('.tb-open-interview-modal').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const createUrl = btn.getAttribute('data-create-url');
                 if (!createUrl) return;
                 formEl.setAttribute('action', createUrl);
+                if (modeSelect) modeSelect.value = 'online';
+                applyModeFields();
                 modal.show();
             });
         });
+
+        applyModeFields();
     });
 </script>
 {% endblock %}

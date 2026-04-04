@@ -13,37 +13,12 @@
             </div>
             <div class="d-flex gap-2">
                 <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Interview Board' : 'Upcoming Slots' }}</a>
-                <a href="#" class="btn btn-outline-primary">Calendar</a>
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#interviewCalendarModal">Calendar</button>
             </div>
         </div>
     </div>
     <div class="page-body">
         <div class="container-xl">
-            <div class="card tb-admin-card mb-3">
-                <div class="card-header"><h3 class="card-title"><i class="ti ti-calendar-event me-1"></i>Upcoming Interviews Calendar</h3></div>
-                <div class="card-body">
-                    {% if upcomingInterviews is not empty %}
-                        <div class="table-responsive">
-                            <table class="table table-vcenter card-table">
-                                <thead><tr><th>Date & Time</th><th>Interview</th><th>Mode</th><th>Status</th></tr></thead>
-                                <tbody>
-                                {% for item in upcomingInterviews %}
-                                    <tr>
-                                        <td>{{ item.date }}</td>
-                                        <td>{{ item.title }}</td>
-                                        <td>{{ item.mode }}</td>
-                                        <td><span class="badge bg-blue-lt">{{ item.status }}</span></td>
-                                    </tr>
-                                {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-secondary mb-0">No upcoming interviews currently scheduled.</p>
-                    {% endif %}
-                </div>
-            </div>
-
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
                     <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#interviewCardsGrid">
@@ -112,6 +87,41 @@
                         <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
                         <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
                         <a href="#" class="btn btn-outline-secondary tb-detail-tertiary">Tertiary Action</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="interviewCalendarModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content tb-admin-card">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="ti ti-calendar-event me-1"></i>Upcoming Interviews Calendar</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            {% if upcomingInterviews is not empty %}
+                                <div class="table-responsive">
+                                    <table class="table table-vcenter card-table">
+                                        <thead><tr><th>Date & Time</th><th>Interview</th><th>Mode</th><th>Status</th></tr></thead>
+                                        <tbody>
+                                        {% for item in upcomingInterviews %}
+                                            <tr>
+                                                <td>{{ item.date }}</td>
+                                                <td>{{ item.title }}</td>
+                                                <td>{{ item.mode }}</td>
+                                                <td><span class="badge bg-blue-lt">{{ item.status }}</span></td>
+                                            </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-secondary mb-0">No upcoming interviews currently scheduled.</p>
+                            {% endif %}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
                     </div>
                 </div>
             </div>
