@@ -2,12 +2,10 @@
 
 namespace App\Controller;
 
-use App\Entity\Candidate;
 use App\Entity\Interview;
 use App\Entity\Interview_feedback;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
-use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -297,7 +295,7 @@ class FrontPortalController extends AbstractController
                 $interview->setLocation($validation['location']);
                 $interview->setNotes($formData['notes']);
                 $interview->setStatus('scheduled');
-                $interview->setCreated_at(new \DateTimeImmutable());
+                $interview->setCreated_at(new \DateTime());
                 $interview->setReminder_sent(false);
 
                 $entityManager = $this->doctrine->getManager();
@@ -472,7 +470,7 @@ class FrontPortalController extends AbstractController
                 $feedback->setOverall_score($score);
                 $feedback->setDecision($decision);
                 $feedback->setComment($comment);
-                $feedback->setCreated_at(new \DateTimeImmutable());
+                $feedback->setCreated_at(new \DateTime());
 
                 $interview->setStatus('completed');
                 $application = $interview->getApplication_id();
@@ -499,12 +497,7 @@ class FrontPortalController extends AbstractController
             return $fromQuery;
         }
 
-        $firstRecruiter = $this->doctrine->getRepository(Recruiter::class)->findOneBy([]);
-        if (!$firstRecruiter instanceof Recruiter) {
-            return null;
-        }
-
-        return (string) $firstRecruiter->getUser_id();
+        return null;
     }
 
     private function resolveCandidateUserId(Request $request): ?string
@@ -514,12 +507,7 @@ class FrontPortalController extends AbstractController
             return $fromQuery;
         }
 
-        $firstCandidate = $this->doctrine->getRepository(Candidate::class)->findOneBy([]);
-        if (!$firstCandidate instanceof Candidate) {
-            return null;
-        }
-
-        return (string) $firstCandidate->getUser_id();
+        return null;
     }
 
     private function isRecruiterApplicationOwner(Job_application $application, string $recruiterUserId): bool
@@ -552,7 +540,7 @@ class FrontPortalController extends AbstractController
     private function validateInterviewPayload(array $data): array
     {
         try {
-            $scheduledAt = new \DateTimeImmutable((string) ($data['scheduled_at'] ?? ''));
+            $scheduledAt = new \DateTime((string) ($data['scheduled_at'] ?? ''));
         } catch (Throwable) {
             return ['ok' => false, 'error' => 'Invalid interview date/time.'];
         }
@@ -600,8 +588,8 @@ class FrontPortalController extends AbstractController
     private function canModifyInterview(Interview $interview): bool
     {
         try {
-            $lockTime = $interview->getScheduled_at()->modify('-' . self::EDIT_LOCK_HOURS . ' hours');
-            return new \DateTimeImmutable() < $lockTime;
+            $lockTime = (clone $interview->getScheduled_at())->modify('-' . self::EDIT_LOCK_HOURS . ' hours');
+            return new \DateTime() < $lockTime;
         } catch (Throwable) {
             return false;
         }
@@ -610,8 +598,8 @@ class FrontPortalController extends AbstractController
     private function canSubmitFeedback(Interview $interview): bool
     {
         try {
-            $endTime = $interview->getScheduled_at()->modify('+' . $interview->getDuration_minutes() . ' minutes');
-            return new \DateTimeImmutable() >= $endTime;
+            $endTime = (clone $interview->getScheduled_at())->modify('+' . $interview->getDuration_minutes() . ' minutes');
+            return new \DateTime() >= $endTime;
         } catch (Throwable) {
             return false;
         }
@@ -620,9 +608,9 @@ class FrontPortalController extends AbstractController
     private function computeCandidateInterviewStatus(Interview $interview): array
     {
         try {
-            $now = new \DateTimeImmutable();
+            $now = new \DateTime();
             $start = $interview->getScheduled_at();
-            $end = $start->modify('+' . $interview->getDuration_minutes() . ' minutes');
+            $end = (clone $start)->modify('+' . $interview->getDuration_minutes() . ' minutes');
             if ($now < $start) {
                 return ['Upcoming Interview', 'bg-blue-lt'];
             }
