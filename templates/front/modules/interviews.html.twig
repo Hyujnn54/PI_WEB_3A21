@@ -21,35 +21,50 @@
         <div class="container-xl">
             <div class="row row-cards">
                 <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100">
+                    <div class="tb-module-card h-100" data-href="#">
                         <div class="tb-module-meta">10 Apr 2026 | 10:00</div>
                         <h3>{{ role == 'recruiter' ? 'Panel: Backend Engineer' : 'Interview: Backend Engineer' }}</h3>
                         <p>{{ role == 'recruiter' ? 'Candidate ready, technical lead assigned, feedback pending.' : 'Technical round with API design and system architecture focus.' }}</p>
                         <div class="tb-module-actions">
-                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Evaluate' : 'Prepare' }}</a>
-                            <a href="#" class="btn btn-sm btn-outline-primary">Notes</a>
+                            {% if role == 'recruiter' %}
+                                <a href="#" class="btn btn-sm btn-primary">Modify Interview</a>
+                                <a href="#" class="btn btn-sm btn-outline-primary">Add Feedback</a>
+                            {% else %}
+                                <a href="#" class="btn btn-sm btn-primary">Prepare</a>
+                                <a href="#" class="btn btn-sm btn-outline-primary">Notes</a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100">
+                    <div class="tb-module-card h-100" data-href="#">
                         <div class="tb-module-meta">15 Apr 2026 | 14:00</div>
                         <h3>{{ role == 'recruiter' ? 'Panel: HR Analyst' : 'Interview: HR Analyst' }}</h3>
                         <p>{{ role == 'recruiter' ? 'Second round scheduled, waiting on interviewer confirmation.' : 'Behavioral interview scheduled with HR and team lead.' }}</p>
                         <div class="tb-module-actions">
-                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Reschedule' : 'Confirm' }}</a>
-                            <a href="#" class="btn btn-sm btn-outline-primary">Timeline</a>
+                            {% if role == 'recruiter' %}
+                                <a href="#" class="btn btn-sm btn-primary">Modify Interview</a>
+                                <a href="#" class="btn btn-sm btn-outline-primary">Add Feedback</a>
+                            {% else %}
+                                <a href="#" class="btn btn-sm btn-primary">Confirm</a>
+                                <a href="#" class="btn btn-sm btn-outline-primary">Timeline</a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100">
+                    <div class="tb-module-card h-100" data-href="#">
                         <div class="tb-module-meta">30 Mar 2026 | Completed</div>
                         <h3>{{ role == 'recruiter' ? 'Panel: Product Owner' : 'Interview: Product Owner' }}</h3>
                         <p>{{ role == 'recruiter' ? 'Final notes recorded, offer recommendation submitted.' : 'Final decision shared. Offer stage available.' }}</p>
                         <div class="tb-module-actions">
-                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'View Scorecard' : 'View Result' }}</a>
-                            <a href="#" class="btn btn-sm btn-outline-primary">Summary</a>
+                            {% if role == 'recruiter' %}
+                                <a href="#" class="btn btn-sm btn-primary">Modify Interview</a>
+                                <a href="#" class="btn btn-sm btn-outline-primary">Add Feedback</a>
+                            {% else %}
+                                <a href="#" class="btn btn-sm btn-primary">View Result</a>
+                                <a href="#" class="btn btn-sm btn-outline-primary">Summary</a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
