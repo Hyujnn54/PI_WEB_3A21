@@ -19,9 +19,28 @@
     </div>
     <div class="page-body">
         <div class="container-xl">
-            <div class="row row-cards">
+            <div class="card tb-admin-card mb-3 tb-filter-bar">
+                <div class="card-body py-2">
+                    <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#applicationCardsGrid">
+                        <div class="input-icon">
+                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                            <input type="text" class="form-control" placeholder="Search applications by id, offer, status..." data-filter-search>
+                        </div>
+                        <select class="form-select" style="max-width: 230px;" data-filter-sort>
+                            <option value="default">Default Order</option>
+                            <option value="title_asc">Title A-Z</option>
+                            <option value="title_desc">Title Z-A</option>
+                            <option value="meta_asc">Meta A-Z</option>
+                            <option value="meta_desc">Meta Z-A</option>
+                        </select>
+                        <div class="small text-secondary ms-auto" data-filter-results></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="applicationCardsGrid" class="row row-cards">
                 {% for card in cards %}
-                    <div class="col-md-6 col-xl-4">
+                    <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
                         <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Track Status' }}" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : 'Update Profile' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : 'Withdraw Application' }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>

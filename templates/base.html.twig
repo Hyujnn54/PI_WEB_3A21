@@ -86,6 +86,76 @@
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
         <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
         <script>
+            document.querySelectorAll('.tb-filter-form').forEach(function (filterForm) {
+                const targetSelector = filterForm.getAttribute('data-target');
+                if (!targetSelector) {
+                    return;
+                }
+
+                const grid = document.querySelector(targetSelector);
+                if (!grid) {
+                    return;
+                }
+
+                const searchInput = filterForm.querySelector('[data-filter-search]');
+                const sortSelect = filterForm.querySelector('[data-filter-sort]');
+                const resultLabel = filterForm.querySelector('[data-filter-results]');
+                const items = Array.from(grid.querySelectorAll('.tb-filter-item'));
+
+                items.forEach(function (item, index) {
+                    item.dataset.originalIndex = String(index);
+                });
+
+                const runFilters = function () {
+                    const query = ((searchInput && searchInput.value) || '').trim().toLowerCase();
+                    const sortMode = (sortSelect && sortSelect.value) || 'default';
+
+                    let visibleCount = 0;
+                    items.forEach(function (item) {
+                        const haystack = (item.dataset.filterText || '').toLowerCase();
+                        const isMatch = query === '' || haystack.includes(query);
+                        item.classList.toggle('d-none', !isMatch);
+                        if (isMatch) {
+                            visibleCount += 1;
+                        }
+                    });
+
+                    const sorted = items.slice().sort(function (a, b) {
+                        if (sortMode === 'title_asc') {
+                            return (a.dataset.sortTitle || '').localeCompare((b.dataset.sortTitle || ''));
+                        }
+                        if (sortMode === 'title_desc') {
+                            return (b.dataset.sortTitle || '').localeCompare((a.dataset.sortTitle || ''));
+                        }
+                        if (sortMode === 'meta_asc') {
+                            return (a.dataset.sortMeta || '').localeCompare((b.dataset.sortMeta || ''));
+                        }
+                        if (sortMode === 'meta_desc') {
+                            return (b.dataset.sortMeta || '').localeCompare((a.dataset.sortMeta || ''));
+                        }
+
+                        return Number(a.dataset.originalIndex || 0) - Number(b.dataset.originalIndex || 0);
+                    });
+
+                    sorted.forEach(function (item) {
+                        grid.appendChild(item);
+                    });
+
+                    if (resultLabel) {
+                        resultLabel.textContent = visibleCount + ' result(s)';
+                    }
+                };
+
+                if (searchInput) {
+                    searchInput.addEventListener('input', runFilters);
+                }
+                if (sortSelect) {
+                    sortSelect.addEventListener('change', runFilters);
+                }
+
+                runFilters();
+            });
+
             document.querySelectorAll('.tb-detail-close').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     const panel = btn.closest('.tb-detail-panel');
