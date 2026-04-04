@@ -51,6 +51,17 @@
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
+                            {% if role == 'recruiter' %}
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <form method="post" action="{{ card.accept_url }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Accept</button>
+                                    </form>
+                                    <form method="post" action="{{ card.decline_url }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Decline</button>
+                                    </form>
+                                    <a href="{{ card.create_interview_url }}" class="btn btn-sm btn-primary">Create Interview</a>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 {% else %}

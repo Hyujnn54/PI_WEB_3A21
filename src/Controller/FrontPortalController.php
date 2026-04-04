@@ -2,19 +2,26 @@
 
 namespace App\Controller;
 
+use App\Entity\Candidate;
 use App\Entity\Interview;
+use App\Entity\Interview_feedback;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
+use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
 
 class FrontPortalController extends AbstractController
 {
+    private const MAX_FUTURE_DAYS = 90;
+    private const EDIT_LOCK_HOURS = 2;
+
     public function __construct(private readonly ManagerRegistry $doctrine)
     {
     }
@@ -46,15 +53,40 @@ class FrontPortalController extends AbstractController
     {
         $role = (string) $request->query->get('role', 'candidate');
         $applications = $this->doctrine->getRepository(Job_application::class)->findBy([], ['id' => 'DESC']);
+        $recruiterUserId = $this->resolveRecruiterUserId($request);
+        $candidateUserId = $this->resolveCandidateUserId($request);
 
-        $cards = array_map(static function (Job_application $application): array {
+        if ($role === 'recruiter' && $recruiterUserId !== null) {
+            $applications = array_values(array_filter($applications, fn (Job_application $application): bool => $this->isRecruiterApplicationOwner($application, $recruiterUserId)));
+        }
+
+        if ($role === 'candidate' && $candidateUserId !== null) {
+            $applications = array_values(array_filter($applications, function (Job_application $application) use ($candidateUserId): bool {
+                try {
+                    return (string) $application->getCandidate_id()->getUser_id() === $candidateUserId;
+                } catch (Throwable) {
+                    return false;
+                }
+            }));
+        }
+
+        $cards = array_map(function (Job_application $application) use ($request, $role): array {
             $offer = $application->getOffer_id();
             $coverLetter = trim((string) $application->getCover_letter());
+            $meta = sprintf('Application #%s | %s', (string) $application->getId(), (string) $application->getCurrent_status());
+            $createInterviewUrl = $this->generateUrl('front_interview_create', ['applicationId' => (string) $application->getId(), 'role' => $role] + $request->query->all());
+            $acceptUrl = $this->generateUrl('front_application_set_status', ['applicationId' => (string) $application->getId(), 'status' => 'accepted', 'role' => $role] + $request->query->all());
+            $declineUrl = $this->generateUrl('front_application_set_status', ['applicationId' => (string) $application->getId(), 'status' => 'declined', 'role' => $role] + $request->query->all());
 
             return [
-                'meta' => sprintf('Application #%s | %s', (string) $application->getId(), (string) $application->getCurrent_status()),
+                'id' => (string) $application->getId(),
+                'meta' => $meta,
                 'title' => sprintf('Offer: %s', (string) $offer->getTitle()),
                 'text' => $coverLetter === '' ? 'No cover letter provided.' : substr($coverLetter, 0, 190),
+                'status' => (string) $application->getCurrent_status(),
+                'create_interview_url' => $createInterviewUrl,
+                'accept_url' => $acceptUrl,
+                'decline_url' => $declineUrl,
             ];
         }, $applications);
 
@@ -91,6 +123,16 @@ class FrontPortalController extends AbstractController
     {
         $role = (string) $request->query->get('role', 'candidate');
         $interviews = $this->doctrine->getRepository(Interview::class)->findBy([], ['id' => 'DESC']);
+        $recruiterUserId = $this->resolveRecruiterUserId($request);
+        $candidateUserId = $this->resolveCandidateUserId($request);
+
+        if ($role === 'recruiter' && $recruiterUserId !== null) {
+            $interviews = array_values(array_filter($interviews, fn (Interview $interview): bool => $this->isRecruiterInterviewOwner($interview, $recruiterUserId)));
+        }
+
+        if ($role === 'candidate' && $candidateUserId !== null) {
+            $interviews = array_values(array_filter($interviews, fn (Interview $interview): bool => $this->isCandidateInterviewOwner($interview, $candidateUserId)));
+        }
 
         $cards = [];
         foreach ($interviews as $interview) {
@@ -103,10 +145,29 @@ class FrontPortalController extends AbstractController
                 $title = (string) $offer->getTitle();
                 $notes = trim((string) $interview->getNotes());
 
+                $displayStatus = $status;
+                $statusClass = 'bg-blue-lt';
+                if ($role === 'candidate') {
+                    [$displayStatus, $statusClass] = $this->computeCandidateInterviewStatus($interview);
+                }
+
+                $canModify = $this->canModifyInterview($interview);
+                $editUrl = $this->generateUrl('front_interview_edit', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all());
+                $deleteUrl = $this->generateUrl('front_interview_delete', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all());
+                $feedbackUrl = $this->generateUrl('front_interview_feedback', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all());
+
                 $cards[] = [
+                    'id' => (string) $interview->getId(),
                     'meta' => sprintf('%s | %s', $scheduledAt->format('d M Y | H:i'), $status === '' ? 'Pending' : $status),
                     'title' => sprintf('Interview: %s', $title === '' ? 'Untitled offer' : $title),
                     'text' => $notes === '' ? 'No interview notes available yet.' : substr($notes, 0, 190),
+                    'status_label' => $displayStatus,
+                    'status_class' => $statusClass,
+                    'can_modify' => $canModify,
+                    'can_feedback' => $this->canSubmitFeedback($interview),
+                    'edit_url' => $editUrl,
+                    'delete_url' => $deleteUrl,
+                    'feedback_url' => $feedbackUrl,
                 ];
             } catch (Throwable) {
                 // Skip malformed rows so one broken interview does not break the page.
@@ -118,5 +179,451 @@ class FrontPortalController extends AbstractController
             'authUser' => ['role' => $role],
             'cards' => $cards,
         ]);
+    }
+
+    #[Route('/front/job-applications/{applicationId}/status/{status}', name: 'front_application_set_status', methods: ['POST'])]
+    public function setApplicationStatus(string $applicationId, string $status, Request $request): RedirectResponse
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ($role !== 'recruiter') {
+            $this->addFlash('warning', 'Only recruiters can update application status.');
+            return $this->redirectToRoute('front_job_applications', $request->query->all());
+        }
+
+        $allowedStatuses = ['accepted', 'declined', 'under_review', 'interview_scheduled'];
+        if (!in_array($status, $allowedStatuses, true)) {
+            $this->addFlash('warning', 'Invalid status selected.');
+            return $this->redirectToRoute('front_job_applications', $request->query->all());
+        }
+
+        $application = $this->doctrine->getRepository(Job_application::class)->find($applicationId);
+        if (!$application instanceof Job_application) {
+            $this->addFlash('warning', 'Application not found.');
+            return $this->redirectToRoute('front_job_applications', $request->query->all());
+        }
+
+        $recruiterUserId = $this->resolveRecruiterUserId($request);
+        if ($recruiterUserId === null || !$this->isRecruiterApplicationOwner($application, $recruiterUserId)) {
+            $this->addFlash('warning', 'You can only manage applications for your own offers.');
+            return $this->redirectToRoute('front_job_applications', $request->query->all());
+        }
+
+        $application->setCurrent_status($status);
+        $this->doctrine->getManager()->flush();
+        $this->addFlash('success', 'Application status updated.');
+
+        return $this->redirectToRoute('front_job_applications', $request->query->all());
+    }
+
+    #[Route('/front/interviews/create/{applicationId}', name: 'front_interview_create', methods: ['GET', 'POST'])]
+    public function createInterview(string $applicationId, Request $request): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        $application = $this->doctrine->getRepository(Job_application::class)->find($applicationId);
+        if (!$application instanceof Job_application) {
+            throw $this->createNotFoundException('Application not found.');
+        }
+
+        $recruiterUserId = $this->resolveRecruiterUserId($request);
+        if ($role !== 'recruiter' || $recruiterUserId === null || !$this->isRecruiterApplicationOwner($application, $recruiterUserId)) {
+            $this->addFlash('warning', 'Only the owner recruiter can schedule this interview.');
+            return $this->redirectToRoute('front_job_applications', $request->query->all());
+        }
+
+        $formData = [
+            'scheduled_at' => '',
+            'duration_minutes' => '60',
+            'mode' => 'online',
+            'meeting_link' => '',
+            'location' => '',
+            'notes' => '',
+        ];
+
+        if ($request->isMethod('POST')) {
+            $formData = [
+                'scheduled_at' => (string) $request->request->get('scheduled_at', ''),
+                'duration_minutes' => (string) $request->request->get('duration_minutes', '60'),
+                'mode' => (string) $request->request->get('mode', 'online'),
+                'meeting_link' => trim((string) $request->request->get('meeting_link', '')),
+                'location' => trim((string) $request->request->get('location', '')),
+                'notes' => trim((string) $request->request->get('notes', '')),
+            ];
+
+            $validation = $this->validateInterviewPayload($formData);
+            if ($validation['ok']) {
+                $offer = $application->getOffer_id();
+                $recruiter = $offer->getRecruiter_id();
+
+                $interview = new Interview();
+                $interview->setId($this->nextNumericId(Interview::class));
+                $interview->setApplication_id($application);
+                $interview->setRecruiter_id($recruiter);
+                $interview->setScheduled_at($validation['scheduledAt']);
+                $interview->setDuration_minutes($validation['duration']);
+                $interview->setMode($validation['mode']);
+                $interview->setMeeting_link($validation['meetingLink']);
+                $interview->setLocation($validation['location']);
+                $interview->setNotes($formData['notes']);
+                $interview->setStatus('scheduled');
+                $interview->setCreated_at(new \DateTimeImmutable());
+                $interview->setReminder_sent(false);
+
+                $entityManager = $this->doctrine->getManager();
+                $entityManager->persist($interview);
+                $application->setCurrent_status('interview_scheduled');
+                $entityManager->flush();
+
+                $this->addFlash('success', 'Interview created successfully.');
+                return $this->redirectToRoute('front_interviews', $request->query->all());
+            }
+
+            $this->addFlash('warning', (string) $validation['error']);
+        }
+
+        return $this->render('front/modules/interview_form.html.twig', [
+            'authUser' => ['role' => $role],
+            'mode' => 'create',
+            'applicationId' => $applicationId,
+            'formData' => $formData,
+        ]);
+    }
+
+    #[Route('/front/interviews/{id}/edit', name: 'front_interview_edit', methods: ['GET', 'POST'])]
+    public function editInterview(string $id, Request $request): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        $interview = $this->doctrine->getRepository(Interview::class)->find($id);
+        if (!$interview instanceof Interview) {
+            throw $this->createNotFoundException('Interview not found.');
+        }
+
+        $recruiterUserId = $this->resolveRecruiterUserId($request);
+        if ($role !== 'recruiter' || $recruiterUserId === null || !$this->isRecruiterInterviewOwner($interview, $recruiterUserId)) {
+            $this->addFlash('warning', 'Only the owner recruiter can edit this interview.');
+            return $this->redirectToRoute('front_interviews', $request->query->all());
+        }
+
+        if (!$this->canModifyInterview($interview)) {
+            $this->addFlash('warning', 'Interview can no longer be modified (past or too close).');
+            return $this->redirectToRoute('front_interviews', $request->query->all());
+        }
+
+        $formData = [
+            'scheduled_at' => $interview->getScheduled_at()->format('Y-m-d\TH:i'),
+            'duration_minutes' => (string) $interview->getDuration_minutes(),
+            'mode' => (string) $interview->getMode(),
+            'meeting_link' => (string) $interview->getMeeting_link(),
+            'location' => (string) $interview->getLocation(),
+            'notes' => (string) $interview->getNotes(),
+        ];
+
+        if ($request->isMethod('POST')) {
+            $formData = [
+                'scheduled_at' => (string) $request->request->get('scheduled_at', ''),
+                'duration_minutes' => (string) $request->request->get('duration_minutes', '60'),
+                'mode' => (string) $request->request->get('mode', 'online'),
+                'meeting_link' => trim((string) $request->request->get('meeting_link', '')),
+                'location' => trim((string) $request->request->get('location', '')),
+                'notes' => trim((string) $request->request->get('notes', '')),
+            ];
+
+            $validation = $this->validateInterviewPayload($formData);
+            if ($validation['ok']) {
+                $interview->setScheduled_at($validation['scheduledAt']);
+                $interview->setDuration_minutes($validation['duration']);
+                $interview->setMode($validation['mode']);
+                $interview->setMeeting_link($validation['meetingLink']);
+                $interview->setLocation($validation['location']);
+                $interview->setNotes($formData['notes']);
+                $this->doctrine->getManager()->flush();
+
+                $this->addFlash('success', 'Interview updated successfully.');
+                return $this->redirectToRoute('front_interviews', $request->query->all());
+            }
+
+            $this->addFlash('warning', (string) $validation['error']);
+        }
+
+        return $this->render('front/modules/interview_form.html.twig', [
+            'authUser' => ['role' => $role],
+            'mode' => 'edit',
+            'interviewId' => $id,
+            'formData' => $formData,
+        ]);
+    }
+
+    #[Route('/front/interviews/{id}/delete', name: 'front_interview_delete', methods: ['POST'])]
+    public function deleteInterview(string $id, Request $request): RedirectResponse
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        $interview = $this->doctrine->getRepository(Interview::class)->find($id);
+        if (!$interview instanceof Interview) {
+            $this->addFlash('warning', 'Interview not found.');
+            return $this->redirectToRoute('front_interviews', $request->query->all());
+        }
+
+        $recruiterUserId = $this->resolveRecruiterUserId($request);
+        if ($role !== 'recruiter' || $recruiterUserId === null || !$this->isRecruiterInterviewOwner($interview, $recruiterUserId)) {
+            $this->addFlash('warning', 'Only the owner recruiter can delete this interview.');
+            return $this->redirectToRoute('front_interviews', $request->query->all());
+        }
+
+        if (!$this->canModifyInterview($interview)) {
+            $this->addFlash('warning', 'Interview can no longer be deleted (past or too close).');
+            return $this->redirectToRoute('front_interviews', $request->query->all());
+        }
+
+        $entityManager = $this->doctrine->getManager();
+        $entityManager->remove($interview);
+        $entityManager->flush();
+        $this->addFlash('success', 'Interview deleted successfully.');
+
+        return $this->redirectToRoute('front_interviews', $request->query->all());
+    }
+
+    #[Route('/front/interviews/{id}/feedback', name: 'front_interview_feedback', methods: ['GET', 'POST'])]
+    public function feedbackInterview(string $id, Request $request): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        $interview = $this->doctrine->getRepository(Interview::class)->find($id);
+        if (!$interview instanceof Interview) {
+            throw $this->createNotFoundException('Interview not found.');
+        }
+
+        $recruiterUserId = $this->resolveRecruiterUserId($request);
+        if ($role !== 'recruiter' || $recruiterUserId === null || !$this->isRecruiterInterviewOwner($interview, $recruiterUserId)) {
+            $this->addFlash('warning', 'Only the owner recruiter can submit feedback.');
+            return $this->redirectToRoute('front_interviews', $request->query->all());
+        }
+
+        if (!$this->canSubmitFeedback($interview)) {
+            $this->addFlash('warning', 'Feedback can only be submitted after interview end time.');
+            return $this->redirectToRoute('front_interviews', $request->query->all());
+        }
+
+        $existingFeedback = $this->doctrine->getRepository(Interview_feedback::class)->findBy(['interview_id' => $interview], ['created_at' => 'DESC'], 1);
+        $feedback = $existingFeedback[0] ?? null;
+
+        $formData = [
+            'overall_score' => $feedback ? (string) $feedback->getOverall_score() : '80',
+            'decision' => $feedback ? (string) $feedback->getDecision() : 'accepted',
+            'comment' => $feedback ? (string) $feedback->getComment() : '',
+        ];
+
+        if ($request->isMethod('POST')) {
+            $formData = [
+                'overall_score' => (string) $request->request->get('overall_score', '80'),
+                'decision' => (string) $request->request->get('decision', 'accepted'),
+                'comment' => trim((string) $request->request->get('comment', '')),
+            ];
+
+            $score = (int) $formData['overall_score'];
+            $decision = $formData['decision'];
+            $comment = $formData['comment'];
+
+            if ($score < 0 || $score > 100) {
+                $this->addFlash('warning', 'Score must be between 0 and 100.');
+            } elseif (!in_array($decision, ['accepted', 'rejected'], true)) {
+                $this->addFlash('warning', 'Decision must be accepted or rejected.');
+            } elseif ($comment === '') {
+                $this->addFlash('warning', 'Comment is required.');
+            } else {
+                $entityManager = $this->doctrine->getManager();
+                if (!$feedback instanceof Interview_feedback) {
+                    $feedback = new Interview_feedback();
+                    $feedback->setId($this->nextNumericId(Interview_feedback::class));
+                    $feedback->setInterview_id($interview);
+                    $feedback->setRecruiter_id($interview->getRecruiter_id());
+                    $entityManager->persist($feedback);
+                }
+
+                $feedback->setOverall_score($score);
+                $feedback->setDecision($decision);
+                $feedback->setComment($comment);
+                $feedback->setCreated_at(new \DateTimeImmutable());
+
+                $interview->setStatus('completed');
+                $application = $interview->getApplication_id();
+                $application->setCurrent_status($decision === 'accepted' ? 'accepted' : 'declined');
+
+                $entityManager->flush();
+                $this->addFlash('success', 'Interview review saved.');
+
+                return $this->redirectToRoute('front_interviews', $request->query->all());
+            }
+        }
+
+        return $this->render('front/modules/interview_feedback_form.html.twig', [
+            'authUser' => ['role' => $role],
+            'interviewId' => $id,
+            'formData' => $formData,
+        ]);
+    }
+
+    private function resolveRecruiterUserId(Request $request): ?string
+    {
+        $fromQuery = trim((string) $request->query->get('recruiter', ''));
+        if ($fromQuery !== '') {
+            return $fromQuery;
+        }
+
+        $firstRecruiter = $this->doctrine->getRepository(Recruiter::class)->findOneBy([]);
+        if (!$firstRecruiter instanceof Recruiter) {
+            return null;
+        }
+
+        return (string) $firstRecruiter->getUser_id();
+    }
+
+    private function resolveCandidateUserId(Request $request): ?string
+    {
+        $fromQuery = trim((string) $request->query->get('candidate', ''));
+        if ($fromQuery !== '') {
+            return $fromQuery;
+        }
+
+        $firstCandidate = $this->doctrine->getRepository(Candidate::class)->findOneBy([]);
+        if (!$firstCandidate instanceof Candidate) {
+            return null;
+        }
+
+        return (string) $firstCandidate->getUser_id();
+    }
+
+    private function isRecruiterApplicationOwner(Job_application $application, string $recruiterUserId): bool
+    {
+        try {
+            return (string) $application->getOffer_id()->getRecruiter_id()->getUser_id() === $recruiterUserId;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function isRecruiterInterviewOwner(Interview $interview, string $recruiterUserId): bool
+    {
+        try {
+            return (string) $interview->getApplication_id()->getOffer_id()->getRecruiter_id()->getUser_id() === $recruiterUserId;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function isCandidateInterviewOwner(Interview $interview, string $candidateUserId): bool
+    {
+        try {
+            return (string) $interview->getApplication_id()->getCandidate_id()->getUser_id() === $candidateUserId;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function validateInterviewPayload(array $data): array
+    {
+        try {
+            $scheduledAt = new \DateTimeImmutable((string) ($data['scheduled_at'] ?? ''));
+        } catch (Throwable) {
+            return ['ok' => false, 'error' => 'Invalid interview date/time.'];
+        }
+
+        $now = new \DateTimeImmutable();
+        if ($scheduledAt <= $now) {
+            return ['ok' => false, 'error' => 'Interview date/time must be in the future.'];
+        }
+
+        if ($scheduledAt > $now->modify('+' . self::MAX_FUTURE_DAYS . ' days')) {
+            return ['ok' => false, 'error' => 'Interview cannot be scheduled more than ' . self::MAX_FUTURE_DAYS . ' days ahead.'];
+        }
+
+        $duration = (int) ($data['duration_minutes'] ?? 0);
+        if ($duration < 15 || $duration > 240) {
+            return ['ok' => false, 'error' => 'Duration must be between 15 and 240 minutes.'];
+        }
+
+        $mode = strtolower(trim((string) ($data['mode'] ?? 'online')));
+        if (!in_array($mode, ['online', 'onsite'], true)) {
+            return ['ok' => false, 'error' => 'Interview mode must be online or onsite.'];
+        }
+
+        $meetingLink = trim((string) ($data['meeting_link'] ?? ''));
+        $location = trim((string) ($data['location'] ?? ''));
+
+        if ($mode === 'online' && $meetingLink === '') {
+            return ['ok' => false, 'error' => 'Meeting link is required for online interviews.'];
+        }
+
+        if ($mode === 'onsite' && $location === '') {
+            return ['ok' => false, 'error' => 'Location is required for onsite interviews.'];
+        }
+
+        return [
+            'ok' => true,
+            'scheduledAt' => $scheduledAt,
+            'duration' => $duration,
+            'mode' => $mode,
+            'meetingLink' => $meetingLink,
+            'location' => $location,
+        ];
+    }
+
+    private function canModifyInterview(Interview $interview): bool
+    {
+        try {
+            $lockTime = $interview->getScheduled_at()->modify('-' . self::EDIT_LOCK_HOURS . ' hours');
+            return new \DateTimeImmutable() < $lockTime;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function canSubmitFeedback(Interview $interview): bool
+    {
+        try {
+            $endTime = $interview->getScheduled_at()->modify('+' . $interview->getDuration_minutes() . ' minutes');
+            return new \DateTimeImmutable() >= $endTime;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function computeCandidateInterviewStatus(Interview $interview): array
+    {
+        try {
+            $now = new \DateTimeImmutable();
+            $start = $interview->getScheduled_at();
+            $end = $start->modify('+' . $interview->getDuration_minutes() . ' minutes');
+            if ($now < $start) {
+                return ['Upcoming Interview', 'bg-blue-lt'];
+            }
+
+            $feedback = $this->doctrine->getRepository(Interview_feedback::class)->findBy(['interview_id' => $interview], ['created_at' => 'DESC'], 1);
+            if (!empty($feedback)) {
+                $decision = strtolower((string) $feedback[0]->getDecision());
+                if ($decision === 'accepted') {
+                    return ['Accepted', 'bg-green-lt'];
+                }
+
+                if ($decision === 'rejected') {
+                    return ['Rejected', 'bg-red-lt'];
+                }
+            }
+
+            if ($now >= $end) {
+                return ['Under Review', 'bg-orange-lt'];
+            }
+        } catch (Throwable) {
+        }
+
+        return ['Under Review', 'bg-orange-lt'];
+    }
+
+    private function nextNumericId(string $entityClass): string
+    {
+        $last = $this->doctrine->getRepository($entityClass)->findBy([], ['id' => 'DESC'], 1);
+        if (empty($last)) {
+            return '1';
+        }
+
+        $lastId = (int) $last[0]->getId();
+        return (string) ($lastId + 1);
     }
 }

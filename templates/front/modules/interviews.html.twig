@@ -51,6 +51,16 @@
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
+                            <div class="mt-2"><span class="badge {{ card.status_class|default('bg-blue-lt') }}">{{ card.status_label|default('Scheduled') }}</span></div>
+                            {% if role == 'recruiter' %}
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <a href="{{ card.edit_url }}" class="btn btn-sm btn-outline-primary {{ not card.can_modify ? 'disabled' : '' }}">Modify</a>
+                                    <form method="post" action="{{ card.delete_url }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" {{ not card.can_modify ? 'disabled' : '' }}>Delete</button>
+                                    </form>
+                                    <a href="{{ card.feedback_url }}" class="btn btn-sm btn-primary {{ not card.can_feedback ? 'disabled' : '' }}">Review</a>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 {% else %}

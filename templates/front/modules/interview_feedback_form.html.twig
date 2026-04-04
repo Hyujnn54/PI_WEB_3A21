@@ -1,0 +1,48 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | Interview Review{% endblock %}
+
+{% block body %}
+{% set role = authUser.role|default('recruiter') %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="page-title"><i class="ti ti-clipboard-check me-1"></i>Interview Review</h2>
+                <p class="text-secondary mb-0">Submit score, decision, and review comment after interview end time.</p>
+            </div>
+            <a href="{{ path('front_interviews', app.request.query.all|merge({role: role})) }}" class="btn btn-outline-primary">Back to Interviews</a>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card tb-admin-card">
+                <div class="card-body">
+                    <form method="post" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Overall Score (0-100)</label>
+                            <input type="number" min="0" max="100" name="overall_score" class="form-control" value="{{ formData.overall_score|default('80') }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Decision</label>
+                            <select name="decision" class="form-select" required>
+                                <option value="accepted" {{ formData.decision|default('accepted') == 'accepted' ? 'selected' : '' }}>Accepted</option>
+                                <option value="rejected" {{ formData.decision|default('accepted') == 'rejected' ? 'selected' : '' }}>Rejected</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Review Comment</label>
+                            <textarea name="comment" rows="5" class="form-control" required>{{ formData.comment|default('') }}</textarea>
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Review</button>
+                            <a href="{{ path('front_interviews', app.request.query.all|merge({role: role})) }}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
