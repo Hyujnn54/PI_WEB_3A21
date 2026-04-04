@@ -1,0 +1,151 @@
+<?php
+
+namespace App\Entity;
+
+use Doctrine\ORM\Mapping as ORM;
+
+use App\Entity\Admin;
+use Doctrine\Common\Collections\Collection;
+use App\Entity\Warning_correction;
+
+#[ORM\Entity]
+class Job_offer_warning
+{
+
+    #[ORM\Id]
+    #[ORM\Column(type: "bigint")]
+    private string $id;
+
+        #[ORM\ManyToOne(targetEntity: Job_offer::class, inversedBy: "job_offer_warnings")]
+    #[ORM\JoinColumn(name: 'job_offer_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    private Job_offer $job_offer_id;
+
+        #[ORM\ManyToOne(targetEntity: Recruiter::class, inversedBy: "job_offer_warnings")]
+    #[ORM\JoinColumn(name: 'recruiter_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    private Recruiter $recruiter_id;
+
+        #[ORM\ManyToOne(targetEntity: Admin::class, inversedBy: "job_offer_warnings")]
+    #[ORM\JoinColumn(name: 'admin_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    private Admin $admin_id;
+
+    #[ORM\Column(type: "string", length: 255)]
+    private string $reason;
+
+    #[ORM\Column(type: "text")]
+    private string $message;
+
+    #[ORM\Column(type: "string")]
+    private string $status;
+
+    #[ORM\Column(type: "datetime")]
+    private \DateTimeInterface $created_at;
+
+    #[ORM\Column(type: "datetime")]
+    private \DateTimeInterface $seen_at;
+
+    #[ORM\Column(type: "datetime")]
+    private \DateTimeInterface $resolved_at;
+
+    public function getId()
+    {
+        return $this->id;
+    }
+
+    public function setId($value)
+    {
+        $this->id = $value;
+    }
+
+    public function getJob_offer_id()
+    {
+        return $this->job_offer_id;
+    }
+
+    public function setJob_offer_id($value)
+    {
+        $this->job_offer_id = $value;
+    }
+
+    public function getRecruiter_id()
+    {
+        return $this->recruiter_id;
+    }
+
+    public function setRecruiter_id($value)
+    {
+        $this->recruiter_id = $value;
+    }
+
+    public function getAdmin_id()
+    {
+        return $this->admin_id;
+    }
+
+    public function setAdmin_id($value)
+    {
+        $this->admin_id = $value;
+    }
+
+    public function getReason()
+    {
+        return $this->reason;
+    }
+
+    public function setReason($value)
+    {
+        $this->reason = $value;
+    }
+
+    public function getMessage()
+    {
+        return $this->message;
+    }
+
+    public function setMessage($value)
+    {
+        $this->message = $value;
+    }
+
+    public function getStatus()
+    {
+        return $this->status;
+    }
+
+    public function setStatus($value)
+    {
+        $this->status = $value;
+    }
+
+    public function getCreated_at()
+    {
+        return $this->created_at;
+    }
+
+    public function setCreated_at($value)
+    {
+        $this->created_at = $value;
+    }
+
+    public function getSeen_at()
+    {
+        return $this->seen_at;
+    }
+
+    public function setSeen_at($value)
+    {
+        $this->seen_at = $value;
+    }
+
+    public function getResolved_at()
+    {
+        return $this->resolved_at;
+    }
+
+    public function setResolved_at($value)
+    {
+        $this->resolved_at = $value;
+    }
+
+    #[ORM\OneToMany(mappedBy: "warning_id", targetEntity: Warning_correction::class)]
+    private Collection $warning_corrections;
+}

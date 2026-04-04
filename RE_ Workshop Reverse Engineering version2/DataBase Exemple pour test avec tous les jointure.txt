@@ -1,0 +1,60 @@
+
+-- 1. Department Table (One-to-Many with Employee)
+CREATE TABLE Department (
+    department_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL
+);
+
+-- 2. Employee Table (Many-to-One with Department)
+CREATE TABLE Employee (
+    employee_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    department_id INT,
+    FOREIGN KEY (department_id) REFERENCES Department(department_id) ON DELETE SET NULL
+);
+
+-- 3. User Table (One-to-One with UserProfile)
+CREATE TABLE User (
+    user_id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- 4. UserProfile Table (One-to-One with User)
+CREATE TABLE UserProfile (
+    profile_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT UNIQUE,
+    bio TEXT,
+    FOREIGN KEY (user_id) REFERENCES User(user_id) ON DELETE CASCADE
+);
+
+-- 5. Student Table (Many-to-Many with Course)
+CREATE TABLE Student (
+    student_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE -- Added email field
+);
+
+-- 6. Course Table (Many-to-Many with Student)
+CREATE TABLE Course (
+    course_id INT PRIMARY KEY AUTO_INCREMENT,
+    course_name VARCHAR(100) NOT NULL
+);
+
+-- 7. Enrollment Table (Join Table for Many-to-Many: Student ↔ Course)
+CREATE TABLE Enrollment (
+    student_id INT,
+    course_id INT,
+    enrollment_date DATE DEFAULT CURRENT_DATE,
+    PRIMARY KEY (student_id, course_id),
+    FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES Course(course_id) ON DELETE CASCADE
+);
+
+-- 8. Project Table (One-to-Many with Employee)
+CREATE TABLE Project (
+    project_id INT PRIMARY KEY AUTO_INCREMENT,
+    project_name VARCHAR(100) NOT NULL,
+    employee_id INT,
+    FOREIGN KEY (employee_id) REFERENCES Employee(employee_id) ON DELETE SET NULL
+);

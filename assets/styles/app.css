@@ -1,0 +1,104 @@
+:root {
+    --tb-primary: #0d5bd7;
+    --tb-primary-dark: #0a43a1;
+    --tb-surface: #ffffff;
+    --tb-soft: #eef5ff;
+    --tb-text: #10243e;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Manrope", sans-serif;
+    color: var(--tb-text);
+    background: radial-gradient(circle at 20% -20%, #dbeafe 0%, #f8fbff 45%, #ffffff 100%);
+    min-height: 100vh;
+}
+
+.app-nav {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #dce8ff;
+}
+
+.navbar-brand,
+.nav-link {
+    color: var(--tb-primary-dark);
+}
+
+.hero-wrap {
+    position: relative;
+}
+
+.hero-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, rgba(13, 91, 215, 0.1), rgba(13, 91, 215, 0));
+    pointer-events: none;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.metric-card,
+.panel,
+.job-card {
+    background: var(--tb-surface);
+    border: 1px solid #d9e6ff;
+    border-radius: 14px;
+    box-shadow: 0 12px 24px rgba(16, 36, 62, 0.06);
+}
+
+.metric-card {
+    padding: 16px;
+}
+
+.metric-label {
+    font-size: 0.85rem;
+    color: #5b7091;
+}
+
+.metric-value {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--tb-primary-dark);
+}
+
+.job-card,
+.panel {
+    padding: 18px;
+}
+
+.panel.stat {
+    padding: 14px 16px;
+}
+
+.admin-links .list-group-item {
+    border: none;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    color: var(--tb-primary-dark);
+    background: var(--tb-soft);
+}
+
+.btn-primary {
+    background: var(--tb-primary);
+    border-color: var(--tb-primary);
+}
+
+.btn-primary:hover {
+    background: var(--tb-primary-dark);
+    border-color: var(--tb-primary-dark);
+}
+
+@media (max-width: 767px) {
+    .metric-grid {
+        grid-template-columns: 1fr;
+    }
+}
