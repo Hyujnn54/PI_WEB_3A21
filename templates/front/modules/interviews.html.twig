@@ -20,27 +20,21 @@
     <div class="page-body">
         <div class="container-xl">
             <div class="row row-cards">
-                <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="10 Apr 2026 | 10:00" data-detail-title="{{ role == 'recruiter' ? 'Panel: Backend Engineer' : 'Interview: Backend Engineer' }}" data-detail-text="Detailed interview context appears here with workflow actions prepared for upcoming CRUD integration." data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'Prepare Interview' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Notes' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Check Results' }}">
-                        <div class="tb-module-meta">10 Apr 2026 | 10:00</div>
-                        <h3>{{ role == 'recruiter' ? 'Panel: Backend Engineer' : 'Interview: Backend Engineer' }}</h3>
-                        <p>{{ role == 'recruiter' ? 'Candidate ready, technical lead assigned, feedback pending.' : 'Technical round with API design and system architecture focus.' }}</p>
+                {% for card in cards %}
+                    <div class="col-md-6 col-xl-4">
+                        <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'Prepare Interview' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Notes' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Check Results' }}">
+                            <div class="tb-module-meta">{{ card.meta }}</div>
+                            <h3>{{ card.title }}</h3>
+                            <p>{{ card.text }}</p>
+                        </div>
                     </div>
-                </div>
-                <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="15 Apr 2026 | 14:00" data-detail-title="{{ role == 'recruiter' ? 'Panel: HR Analyst' : 'Interview: HR Analyst' }}" data-detail-text="Use this detail space for recruiter decision flow or candidate preparation workflow actions." data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'Confirm Attendance' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Timeline' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Check Results' }}">
-                        <div class="tb-module-meta">15 Apr 2026 | 14:00</div>
-                        <h3>{{ role == 'recruiter' ? 'Panel: HR Analyst' : 'Interview: HR Analyst' }}</h3>
-                        <p>{{ role == 'recruiter' ? 'Second round scheduled, waiting on interviewer confirmation.' : 'Behavioral interview scheduled with HR and team lead.' }}</p>
+                {% else %}
+                    <div class="col-12">
+                        <div class="card tb-admin-card">
+                            <div class="card-body text-secondary">No interviews found in the database.</div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="30 Mar 2026 | Completed" data-detail-title="{{ role == 'recruiter' ? 'Panel: Product Owner' : 'Interview: Product Owner' }}" data-detail-text="Result summaries and follow-up actions should be controlled from this detail panel." data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'View Result' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Summary' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Request Clarification' }}">
-                        <div class="tb-module-meta">30 Mar 2026 | Completed</div>
-                        <h3>{{ role == 'recruiter' ? 'Panel: Product Owner' : 'Interview: Product Owner' }}</h3>
-                        <p>{{ role == 'recruiter' ? 'Final notes recorded, offer recommendation submitted.' : 'Final decision shared. Offer stage available.' }}</p>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
 
             <div id="interviewDetailPanel" class="card tb-detail-panel mt-4 d-none">

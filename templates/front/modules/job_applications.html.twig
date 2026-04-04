@@ -20,27 +20,21 @@
     <div class="page-body">
         <div class="container-xl">
             <div class="row row-cards">
-                <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="Application #A-101" data-detail-title="{{ role == 'recruiter' ? 'Candidate: Aya Trabelsi' : 'Backend Engineer Application' }}" data-detail-text="Detailed stage history, scoring notes, and next pipeline actions will appear here." data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Track Status' }}" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : 'Update Profile' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : 'Withdraw Application' }}">
-                        <div class="tb-module-meta">Application #A-101</div>
-                        <h3>{{ role == 'recruiter' ? 'Candidate: Aya Trabelsi' : 'Position: Backend Engineer' }}</h3>
-                        <p>{{ role == 'recruiter' ? 'Strong API and SQL experience, currently at interview stage.' : 'Your application is currently under technical review.' }}</p>
+                {% for card in cards %}
+                    <div class="col-md-6 col-xl-4">
+                        <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Track Status' }}" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : 'Update Profile' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : 'Withdraw Application' }}">
+                            <div class="tb-module-meta">{{ card.meta }}</div>
+                            <h3>{{ card.title }}</h3>
+                            <p>{{ card.text }}</p>
+                        </div>
                     </div>
-                </div>
-                <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="Application #A-102" data-detail-title="{{ role == 'recruiter' ? 'Candidate: Mehdi Gharbi' : 'HR Data Analyst Application' }}" data-detail-text="Candidate strengths, matching score, and timeline actions can be handled from this section." data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Track Status' }}" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : 'Update Profile' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : 'Withdraw Application' }}">
-                        <div class="tb-module-meta">Application #A-102</div>
-                        <h3>{{ role == 'recruiter' ? 'Candidate: Mehdi Gharbi' : 'Position: HR Data Analyst' }}</h3>
-                        <p>{{ role == 'recruiter' ? 'Needs follow-up on interview scheduling and profile completion.' : 'Recruiter requested an additional profile update.' }}</p>
+                {% else %}
+                    <div class="col-12">
+                        <div class="card tb-admin-card">
+                            <div class="card-body text-secondary">No job applications found in the database.</div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="Application #A-103" data-detail-title="{{ role == 'recruiter' ? 'Candidate: Sara Ben Amor' : 'Interview Coordinator Application' }}" data-detail-text="Use the action area for shortlisting decisions, interview scheduling, and post-evaluation updates." data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Track Status' }}" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : 'Update Profile' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : 'Withdraw Application' }}">
-                        <div class="tb-module-meta">Application #A-103</div>
-                        <h3>{{ role == 'recruiter' ? 'Candidate: Sara Ben Amor' : 'Position: Interview Coordinator' }}</h3>
-                        <p>{{ role == 'recruiter' ? 'Interview feedback pending from panel member.' : 'Decision expected after final panel review.' }}</p>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
 
             <div id="applicationDetailPanel" class="card tb-detail-panel mt-4 d-none">

@@ -20,27 +20,21 @@
     <div class="page-body">
         <div class="container-xl">
             <div class="row row-cards">
-                <div class="col-lg-4">
-                    <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="12 Apr 2026 | Tunis" data-detail-title="Talent Networking Day" data-detail-text="Event overview, attendance metrics, and planned operations actions are surfaced here." data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}">
-                        <div class="tb-module-meta">12 Apr 2026 | Tunis</div>
-                        <h3>Talent Networking Day</h3>
-                        <p>Meet hiring teams, attend quick interviews, and discover open positions in one place.</p>
+                {% for card in cards %}
+                    <div class="col-lg-4 col-md-6">
+                        <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}">
+                            <div class="tb-module-meta">{{ card.meta }}</div>
+                            <h3>{{ card.title }}</h3>
+                            <p>{{ card.text }}</p>
+                        </div>
                     </div>
-                </div>
-                <div class="col-lg-4">
-                    <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="18 Apr 2026 | Online" data-detail-title="Recruiter Workshop" data-detail-text="Use this panel to preview workshop operations and placeholder buttons for upcoming CRUD actions." data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}">
-                        <div class="tb-module-meta">18 Apr 2026 | Online</div>
-                        <h3>Recruiter Workshop</h3>
-                        <p>Practical session on improving interview quality and reducing drop-off in hiring steps.</p>
+                {% else %}
+                    <div class="col-12">
+                        <div class="card tb-admin-card">
+                            <div class="card-body text-secondary">No events found in the database.</div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-lg-4">
-                    <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="27 Apr 2026 | Hybrid" data-detail-title="Tech Hiring Sprint" data-detail-text="When clicked, this details section can host edit/event controls and event-specific call-to-actions." data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}">
-                        <div class="tb-module-meta">27 Apr 2026 | Hybrid</div>
-                        <h3>Tech Hiring Sprint</h3>
-                        <p>Fast-track event with coding challenges, portfolio review, and offer pre-screening.</p>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
 
             <div id="eventDetailPanel" class="card tb-detail-panel mt-4 d-none">
