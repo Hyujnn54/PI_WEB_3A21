@@ -26,6 +26,12 @@
                             <span class="input-icon-addon"><i class="ti ti-search"></i></span>
                             <input type="text" class="form-control" placeholder="Search events by title, date, location..." data-filter-search>
                         </div>
+                        <select class="form-select" style="max-width: 220px;" data-filter-criteria>
+                            <option value="all">Search In: All</option>
+                            <option value="title">Title</option>
+                            <option value="meta">Meta</option>
+                            <option value="description">Description</option>
+                        </select>
                         <select class="form-select" style="max-width: 230px;" data-filter-sort>
                             <option value="default">Default Order</option>
                             <option value="title_asc">Title A-Z</option>
@@ -40,7 +46,7 @@
 
             <div id="eventCardsGrid" class="row row-cards">
                 {% for card in cards %}
-                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
+                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
                         <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
