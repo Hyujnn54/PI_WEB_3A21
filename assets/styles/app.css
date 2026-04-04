@@ -27,9 +27,34 @@
 }
 
 .tb-topbar {
+    position: sticky;
+    top: 10px;
+    z-index: 1100;
+    width: min(1220px, calc(100% - 24px));
+    margin: 10px auto 8px;
+    border-radius: 14px;
     background: rgba(255, 255, 255, 0.75);
     backdrop-filter: blur(8px);
-    border-bottom: 1px solid #dce8ff;
+    border: 1px solid #dce8ff;
+    box-shadow: 0 14px 30px rgba(20, 53, 104, 0.11);
+}
+
+.tb-subnav-wrap {
+    position: sticky;
+    top: 76px;
+    z-index: 1080;
+    width: min(1220px, calc(100% - 24px));
+    margin: 0 auto 10px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #dce8ff;
+    box-shadow: 0 10px 24px rgba(20, 53, 104, 0.08);
+    background: rgba(255, 255, 255, 0.83);
+    backdrop-filter: blur(7px);
+}
+
+.tb-subnav-wrap .navbar {
+    background: transparent;
 }
 
 .tb-topbar .navbar-brand,
@@ -49,6 +74,7 @@
 
 .tb-brand-text {
     letter-spacing: 0.01em;
+    font-weight: 800;
 }
 
 .tb-hero {
@@ -198,6 +224,16 @@
     border: 1.5px solid #c8daff;
     box-shadow: 0 22px 40px rgba(16, 47, 94, 0.12);
     animation: tbFadeSlide 0.25s ease;
+    border-radius: 14px;
+}
+
+.tb-detail-panel.is-open {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 16px;
+    width: min(1100px, calc(100% - 28px));
+    z-index: 1050;
 }
 
 .tb-detail-panel .card-header {
@@ -305,5 +341,16 @@
 @media (max-width: 767px) {
     .tb-hero-subtitle {
         font-size: 0.95rem;
+    }
+
+    .tb-topbar {
+        top: 6px;
+        width: calc(100% - 12px);
+        margin: 6px auto 6px;
+    }
+
+    .tb-subnav-wrap {
+        top: 62px;
+        width: calc(100% - 12px);
     }
 }
