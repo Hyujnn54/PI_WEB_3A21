@@ -38,13 +38,13 @@
 }
 
 .tb-logo {
-    width: 34px;
-    height: 34px;
+    width: 26px;
+    height: 26px;
     object-fit: contain;
-    border-radius: 8px;
+    border-radius: 6px;
     background: #fff;
-    padding: 2px;
-    box-shadow: 0 4px 14px rgba(13, 91, 215, 0.18);
+    padding: 1px;
+    box-shadow: 0 3px 10px rgba(13, 91, 215, 0.16);
 }
 
 .tb-brand-text {
@@ -125,13 +125,18 @@
 
 .tb-module-card {
     background: linear-gradient(150deg, #ffffff, #f5f9ff);
-    border: 1px solid #d8e6ff;
+    border: 1.5px solid #cfe1ff;
     border-radius: 14px;
     padding: 1rem;
     box-shadow: 0 12px 26px rgba(17, 50, 98, 0.08);
     transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
     position: relative;
     cursor: pointer;
+}
+
+.tb-module-card.is-selected {
+    border-color: #5d46ff;
+    box-shadow: 0 0 0 3px rgba(93, 70, 255, 0.12), 0 18px 35px rgba(13, 91, 215, 0.16);
 }
 
 .tb-module-card::before {
@@ -187,6 +192,27 @@
 .tb-module-actions .btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 8px 16px rgba(13, 91, 215, 0.15);
+}
+
+.tb-detail-panel {
+    border: 1.5px solid #c8daff;
+    box-shadow: 0 22px 40px rgba(16, 47, 94, 0.12);
+    animation: tbFadeSlide 0.25s ease;
+}
+
+.tb-detail-panel .card-header {
+    background: linear-gradient(115deg, rgba(93, 70, 255, 0.12), rgba(19, 182, 255, 0.12));
+}
+
+@keyframes tbFadeSlide {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .tb-tags {

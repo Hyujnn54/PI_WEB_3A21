@@ -22,39 +22,53 @@
         <div class="container-xl">
             <div class="row row-cards">
                 <div class="col-lg-4">
-                    <div class="tb-module-card h-100" data-href="#">
+                    <div class="tb-module-card h-100" data-detail-target="#offerDetailPanel" data-detail-meta="Tunis | Full-time" data-detail-title="Senior Backend Engineer" data-detail-text="This role focuses on API scalability, architecture quality, and cross-team delivery. Use actions below for next steps." data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}">
                         <div class="tb-module-meta">Tunis | Full-time</div>
                         <h3>Senior Backend Engineer</h3>
                         <p>Build scalable APIs, improve hiring intelligence services, and work with data and AI pipelines.</p>
                         <div class="tb-tags"><span>Symfony</span><span>MySQL</span><span>REST</span></div>
                         <div class="tb-module-actions">
-                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Edit Offer' : 'Apply Now' }}</a>
-                            <a href="#" class="btn btn-sm btn-outline-primary">Details</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Open Details</a>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-4">
-                    <div class="tb-module-card h-100" data-href="#">
+                    <div class="tb-module-card h-100" data-detail-target="#offerDetailPanel" data-detail-meta="Sfax | Hybrid" data-detail-title="HR Data Analyst" data-detail-text="Analytics role for hiring conversion, recruiter productivity, and pipeline reporting. Open the actions for planned CRUD flow." data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}">
                         <div class="tb-module-meta">Sfax | Hybrid</div>
                         <h3>HR Data Analyst</h3>
                         <p>Analyze pipeline metrics, improve conversion ratios, and support recruiter decision-making with dashboards.</p>
                         <div class="tb-tags"><span>Analytics</span><span>SQL</span><span>BI</span></div>
                         <div class="tb-module-actions">
-                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Manage Applicants' : 'Quick Apply' }}</a>
-                            <a href="#" class="btn btn-sm btn-outline-primary">Compare</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Open Details</a>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-4">
-                    <div class="tb-module-card h-100" data-href="#">
+                    <div class="tb-module-card h-100" data-detail-target="#offerDetailPanel" data-detail-meta="Remote | Contract" data-detail-title="Interview Coordinator" data-detail-text="Coordination-focused position for schedules, interview outcomes, and process quality across candidates and recruiters." data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}">
                         <div class="tb-module-meta">Remote | Contract</div>
                         <h3>Interview Coordinator</h3>
                         <p>Coordinate interview schedules, collect feedback, and streamline communication across candidate stages.</p>
                         <div class="tb-tags"><span>Coordination</span><span>Communication</span><span>ATS</span></div>
                         <div class="tb-module-actions">
-                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Duplicate Offer' : 'Apply Now' }}</a>
-                            <a href="#" class="btn btn-sm btn-outline-primary">Share</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Open Details</a>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="offerDetailPanel" class="card tb-detail-panel mt-4 d-none">
+                <div class="card-header">
+                    <div>
+                        <div class="small text-secondary tb-detail-meta"></div>
+                        <h3 class="card-title mb-0 tb-detail-title">Offer Details</h3>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3 tb-detail-text">Select a card to preview details and available actions.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
+                        <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
+                        <a href="#" class="btn btn-outline-secondary tb-detail-tertiary">Tertiary Action</a>
                     </div>
                 </div>
             </div>

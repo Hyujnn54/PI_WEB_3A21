@@ -21,51 +21,50 @@
         <div class="container-xl">
             <div class="row row-cards">
                 <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100" data-href="#">
+                    <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="10 Apr 2026 | 10:00" data-detail-title="{{ role == 'recruiter' ? 'Panel: Backend Engineer' : 'Interview: Backend Engineer' }}" data-detail-text="Detailed interview context appears here with workflow actions prepared for upcoming CRUD integration." data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'Prepare Interview' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Notes' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Check Results' }}">
                         <div class="tb-module-meta">10 Apr 2026 | 10:00</div>
                         <h3>{{ role == 'recruiter' ? 'Panel: Backend Engineer' : 'Interview: Backend Engineer' }}</h3>
                         <p>{{ role == 'recruiter' ? 'Candidate ready, technical lead assigned, feedback pending.' : 'Technical round with API design and system architecture focus.' }}</p>
                         <div class="tb-module-actions">
-                            {% if role == 'recruiter' %}
-                                <a href="#" class="btn btn-sm btn-primary">Modify Interview</a>
-                                <a href="#" class="btn btn-sm btn-outline-primary">Add Feedback</a>
-                            {% else %}
-                                <a href="#" class="btn btn-sm btn-primary">Prepare</a>
-                                <a href="#" class="btn btn-sm btn-outline-primary">Notes</a>
-                            {% endif %}
+                            <a href="#" class="btn btn-sm btn-outline-primary">Open Details</a>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100" data-href="#">
+                    <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="15 Apr 2026 | 14:00" data-detail-title="{{ role == 'recruiter' ? 'Panel: HR Analyst' : 'Interview: HR Analyst' }}" data-detail-text="Use this detail space for recruiter decision flow or candidate preparation workflow actions." data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'Confirm Attendance' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Timeline' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Check Results' }}">
                         <div class="tb-module-meta">15 Apr 2026 | 14:00</div>
                         <h3>{{ role == 'recruiter' ? 'Panel: HR Analyst' : 'Interview: HR Analyst' }}</h3>
                         <p>{{ role == 'recruiter' ? 'Second round scheduled, waiting on interviewer confirmation.' : 'Behavioral interview scheduled with HR and team lead.' }}</p>
                         <div class="tb-module-actions">
-                            {% if role == 'recruiter' %}
-                                <a href="#" class="btn btn-sm btn-primary">Modify Interview</a>
-                                <a href="#" class="btn btn-sm btn-outline-primary">Add Feedback</a>
-                            {% else %}
-                                <a href="#" class="btn btn-sm btn-primary">Confirm</a>
-                                <a href="#" class="btn btn-sm btn-outline-primary">Timeline</a>
-                            {% endif %}
+                            <a href="#" class="btn btn-sm btn-outline-primary">Open Details</a>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6 col-xl-4">
-                    <div class="tb-module-card h-100" data-href="#">
+                    <div class="tb-module-card h-100" data-detail-target="#interviewDetailPanel" data-detail-meta="30 Mar 2026 | Completed" data-detail-title="{{ role == 'recruiter' ? 'Panel: Product Owner' : 'Interview: Product Owner' }}" data-detail-text="Result summaries and follow-up actions should be controlled from this detail panel." data-action-primary="{{ role == 'recruiter' ? 'Add Feedback' : 'View Result' }}" data-action-secondary="{{ role == 'recruiter' ? 'Schedule Follow-up' : 'View Summary' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Evaluate Candidate' : 'Request Clarification' }}">
                         <div class="tb-module-meta">30 Mar 2026 | Completed</div>
                         <h3>{{ role == 'recruiter' ? 'Panel: Product Owner' : 'Interview: Product Owner' }}</h3>
                         <p>{{ role == 'recruiter' ? 'Final notes recorded, offer recommendation submitted.' : 'Final decision shared. Offer stage available.' }}</p>
                         <div class="tb-module-actions">
-                            {% if role == 'recruiter' %}
-                                <a href="#" class="btn btn-sm btn-primary">Modify Interview</a>
-                                <a href="#" class="btn btn-sm btn-outline-primary">Add Feedback</a>
-                            {% else %}
-                                <a href="#" class="btn btn-sm btn-primary">View Result</a>
-                                <a href="#" class="btn btn-sm btn-outline-primary">Summary</a>
-                            {% endif %}
+                            <a href="#" class="btn btn-sm btn-outline-primary">Open Details</a>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="interviewDetailPanel" class="card tb-detail-panel mt-4 d-none">
+                <div class="card-header">
+                    <div>
+                        <div class="small text-secondary tb-detail-meta"></div>
+                        <h3 class="card-title mb-0 tb-detail-title">Interview Details</h3>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3 tb-detail-text">Select an interview card to open detailed actions and workflow controls.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
+                        <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
+                        <a href="#" class="btn btn-outline-secondary tb-detail-tertiary">Tertiary Action</a>
                     </div>
                 </div>
             </div>

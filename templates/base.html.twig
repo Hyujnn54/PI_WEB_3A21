@@ -84,11 +84,54 @@
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
         <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
         <script>
-            document.querySelectorAll('.tb-module-card[data-href]').forEach(function (card) {
+            document.querySelectorAll('.tb-module-card').forEach(function (card) {
                 card.addEventListener('click', function (event) {
                     if (event.target.closest('a,button,input,select,textarea,form')) {
                         return;
                     }
+
+                    document.querySelectorAll('.tb-module-card.is-selected').forEach(function (selectedCard) {
+                        selectedCard.classList.remove('is-selected');
+                    });
+                    card.classList.add('is-selected');
+
+                    const detailTarget = card.getAttribute('data-detail-target');
+                    if (detailTarget) {
+                        const panel = document.querySelector(detailTarget);
+                        if (panel) {
+                            const meta = panel.querySelector('.tb-detail-meta');
+                            const title = panel.querySelector('.tb-detail-title');
+                            const text = panel.querySelector('.tb-detail-text');
+                            const primary = panel.querySelector('.tb-detail-primary');
+                            const secondary = panel.querySelector('.tb-detail-secondary');
+                            const tertiary = panel.querySelector('.tb-detail-tertiary');
+
+                            if (meta) meta.textContent = card.getAttribute('data-detail-meta') || '';
+                            if (title) title.textContent = card.getAttribute('data-detail-title') || 'Details';
+                            if (text) text.textContent = card.getAttribute('data-detail-text') || '';
+
+                            if (primary) {
+                                primary.textContent = card.getAttribute('data-action-primary') || 'Primary Action';
+                            }
+                            if (secondary) {
+                                secondary.textContent = card.getAttribute('data-action-secondary') || 'Secondary Action';
+                            }
+                            if (tertiary) {
+                                const tertiaryLabel = card.getAttribute('data-action-tertiary');
+                                if (tertiaryLabel) {
+                                    tertiary.textContent = tertiaryLabel;
+                                    tertiary.classList.remove('d-none');
+                                } else {
+                                    tertiary.classList.add('d-none');
+                                }
+                            }
+
+                            panel.classList.remove('d-none');
+                            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            return;
+                        }
+                    }
+
                     const href = card.getAttribute('data-href');
                     if (href && href !== '#') {
                         window.location.href = href;

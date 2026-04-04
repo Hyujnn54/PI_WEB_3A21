@@ -21,36 +21,50 @@
         <div class="container-xl">
             <div class="row row-cards">
                 <div class="col-lg-4">
-                    <div class="tb-module-card h-100" data-href="#">
+                    <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="12 Apr 2026 | Tunis" data-detail-title="Talent Networking Day" data-detail-text="Event overview, attendance metrics, and planned operations actions are surfaced here." data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}">
                         <div class="tb-module-meta">12 Apr 2026 | Tunis</div>
                         <h3>Talent Networking Day</h3>
                         <p>Meet hiring teams, attend quick interviews, and discover open positions in one place.</p>
                         <div class="tb-module-actions">
-                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Manage Event' : 'Register' }}</a>
-                            <a href="#" class="btn btn-sm btn-outline-primary">Agenda</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Open Details</a>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-4">
-                    <div class="tb-module-card h-100" data-href="#">
+                    <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="18 Apr 2026 | Online" data-detail-title="Recruiter Workshop" data-detail-text="Use this panel to preview workshop operations and placeholder buttons for upcoming CRUD actions." data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}">
                         <div class="tb-module-meta">18 Apr 2026 | Online</div>
                         <h3>Recruiter Workshop</h3>
                         <p>Practical session on improving interview quality and reducing drop-off in hiring steps.</p>
                         <div class="tb-module-actions">
-                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Publish Seats' : 'Join Workshop' }}</a>
-                            <a href="#" class="btn btn-sm btn-outline-primary">Speakers</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Open Details</a>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-4">
-                    <div class="tb-module-card h-100" data-href="#">
+                    <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="27 Apr 2026 | Hybrid" data-detail-title="Tech Hiring Sprint" data-detail-text="When clicked, this details section can host edit/event controls and event-specific call-to-actions." data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}">
                         <div class="tb-module-meta">27 Apr 2026 | Hybrid</div>
                         <h3>Tech Hiring Sprint</h3>
                         <p>Fast-track event with coding challenges, portfolio review, and offer pre-screening.</p>
                         <div class="tb-module-actions">
-                            <a href="#" class="btn btn-sm btn-primary">{{ role == 'recruiter' ? 'Track Registrations' : 'Reserve Spot' }}</a>
-                            <a href="#" class="btn btn-sm btn-outline-primary">Rules</a>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Open Details</a>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="eventDetailPanel" class="card tb-detail-panel mt-4 d-none">
+                <div class="card-header">
+                    <div>
+                        <div class="small text-secondary tb-detail-meta"></div>
+                        <h3 class="card-title mb-0 tb-detail-title">Event Details</h3>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3 tb-detail-text">Select an event card to show details and contextual actions.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
+                        <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
+                        <a href="#" class="btn btn-outline-secondary tb-detail-tertiary">Tertiary Action</a>
                     </div>
                 </div>
             </div>
