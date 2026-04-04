@@ -38,6 +38,7 @@
                         <span class="navbar-toggler-icon"></span>
                     </button>
                     <h1 class="navbar-brand navbar-brand-autodark mb-0 d-flex align-items-center">
+                        <img src="{{ asset('assets/team_uploads/logo.png') }}" alt="Talent Bridge logo" class="tb-logo me-2">
                         <span class="tb-brand-text">Talent Bridge</span>
                     </h1>
                     <div class="collapse navbar-collapse" id="tbMainNav">
@@ -67,14 +68,14 @@
                             {% endif %}
                         </div>
                         <div class="nav-item d-none d-md-flex me-2">
-                            <a class="btn btn-sm btn-outline-primary" href="{{ path('app_login') }}">Login</a>
+                            <a class="btn btn-sm btn-outline-primary" href="{{ path('app_login') }}"><i class="ti ti-user-circle me-1"></i>User Login</a>
                         </div>
                         <div class="nav-item d-none d-md-flex me-2">
                             <a class="btn btn-sm btn-primary" href="{{ path('app_register') }}">Register</a>
                         </div>
                         <div class="nav-item d-none d-md-flex">
                             <form method="post" action="{{ path('app_logout') }}">
-                                <button class="btn btn-sm btn-outline-secondary" type="submit">Logout</button>
+                                <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="ti ti-logout me-1"></i>Logout</button>
                             </form>
                         </div>
                     </div>
