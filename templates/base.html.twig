@@ -39,6 +39,20 @@
                     <h1 class="navbar-brand navbar-brand-autodark mb-0 d-flex align-items-center">
                         <span class="tb-brand-text">Talent Bridge</span>
                     </h1>
+                    <div class="collapse navbar-collapse" id="tbMainNav">
+                        <ul class="navbar-nav tb-main-nav me-auto">
+                            {% if isAdminPage %}
+                                <li class="nav-item"><a class="nav-link" href="{{ path('management_users') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
+                            {% endif %}
+                            <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-check"></i></span><span class="nav-link-title">Applications</span></a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ path('front_events', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-message-2"></i></span><span class="nav-link-title">Interviews</span></a></li>
+                            {% if isAdminPage %}
+                                <li class="nav-item"><a class="nav-link" href="{{ path('back_dashboard') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span><span class="nav-link-title">Admin Dashboard</span></a></li>
+                            {% endif %}
+                        </ul>
+                    </div>
                     <div class="navbar-nav flex-row order-md-last">
                         <div class="btn-list me-2">
                             <a class="btn btn-sm {{ currentRole == 'candidate' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({role: 'candidate'})) }}">Candidate</a>
@@ -61,26 +75,6 @@
                             <form method="post" action="{{ path('app_logout') }}">
                                 <button class="btn btn-sm btn-outline-secondary" type="submit">Logout</button>
                             </form>
-                        </div>
-                    </div>
-                </div>
-            </header>
-            <header class="navbar-expand-md tb-subnav-wrap">
-                <div class="collapse navbar-collapse" id="tbMainNav">
-                    <div class="navbar navbar-light">
-                        <div class="container-xl">
-                            <ul class="navbar-nav">
-                                {% if isAdminPage %}
-                                    <li class="nav-item"><a class="nav-link" href="{{ path('management_users') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
-                                {% endif %}
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-check"></i></span><span class="nav-link-title">Applications</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_events', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-message-2"></i></span><span class="nav-link-title">Interviews</span></a></li>
-                                {% if isAdminPage %}
-                                    <li class="nav-item"><a class="nav-link" href="{{ path('back_dashboard') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span><span class="nav-link-title">Admin Dashboard</span></a></li>
-                                {% endif %}
-                            </ul>
                         </div>
                     </div>
                 </div>
