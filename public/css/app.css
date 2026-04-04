@@ -358,6 +358,25 @@
     background: var(--tb-soft);
 }
 
+.tb-admin-card {
+    border: 2px solid #2a5faa;
+    box-shadow: 0 14px 26px rgba(16, 47, 94, 0.14);
+    border-radius: 14px;
+}
+
+.tb-admin-stat-card .card-body {
+    border-top: 3px solid #5da2ff;
+}
+
+.tb-admin-card .card-header {
+    border-bottom: 2px solid #d2e3ff;
+}
+
+.tb-admin-card .table thead th {
+    background: #f4f8ff;
+    border-bottom: 2px solid #c8dcff;
+}
+
 .btn-primary {
     background: var(--tb-primary);
     border-color: var(--tb-primary);
