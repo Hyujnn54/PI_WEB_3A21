@@ -25,7 +25,6 @@
         {% endif %}
     </head>
     <body class="tb-body">
-        {% set authUser = app.session.get('auth_user') %}
         <div class="page tb-page-shell">
             <header class="navbar navbar-expand-md navbar-light d-print-none tb-topbar">
                 <div class="container-xl">
@@ -34,24 +33,17 @@
                     </button>
                     <h1 class="navbar-brand navbar-brand-autodark mb-0">Talent Bridge</h1>
                     <div class="navbar-nav flex-row order-md-last">
-                        {% if authUser %}
-                            <div class="nav-item d-none d-md-flex me-3">
-                                <span class="badge bg-blue-lt">{{ authUser.role|capitalize }}</span>
-                            </div>
-                            <div class="nav-item d-none d-md-flex me-3 align-items-center text-secondary small">{{ authUser.full_name }}</div>
-                            <div class="nav-item d-none d-md-flex">
-                                <form method="post" action="{{ path('app_logout') }}">
-                                    <button class="btn btn-sm btn-outline-primary" type="submit">Logout</button>
-                                </form>
-                            </div>
-                        {% else %}
-                            <div class="nav-item d-none d-md-flex me-2">
-                                <a class="btn btn-sm btn-outline-primary" href="{{ path('app_login') }}">Login</a>
-                            </div>
-                            <div class="nav-item d-none d-md-flex">
-                                <a class="btn btn-sm btn-primary" href="{{ path('app_register') }}">Register</a>
-                            </div>
-                        {% endif %}
+                        <div class="nav-item d-none d-md-flex me-2">
+                            <a class="btn btn-sm btn-outline-primary" href="{{ path('app_login') }}">Login</a>
+                        </div>
+                        <div class="nav-item d-none d-md-flex me-2">
+                            <a class="btn btn-sm btn-primary" href="{{ path('app_register') }}">Register</a>
+                        </div>
+                        <div class="nav-item d-none d-md-flex">
+                            <form method="post" action="{{ path('app_logout') }}">
+                                <button class="btn btn-sm btn-outline-secondary" type="submit">Logout</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -61,7 +53,7 @@
                         <div class="container-xl">
                             <ul class="navbar-nav">
                                 <li class="nav-item">
-                                    <a class="nav-link" href="{{ authUser and authUser.role == 'admin' ? path('back_dashboard') : path('front_home') }}">
+                                    <a class="nav-link" href="{{ path('front_home') }}">
                                         <span class="nav-link-title">Front Office</span>
                                     </a>
                                 </li>
@@ -70,12 +62,10 @@
                                         <span class="nav-link-title">Back Office</span>
                                     </a>
                                 </li>
-                                {% if authUser and authUser.role != 'admin' %}
-                                    <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers') }}"><span class="nav-link-title">Job Offers</span></a></li>
-                                    <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications') }}"><span class="nav-link-title">Applications</span></a></li>
-                                    <li class="nav-item"><a class="nav-link" href="{{ path('front_events') }}"><span class="nav-link-title">Events</span></a></li>
-                                    <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews') }}"><span class="nav-link-title">Interviews</span></a></li>
-                                {% endif %}
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers') }}"><span class="nav-link-title">Job Offers</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications') }}"><span class="nav-link-title">Applications</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_events') }}"><span class="nav-link-title">Events</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews') }}"><span class="nav-link-title">Interviews</span></a></li>
                             </ul>
                         </div>
                     </div>

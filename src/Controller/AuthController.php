@@ -11,25 +11,14 @@ use Symfony\Component\Routing\Attribute\Route;
 class AuthController extends AbstractController
 {
     #[Route('/', name: 'app_entry')]
-    public function entry(Request $request): Response
+    public function entry(): Response
     {
-        $authUser = $request->getSession()->get('auth_user');
-
-        if (!$authUser) {
-            return $this->redirectToRoute('app_login');
-        }
-
-        return $this->redirectByRole((string) ($authUser['role'] ?? 'candidate'));
+        return $this->redirectToRoute('app_login');
     }
 
     #[Route('/login', name: 'app_login', methods: ['GET', 'POST'])]
     public function login(Request $request): Response
     {
-        $authUser = $request->getSession()->get('auth_user');
-        if ($authUser) {
-            return $this->redirectByRole((string) ($authUser['role'] ?? 'candidate'));
-        }
-
         if ($request->isMethod('POST')) {
             $fullName = trim((string) $request->request->get('full_name', ''));
             $email = trim((string) $request->request->get('email', ''));
@@ -44,12 +33,6 @@ class AuthController extends AbstractController
                 $role = 'candidate';
             }
 
-            $request->getSession()->set('auth_user', [
-                'full_name' => $fullName,
-                'email' => $email,
-                'role' => $role,
-            ]);
-
             return $this->redirectByRole($role);
         }
 
@@ -59,11 +42,6 @@ class AuthController extends AbstractController
     #[Route('/register', name: 'app_register', methods: ['GET', 'POST'])]
     public function register(Request $request): Response
     {
-        $authUser = $request->getSession()->get('auth_user');
-        if ($authUser) {
-            return $this->redirectByRole((string) ($authUser['role'] ?? 'candidate'));
-        }
-
         if ($request->isMethod('POST')) {
             $fullName = trim((string) $request->request->get('full_name', ''));
             $email = trim((string) $request->request->get('email', ''));
@@ -78,12 +56,6 @@ class AuthController extends AbstractController
                 $role = 'candidate';
             }
 
-            $request->getSession()->set('auth_user', [
-                'full_name' => $fullName,
-                'email' => $email,
-                'role' => $role,
-            ]);
-
             $this->addFlash('success', 'Registration completed successfully.');
             return $this->redirectByRole($role);
         }
@@ -92,11 +64,8 @@ class AuthController extends AbstractController
     }
 
     #[Route('/logout', name: 'app_logout', methods: ['POST'])]
-    public function logout(Request $request): RedirectResponse
+    public function logout(): RedirectResponse
     {
-        $request->getSession()->remove('auth_user');
-        $request->getSession()->invalidate();
-
         return $this->redirectToRoute('app_login');
     }
 
