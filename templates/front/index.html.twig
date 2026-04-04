@@ -11,8 +11,8 @@
                     <h2 class="page-title">Smart Hiring Workspace</h2>
                     <p class="tb-hero-subtitle">Talent Bridge connects candidates, recruiters, and admins with one clean hiring flow from offer to interview.</p>
                     <div class="mt-3 d-flex flex-wrap gap-2">
-                        <a class="btn btn-primary" href="#jobs">Browse Opportunities</a>
-                        <a class="btn btn-outline-primary" href="{{ path('back_dashboard') }}">Go to Back Office</a>
+                        <a class="btn btn-primary" href="{{ path('front_job_offers') }}">Browse Opportunities</a>
+                        <a class="btn btn-outline-primary" href="{{ path('front_job_applications') }}">My Applications</a>
                     </div>
                 </div>
                 <div class="col-lg-4 ms-lg-auto">
@@ -54,11 +54,12 @@
                             <h3 class="card-title mb-0">Team Navigation</h3>
                         </div>
                         <div class="card-body d-flex flex-wrap gap-2">
-                            <a class="btn btn-outline-primary" href="{{ path('management_users') }}">Users</a>
-                            <a class="btn btn-outline-primary" href="{{ path('management_job_offers') }}">Job Offers</a>
-                            <a class="btn btn-outline-primary" href="{{ path('management_job_applications') }}">Job Applications</a>
-                            <a class="btn btn-outline-primary" href="{{ path('management_events') }}">Events</a>
-                            <a class="btn btn-outline-primary" href="{{ path('management_interviews') }}">Interviews</a>
+                            <a class="btn btn-outline-primary" href="{{ path('front_job_offers') }}">Job Offers</a>
+                            <a class="btn btn-outline-primary" href="{{ path('front_job_applications') }}">Job Applications</a>
+                            <a class="btn btn-outline-primary" href="{{ path('front_events') }}">Events</a>
+                            <a class="btn btn-outline-primary" href="{{ path('front_interviews') }}">Interviews</a>
+                            <a class="btn btn-outline-primary" href="{{ path('app_logout') }}" onclick="event.preventDefault(); this.nextElementSibling.submit();">Logout</a>
+                            <form method="post" action="{{ path('app_logout') }}" class="d-none"></form>
                         </div>
                     </div>
                 </div>

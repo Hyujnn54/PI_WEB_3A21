@@ -1,0 +1,24 @@
+{% extends 'shared/module_layout.html.twig' %}
+
+{% set roleLabel = authUser.role|default('candidate')|capitalize %}
+{% set module_title = 'Events' %}
+{% set module_subtitle = 'Recruitment events, workshops, and networking sessions.' %}
+{% set module_scope = roleLabel %}
+{% set module_actions = [
+    { label: 'Upcoming Events', href: '#', style: 'btn-primary' },
+    { label: roleLabel == 'Recruiter' ? 'Create Event' : 'My Registrations', href: '#' },
+    { label: 'Past Events', href: '#' }
+] %}
+{% set module_metrics = [
+    { label: 'Upcoming', value: '8' },
+    { label: 'This Month', value: '5' },
+    { label: 'Registrations', value: '231' },
+    { label: 'Avg. Rating', value: '4.6' }
+] %}
+{% set table_title = 'Event Board' %}
+{% set table_headers = ['Event', 'Date', 'Type'] %}
+{% set table_rows = [
+    ['Talent Networking Day', '2026-04-12', 'Networking'],
+    ['Recruiter Workshop', '2026-04-18', 'Workshop'],
+    ['Tech Hiring Sprint', '2026-04-27', 'Hybrid']
+] %}

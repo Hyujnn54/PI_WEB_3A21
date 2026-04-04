@@ -11,14 +11,25 @@ use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 class FrontOfficeController extends AbstractController
 {
-    #[Route('/', name: 'front_home')]
-    public function index(ManagerRegistry $doctrine): Response
+    #[Route('/front', name: 'front_home')]
+    public function index(ManagerRegistry $doctrine, Request $request): Response
     {
+        $authUser = $request->getSession()->get('auth_user');
+
+        if (!$authUser) {
+            return $this->redirectToRoute('app_login');
+        }
+
+        if (($authUser['role'] ?? '') === 'admin') {
+            return $this->redirectToRoute('back_dashboard');
+        }
+
         $stats = [
             'admins' => $doctrine->getRepository(Admin::class)->count([]),
             'candidates' => $doctrine->getRepository(Candidate::class)->count([]),
@@ -55,6 +66,7 @@ class FrontOfficeController extends AbstractController
         return $this->render('front/index.html.twig', [
             'stats' => $stats,
             'latestOffers' => $latestOffers,
+            'authUser' => $authUser,
         ]);
     }
 }

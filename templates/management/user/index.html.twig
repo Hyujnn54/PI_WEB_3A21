@@ -1,28 +1,23 @@
-{% extends 'base.html.twig' %}
+{% extends 'shared/module_layout.html.twig' %}
 
-{% block title %}Talent Bridge | User Management{% endblock %}
-
-{% block body %}
-<div class="page-wrapper">
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <h2 class="page-title">{{ module }}</h2>
-            <p class="text-secondary mb-0">{{ description }}</p>
-        </div>
-    </div>
-    <div class="page-body">
-        <div class="container-xl">
-            <div class="card">
-                <div class="card-body">
-                    <p class="mb-3">This area is ready for your teammate branch work.</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-primary" href="#">Admins</a>
-                        <a class="btn btn-outline-primary" href="#">Candidates</a>
-                        <a class="btn btn-outline-primary" href="#">Recruiters</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+{% set module_title = 'User Management' %}
+{% set module_subtitle = 'Shared workspace for admin, candidate, and recruiter account flows.' %}
+{% set module_scope = 'admin' %}
+{% set module_actions = [
+    { label: 'Admins', href: '#', style: 'btn-primary' },
+    { label: 'Candidates', href: '#' },
+    { label: 'Recruiters', href: '#' }
+] %}
+{% set module_metrics = [
+    { label: 'Pending Invites', value: '14' },
+    { label: 'Active Profiles', value: '289' },
+    { label: 'Locked Accounts', value: '7' },
+    { label: 'Role Updates', value: '21' }
+] %}
+{% set table_title = 'User Module Backlog' %}
+{% set table_headers = ['Task', 'Owner', 'Status'] %}
+{% set table_rows = [
+    ['Admin verification flow', 'User Team', 'Planned'],
+    ['Candidate profile validation', 'User Team', 'Planned'],
+    ['Recruiter account lifecycle', 'User Team', 'Planned']
+] %}

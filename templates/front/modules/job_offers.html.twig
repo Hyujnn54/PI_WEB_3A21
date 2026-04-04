@@ -1,0 +1,24 @@
+{% extends 'shared/module_layout.html.twig' %}
+
+{% set roleLabel = authUser.role|default('candidate')|capitalize %}
+{% set module_title = 'Job Offers' %}
+{% set module_subtitle = 'Browse and track opportunities relevant to your profile.' %}
+{% set module_scope = roleLabel %}
+{% set module_actions = [
+    { label: 'Browse Offers', href: '#', style: 'btn-primary' },
+    { label: roleLabel == 'Recruiter' ? 'Publish Offer' : 'Saved Offers', href: '#' },
+    { label: roleLabel == 'Recruiter' ? 'Offer Performance' : 'Apply Now', href: '#' }
+] %}
+{% set module_metrics = [
+    { label: 'Open Offers', value: '76' },
+    { label: roleLabel == 'Recruiter' ? 'Your Offers' : 'Recommended', value: roleLabel == 'Recruiter' ? '14' : '22' },
+    { label: 'New Today', value: '9' },
+    { label: 'Remote Roles', value: '17' }
+] %}
+{% set table_title = 'Offer Feed' %}
+{% set table_headers = ['Offer', 'Location', 'Status'] %}
+{% set table_rows = [
+    ['Backend Developer', 'Tunis', 'Open'],
+    ['HR Specialist', 'Sfax', 'Open'],
+    ['Data Analyst', 'Remote', 'Open']
+] %}

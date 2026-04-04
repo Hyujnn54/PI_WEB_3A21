@@ -1,0 +1,24 @@
+{% extends 'shared/module_layout.html.twig' %}
+
+{% set roleLabel = authUser.role|default('candidate')|capitalize %}
+{% set module_title = 'Interviews' %}
+{% set module_subtitle = roleLabel == 'Recruiter' ? 'Schedule, evaluate, and conclude interview sessions.' : 'Track upcoming interviews and review outcomes.' %}
+{% set module_scope = roleLabel %}
+{% set module_actions = [
+    { label: roleLabel == 'Recruiter' ? 'Interview Board' : 'Upcoming Interviews', href: '#', style: 'btn-primary' },
+    { label: 'Calendar', href: '#' },
+    { label: roleLabel == 'Recruiter' ? 'Evaluate Candidate' : 'Results', href: '#' }
+] %}
+{% set module_metrics = [
+    { label: 'Upcoming', value: '6' },
+    { label: 'Completed', value: '21' },
+    { label: roleLabel == 'Recruiter' ? 'Pending Feedback' : 'Awaiting Result', value: '4' },
+    { label: 'Accepted', value: '3' }
+] %}
+{% set table_title = 'Interview Timeline' %}
+{% set table_headers = ['Position', 'Schedule', 'Outcome'] %}
+{% set table_rows = [
+    ['Senior Recruiter', '2026-04-10 10:00', 'Pending'],
+    ['Frontend Engineer', '2026-04-15 14:00', 'Pending'],
+    ['Product Owner', '2026-03-30 09:30', 'Accepted']
+] %}

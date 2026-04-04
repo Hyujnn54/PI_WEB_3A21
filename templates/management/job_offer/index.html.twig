@@ -1,27 +1,23 @@
-{% extends 'base.html.twig' %}
+{% extends 'shared/module_layout.html.twig' %}
 
-{% block title %}Talent Bridge | Job Offer Management{% endblock %}
-
-{% block body %}
-<div class="page-wrapper">
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <h2 class="page-title">{{ module }}</h2>
-            <p class="text-secondary mb-0">{{ description }}</p>
-        </div>
-    </div>
-    <div class="page-body">
-        <div class="container-xl">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-primary" href="#">All Offers</a>
-                        <a class="btn btn-outline-primary" href="#">Pending Review</a>
-                        <a class="btn btn-outline-primary" href="#">Flagged Offers</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+{% set module_title = 'Job Offer Management' %}
+{% set module_subtitle = 'Shared base for offer posting, moderation, and publication pipeline.' %}
+{% set module_scope = 'admin' %}
+{% set module_actions = [
+    { label: 'All Offers', href: '#', style: 'btn-primary' },
+    { label: 'Pending Review', href: '#' },
+    { label: 'Flagged Offers', href: '#' }
+] %}
+{% set module_metrics = [
+    { label: 'Open Offers', value: '76' },
+    { label: 'Draft Offers', value: '19' },
+    { label: 'Flagged Offers', value: '6' },
+    { label: 'Expired Offers', value: '11' }
+] %}
+{% set table_title = 'Offer Module Backlog' %}
+{% set table_headers = ['Task', 'Owner', 'Status'] %}
+{% set table_rows = [
+    ['Offer listing table', 'Offer Team', 'Planned'],
+    ['Moderation queue', 'Offer Team', 'Planned'],
+    ['Skill matching badge', 'Offer Team', 'Planned']
+] %}

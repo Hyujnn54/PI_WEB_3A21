@@ -1,0 +1,47 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | Login{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="page-body auth-body">
+        <div class="container container-tight py-4">
+            <div class="text-center mb-4">
+                <h1 class="h2">Talent Bridge</h1>
+                <div class="text-secondary">Sign in to continue to your workspace</div>
+            </div>
+            <div class="card card-md auth-card">
+                <div class="card-body">
+                    {% for message in app.flashes('error') %}
+                        <div class="alert alert-danger">{{ message }}</div>
+                    {% endfor %}
+                    <form method="post" action="{{ path('app_login') }}">
+                        <div class="mb-3">
+                            <label class="form-label">Full Name</label>
+                            <input type="text" name="full_name" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Role</label>
+                            <select name="role" class="form-select" required>
+                                <option value="candidate">Candidate</option>
+                                <option value="recruiter">Recruiter</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="form-footer">
+                            <button type="submit" class="btn btn-primary w-100">Sign In</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="text-center text-secondary mt-3">
+                No account yet? <a href="{{ path('app_register') }}">Register</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

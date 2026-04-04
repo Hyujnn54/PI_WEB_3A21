@@ -1,27 +1,23 @@
-{% extends 'base.html.twig' %}
+{% extends 'shared/module_layout.html.twig' %}
 
-{% block title %}Talent Bridge | Interview Management{% endblock %}
-
-{% block body %}
-<div class="page-wrapper">
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <h2 class="page-title">{{ module }}</h2>
-            <p class="text-secondary mb-0">{{ description }}</p>
-        </div>
-    </div>
-    <div class="page-body">
-        <div class="container-xl">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-primary" href="#">Interview Board</a>
-                        <a class="btn btn-outline-primary" href="#">Schedule</a>
-                        <a class="btn btn-outline-primary" href="#">Feedback</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+{% set module_title = 'Interview Management' %}
+{% set module_subtitle = 'Shared board for interview rounds, evaluations, and outcomes.' %}
+{% set module_scope = 'admin' %}
+{% set module_actions = [
+    { label: 'Interview Board', href: '#', style: 'btn-primary' },
+    { label: 'Schedule', href: '#' },
+    { label: 'Feedback', href: '#' }
+] %}
+{% set module_metrics = [
+    { label: 'Scheduled', value: '34' },
+    { label: 'Completed', value: '97' },
+    { label: 'Pending Feedback', value: '11' },
+    { label: 'Accepted', value: '19' }
+] %}
+{% set table_title = 'Interview Module Backlog' %}
+{% set table_headers = ['Task', 'Owner', 'Status'] %}
+{% set table_rows = [
+    ['Interview calendar', 'Interview Team', 'Planned'],
+    ['Scoring form', 'Interview Team', 'Planned'],
+    ['Decision summary board', 'Interview Team', 'Planned']
+] %}

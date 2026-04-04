@@ -11,14 +11,25 @@ use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 class BackOfficeController extends AbstractController
 {
     #[Route('/admin', name: 'back_dashboard')]
-    public function index(ManagerRegistry $doctrine): Response
+    public function index(ManagerRegistry $doctrine, Request $request): Response
     {
+        $authUser = $request->getSession()->get('auth_user');
+
+        if (!$authUser) {
+            return $this->redirectToRoute('app_login');
+        }
+
+        if (($authUser['role'] ?? '') !== 'admin') {
+            return $this->redirectToRoute('front_home');
+        }
+
         $stats = [
             'admins' => $doctrine->getRepository(Admin::class)->count([]),
             'candidates' => $doctrine->getRepository(Candidate::class)->count([]),
@@ -31,6 +42,7 @@ class BackOfficeController extends AbstractController
 
         return $this->render('back/index.html.twig', [
             'stats' => $stats,
+            'authUser' => $authUser,
         ]);
     }
 }

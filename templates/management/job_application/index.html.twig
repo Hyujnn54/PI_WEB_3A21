@@ -1,27 +1,23 @@
-{% extends 'base.html.twig' %}
+{% extends 'shared/module_layout.html.twig' %}
 
-{% block title %}Talent Bridge | Job Application Management{% endblock %}
-
-{% block body %}
-<div class="page-wrapper">
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <h2 class="page-title">{{ module }}</h2>
-            <p class="text-secondary mb-0">{{ description }}</p>
-        </div>
-    </div>
-    <div class="page-body">
-        <div class="container-xl">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-primary" href="#">All Applications</a>
-                        <a class="btn btn-outline-primary" href="#">In Review</a>
-                        <a class="btn btn-outline-primary" href="#">Status Timeline</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+{% set module_title = 'Job Application Management' %}
+{% set module_subtitle = 'Shared space for application tracking, filtering, and decisions.' %}
+{% set module_scope = 'admin' %}
+{% set module_actions = [
+    { label: 'All Applications', href: '#', style: 'btn-primary' },
+    { label: 'In Review', href: '#' },
+    { label: 'Status Timeline', href: '#' }
+] %}
+{% set module_metrics = [
+    { label: 'New Applications', value: '43' },
+    { label: 'Under Review', value: '27' },
+    { label: 'Shortlisted', value: '12' },
+    { label: 'Rejected', value: '9' }
+] %}
+{% set table_title = 'Application Module Backlog' %}
+{% set table_headers = ['Task', 'Owner', 'Status'] %}
+{% set table_rows = [
+    ['Pipeline Kanban', 'Application Team', 'Planned'],
+    ['Status history timeline', 'Application Team', 'Planned'],
+    ['Bulk decision actions', 'Application Team', 'Planned']
+] %}

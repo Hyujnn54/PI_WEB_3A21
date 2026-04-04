@@ -1,27 +1,23 @@
-{% extends 'base.html.twig' %}
+{% extends 'shared/module_layout.html.twig' %}
 
-{% block title %}Talent Bridge | Event Management{% endblock %}
-
-{% block body %}
-<div class="page-wrapper">
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <h2 class="page-title">{{ module }}</h2>
-            <p class="text-secondary mb-0">{{ description }}</p>
-        </div>
-    </div>
-    <div class="page-body">
-        <div class="container-xl">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-primary" href="#">Event Calendar</a>
-                        <a class="btn btn-outline-primary" href="#">Registrations</a>
-                        <a class="btn btn-outline-primary" href="#">Reviews</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+{% set module_title = 'Event Management' %}
+{% set module_subtitle = 'Shared space for event scheduling and participant engagement.' %}
+{% set module_scope = 'admin' %}
+{% set module_actions = [
+    { label: 'Event Calendar', href: '#', style: 'btn-primary' },
+    { label: 'Registrations', href: '#' },
+    { label: 'Reviews', href: '#' }
+] %}
+{% set module_metrics = [
+    { label: 'Upcoming Events', value: '8' },
+    { label: 'Registrations', value: '231' },
+    { label: 'Average Rating', value: '4.6' },
+    { label: 'Cancelled', value: '1' }
+] %}
+{% set table_title = 'Event Module Backlog' %}
+{% set table_headers = ['Task', 'Owner', 'Status'] %}
+{% set table_rows = [
+    ['Calendar board', 'Event Team', 'Planned'],
+    ['Registration approvals', 'Event Team', 'Planned'],
+    ['Event review analytics', 'Event Team', 'Planned']
+] %}

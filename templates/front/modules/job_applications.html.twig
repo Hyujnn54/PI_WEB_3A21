@@ -1,0 +1,24 @@
+{% extends 'shared/module_layout.html.twig' %}
+
+{% set roleLabel = authUser.role|default('candidate')|capitalize %}
+{% set module_title = 'Job Applications' %}
+{% set module_subtitle = roleLabel == 'Recruiter' ? 'Review candidate submissions and update application statuses.' : 'Track your applications and progress through stages.' %}
+{% set module_scope = roleLabel %}
+{% set module_actions = [
+    { label: roleLabel == 'Recruiter' ? 'Incoming Applications' : 'My Applications', href: '#', style: 'btn-primary' },
+    { label: roleLabel == 'Recruiter' ? 'Shortlist' : 'Withdraw', href: '#' },
+    { label: 'Status Timeline', href: '#' }
+] %}
+{% set module_metrics = [
+    { label: roleLabel == 'Recruiter' ? 'Pending Review' : 'Submitted', value: roleLabel == 'Recruiter' ? '27' : '12' },
+    { label: 'In Process', value: '8' },
+    { label: 'Interview Stage', value: '5' },
+    { label: roleLabel == 'Recruiter' ? 'Accepted' : 'Offers Received', value: '3' }
+] %}
+{% set table_title = 'Application Queue' %}
+{% set table_headers = ['Candidate/Offer', 'Stage', 'Updated'] %}
+{% set table_rows = [
+    ['Fullstack Position', 'Screening', 'Today'],
+    ['HR Coordinator', 'Interview', 'Yesterday'],
+    ['QA Engineer', 'Decision', '2 days ago']
+] %}
