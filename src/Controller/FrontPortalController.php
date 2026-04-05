@@ -5,7 +5,9 @@ namespace App\Controller;
 use App\Entity\Interview;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
+use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
+use App\Form\JobOfferType;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,6 +31,7 @@ class FrontPortalController extends AbstractController
             $description = trim((string) $offer->getDescription());
 
             return [
+                'id' => $offer->getId(),
                 'meta' => sprintf('%s | %s', (string) $offer->getLocation(), (string) $offer->getContract_type()),
                 'title' => (string) $offer->getTitle(),
                 'text' => $description === '' ? 'No description available yet.' : substr($description, 0, 190),
@@ -118,5 +121,90 @@ class FrontPortalController extends AbstractController
             'authUser' => ['role' => $role],
             'cards' => $cards,
         ]);
+    }
+
+    #[Route('/front/job-offers/new', name: 'front_job_offers_new', methods: ['GET', 'POST'])]
+    public function jobOfferCreate(Request $request): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ('recruiter' !== $role) {
+            throw $this->createAccessDeniedException('Only recruiters can create job offers.');
+        }
+        
+        $offer = new Job_offer();
+        $form = $this->createForm(JobOfferType::class, $offer);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $offer->setCreated_at(new \DateTime());
+            $offer->setStatus('Active');
+            $offer->setQuality_score(100);
+            $offer->setAi_suggestions('[]');
+            $offer->setIs_flagged(false);
+            $offer->setFlagged_at(new \DateTime());
+
+            $recruiter = $this->doctrine->getRepository(Recruiter::class)->findOneBy([]);
+            if ($recruiter) {
+                $offer->setRecruiter_id($recruiter);
+            }
+
+            $entityManager = $this->doctrine->getManager();
+            $entityManager->persist($offer);
+            $entityManager->flush();
+
+            $this->addFlash('success', 'Job offer created successfully!');
+            return $this->redirectToRoute('front_job_offers', ['role' => $role]);
+        }
+
+        return $this->render('front/modules/job_offer_form.html.twig', [
+            'form' => $form->createView(),
+            'authUser' => ['role' => $role],
+            'action' => 'Create',
+            'offer' => $offer,
+        ]);
+    }
+
+    #[Route('/front/job-offers/{id}/edit', name: 'front_job_offers_edit', methods: ['GET', 'POST'])]
+    public function jobOfferEdit(Request $request, Job_offer $offer): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ('recruiter' !== $role) {
+            throw $this->createAccessDeniedException('Only recruiters can edit job offers.');
+        }
+
+        $form = $this->createForm(JobOfferType::class, $offer);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->doctrine->getManager()->flush();
+
+            $this->addFlash('success', 'Job offer updated successfully!');
+            return $this->redirectToRoute('front_job_offers', ['role' => $role]);
+        }
+
+        return $this->render('front/modules/job_offer_form.html.twig', [
+            'form' => $form->createView(),
+            'authUser' => ['role' => $role],
+            'action' => 'Edit',
+            'offer' => $offer,
+        ]);
+    }
+
+    #[Route('/front/job-offers/{id}/delete', name: 'front_job_offers_delete', methods: ['POST'])]
+    public function jobOfferDelete(Request $request, Job_offer $offer): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ('recruiter' !== $role) {
+            throw $this->createAccessDeniedException('Only recruiters can delete job offers.');
+        }
+
+        if ($this->isCsrfTokenValid('delete' . $offer->getId(), (string) $request->request->get('_token'))) {
+            $entityManager = $this->doctrine->getManager();
+            $entityManager->remove($offer);
+            $entityManager->flush();
+            $this->addFlash('success', 'Job offer deleted successfully!');
+        }
+
+        return $this->redirectToRoute('front_job_offers', ['role' => $role]);
     }
 }

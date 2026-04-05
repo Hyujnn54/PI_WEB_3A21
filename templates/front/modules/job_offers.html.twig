@@ -12,8 +12,13 @@
                 <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Manage your offers and monitor candidate interest.' : 'Explore detailed roles and apply directly.' }}</p>
             </div>
             <div class="d-flex gap-2">
-                <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Create Offer' : 'Recommended For You' }}</a>
-                <a href="#" class="btn btn-outline-primary">{{ role == 'recruiter' ? 'Offer Analytics' : 'Saved Jobs' }}</a>
+                {% if role == 'recruiter' %}
+                    <a href="{{ path('front_job_offers_new', { role: role }) }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Create Offer</a>
+                    <a href="#" class="btn btn-outline-primary">Offer Analytics</a>
+                {% else %}
+                    <a href="#" class="btn btn-primary">Recommended For You</a>
+                    <a href="#" class="btn btn-outline-primary">Saved Jobs</a>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -48,7 +53,7 @@
             <div id="offerCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}">
+                        <div class="tb-module-card h-100" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete Offer' : 'Save Offer' }}" data-action-tertiary="{{ role == 'recruiter' ? 'View Applicants' : 'Compare Offer' }}" data-action-primary-url="{{ role == 'recruiter' ? path('front_job_offers_edit', { id: card.id|default(0), role: role }) : '#' }}" data-action-secondary-url="{{ role == 'recruiter' ? path('front_job_offers_delete', { id: card.id|default(0), role: role }) : '#' }}" data-action-secondary-csrf="{{ csrf_token('delete' ~ card.id|default(0)) }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
@@ -75,10 +80,43 @@
                     <p class="mb-3 tb-detail-text">Select a card to preview details and available actions.</p>
                     <div class="d-flex flex-wrap gap-2">
                         <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
-                        <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
+                        {% if role == 'recruiter' %}
+                            <form method="post" action="#" class="tb-detail-secondary-form d-inline-block">
+                                <input type="hidden" name="_token" value="">
+                                <button class="btn btn-outline-danger tb-detail-secondary">Secondary Action</button>
+                            </form>
+                        {% else %}
+                            <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
+                        {% endif %}
                         <a href="#" class="btn btn-outline-secondary tb-detail-tertiary">Tertiary Action</a>
                     </div>
                 </div>
+
+                {# Add some inline JS or rely on base.html.twig behavior if it exists #}
+                <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const panel = document.querySelector('#offerDetailPanel');
+                        const primaryBtn = panel.querySelector('.tb-detail-primary');
+                        const secondaryForm = panel.querySelector('.tb-detail-secondary-form');
+                        const secondaryBtn = panel.querySelector('.tb-detail-secondary');
+                        const tokenInput = panel.querySelector('input[name="_token"]');
+
+                        document.querySelectorAll('.tb-module-card').forEach(card => {
+                            card.addEventListener('click', () => {
+                                const pUrl = card.dataset.actionPrimaryUrl;
+                                if (pUrl && primaryBtn) primaryBtn.href = pUrl;
+                                
+                                const sUrl = card.dataset.actionSecondaryUrl;
+                                const csrf = card.dataset.actionSecondaryCsrf;
+                                if (sUrl && secondaryForm) {
+                                    secondaryForm.action = sUrl;
+                                    if (tokenInput) tokenInput.value = csrf;
+                                    if (secondaryBtn) secondaryBtn.textContent = card.dataset.actionSecondary;
+                                }
+                            });
+                        });
+                    });
+                </script>
             </div>
         </div>
     </div>
