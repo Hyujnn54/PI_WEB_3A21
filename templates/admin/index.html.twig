@@ -1,0 +1,41 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Talent Bridge | Admin Dashboard{% endblock %}
+
+{% block admin_content %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-1">Administration Dashboard</h1>
+            <p class="mb-0">Template scaffold ready for recruitment management workflows.</p>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        {% for kpi in kpis %}
+            <div class="col-md-6 col-xl-3">
+                <div class="card card-body border">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="mb-1 small text-muted">{{ kpi.label }}</p>
+                            <h4 class="mb-0">{{ kpi.value }}</h4>
+                        </div>
+                        <div class="icon-lg bg-primary bg-opacity-10 text-primary rounded-circle">
+                            <i class="{{ kpi.icon }}"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="card border">
+        <div class="card-body">
+            <h5 class="card-title">Next Migration Steps</h5>
+            <ul class="mb-0">
+                <li>Connect this dashboard to Symfony entities and repositories.</li>
+                <li>Port Java module logic (users, offers, interviews, events).</li>
+                <li>Enable role-based security for admin and recruiter spaces.</li>
+            </ul>
+        </div>
+    </div>
+{% endblock %}

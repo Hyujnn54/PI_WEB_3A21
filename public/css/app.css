@@ -19,6 +19,9 @@
         radial-gradient(circle at 90% 8%, rgba(19, 182, 255, 0.18), transparent 36%),
         radial-gradient(circle at 50% 120%, rgba(13, 91, 215, 0.09), transparent 42%),
         linear-gradient(180deg, #f4f8ff 0%, #ffffff 75%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    background-size: cover;
     min-height: 100vh;
 }
 
@@ -211,6 +214,77 @@
     border-bottom: 2px dashed #d2e2fb;
 }
 
+.tb-interview-status {
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    padding: 0.45rem 0.62rem;
+    border: 1px solid rgba(22, 58, 108, 0.14);
+}
+
+.tb-status-anchor {
+    flex-shrink: 0;
+}
+
+.tb-candidate-card {
+    border-width: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.tb-candidate-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 12px;
+    height: 100%;
+    opacity: 0.85;
+}
+
+.tb-candidate-card.tb-status-pending {
+    background: linear-gradient(120deg, #ffffff 0%, #fff3db 100%);
+    border-color: #d6a352;
+}
+
+.tb-candidate-card.tb-status-pending::after {
+    background: linear-gradient(180deg, #f0b14a, #c88812);
+}
+
+.tb-candidate-card.tb-status-accepted {
+    background: linear-gradient(120deg, #ffffff 0%, #dff7e7 100%);
+    border-color: #4ca969;
+}
+
+.tb-candidate-card.tb-status-accepted::after {
+    background: linear-gradient(180deg, #58b874, #2f8a4a);
+}
+
+.tb-candidate-card.tb-status-rejected {
+    background: linear-gradient(120deg, #ffffff 0%, #fde4e4 100%);
+    border-color: #cc7070;
+}
+
+.tb-candidate-card.tb-status-rejected::after {
+    background: linear-gradient(180deg, #df7a7a, #b84a4a);
+}
+
+.tb-candidate-card.tb-status-scheduled {
+    background: linear-gradient(120deg, #ffffff 0%, #e5f0ff 100%);
+    border-color: #6e99d7;
+}
+
+.tb-candidate-card.tb-status-scheduled::after {
+    background: linear-gradient(180deg, #6ea4e8, #3f76bd);
+}
+
+.col-12 .tb-module-card h3 {
+    font-size: 1.12rem;
+}
+
+.col-12 .tb-module-card p {
+    font-size: 0.95rem;
+}
+
 .tb-module-actions {
     display: flex;
     gap: 0.45rem;
@@ -246,6 +320,91 @@
     z-index: 1190;
     max-height: min(44vh, 360px);
     overflow: auto;
+}
+
+.tb-interviews-page {
+    padding-bottom: 130px;
+}
+
+.tb-detail-panel-side {
+    position: sticky;
+    top: 96px;
+    border: 2px solid #2a5faa;
+    box-shadow: 0 16px 30px rgba(16, 47, 94, 0.16);
+    min-height: 280px;
+    z-index: 1100;
+}
+
+.tb-interviews-layout .tb-detail-panel.is-open {
+    position: sticky;
+    left: auto;
+    transform: none;
+    bottom: auto;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+}
+
+.tb-interview-action-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 10px;
+    z-index: 1205;
+}
+
+.tb-interview-action-dock .container-xl {
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.tb-interview-action-dock-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.8rem;
+    border: 2px solid #2a5faa;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 14px 30px rgba(16, 47, 94, 0.22);
+    padding: 0.7rem 0.9rem;
+}
+
+.tb-interview-action-buttons {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    padding-bottom: 2px;
+}
+
+.tb-interview-action-buttons .btn,
+.tb-interview-action-buttons form {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* Layering: page (base) < details panel (1100) < bars (1200+) < popups (1300+) */
+.modal-backdrop.show {
+    z-index: 1300;
+}
+
+.modal.show {
+    z-index: 1310;
+}
+
+@media (max-width: 1199px) {
+    .tb-detail-panel-side {
+        position: static;
+        top: auto;
+    }
+}
+
+@media (max-width: 767px) {
+    .tb-interview-action-dock-inner {
+        flex-direction: row;
+        align-items: center;
+    }
 }
 
 .tb-detail-panel .card-header {
@@ -385,6 +544,112 @@
 .tb-filter-bar .input-icon {
     min-width: min(430px, 100%);
     flex: 1 1 300px;
+}
+
+.tb-detail-extra {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.tb-detail-row {
+    background: #f6f9ff;
+    border: 1px solid #d7e5ff;
+    border-radius: 8px;
+    padding: 0.45rem 0.6rem;
+}
+
+.tb-calendar-title {
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+    color: #1a437e;
+}
+
+.tb-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.tb-calendar-head div {
+    font-size: 0.78rem;
+    color: #55719a;
+    text-align: center;
+    font-weight: 700;
+}
+
+.tb-calendar-cell {
+    min-height: 46px;
+    border: 1px solid #d6e4ff;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    position: relative;
+    font-weight: 600;
+    color: #2e4f7f;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    cursor: pointer;
+}
+
+.tb-calendar-cell.tb-empty {
+    background: transparent;
+    border-style: dashed;
+    opacity: 0.45;
+    cursor: default;
+}
+
+.tb-calendar-cell:not(.tb-empty):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 18px rgba(17, 47, 91, 0.12);
+    border-color: #4f82d5;
+}
+
+.tb-calendar-cell.tb-has-event {
+    border-color: #0d5bd7;
+    box-shadow: inset 0 0 0 1px rgba(13, 91, 215, 0.2);
+    background: #edf5ff;
+}
+
+.tb-calendar-cell.is-selected {
+    border-color: #0f55b8;
+    background: #dbeaff;
+    box-shadow: 0 0 0 2px rgba(15, 85, 184, 0.2);
+}
+
+.tb-calendar-cell .tb-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #0d5bd7;
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+}
+
+.tb-calendar-day-details {
+    border: 1px solid #d8e7ff;
+    border-radius: 10px;
+    background: #f7fbff;
+    padding: 0.75rem;
+}
+
+.tb-calendar-day-title {
+    font-weight: 700;
+    color: #1f4a87;
+    margin-bottom: 0.5rem;
+}
+
+.tb-calendar-event-item {
+    border: 1px solid #d5e3f9;
+    background: #fff;
+    border-radius: 8px;
+    padding: 0.45rem 0.6rem;
+    margin-bottom: 0.4rem;
+}
+
+.tb-calendar-event-item:last-child {
+    margin-bottom: 0;
 }
 
 .btn-primary {

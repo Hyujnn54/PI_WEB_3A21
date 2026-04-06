@@ -12,19 +12,16 @@
                 <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Manage your offers and monitor candidate interest.' : 'Explore detailed roles and apply directly.' }}</p>
             </div>
             <div class="d-flex gap-2">
-                {% if role == 'recruiter' %}
-                    <a href="{{ path('front_job_offers_new', { role: role }) }}" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Create Offer</a>
-                    <a href="#" class="btn btn-outline-primary">Offer Analytics</a>
-                {% else %}
-                    <a href="#" class="btn btn-primary">Recommended For You</a>
-                    <a href="#" class="btn btn-outline-primary">Saved Jobs</a>
-                {% endif %}
+                <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Create Offer' : 'Recommended For You' }}</a>
+                <a href="#" class="btn btn-outline-primary">{{ role == 'recruiter' ? 'Offer Analytics' : 'Saved Jobs' }}</a>
             </div>
         </div>
     </div>
 
     <div class="page-body">
-        <div class="container-xl">
+        <div class="container-xl tb-interviews-page">
+            <div class="row g-3 tb-interviews-layout">
+                <div class="col-12 col-xl-8">
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
                     <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#offerCardsGrid">
@@ -53,7 +50,7 @@
             <div id="offerCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete Offer' : 'Save Offer' }}" data-action-tertiary="{{ role == 'recruiter' ? 'View Applicants' : 'Compare Offer' }}" data-action-primary-url="{{ role == 'recruiter' ? path('front_job_offers_edit', { id: card.id|default(0), role: role }) : '#' }}" data-action-secondary-url="{{ role == 'recruiter' ? path('front_job_offers_delete', { id: card.id|default(0), role: role }) : '#' }}" data-action-secondary-csrf="{{ csrf_token('delete' ~ card.id|default(0)) }}">
+                        <div class="tb-module-card h-100" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Type: {{ card.meta|split(' | ')|last }}||Location: {{ card.meta|split(' | ')|first }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
@@ -68,55 +65,36 @@
                 {% endfor %}
             </div>
 
-            <div id="offerDetailPanel" class="card tb-detail-panel mt-4 d-none">
+                </div>
+                <div class="col-12 col-xl-4">
+            <div id="offerDetailPanel" class="card tb-detail-panel tb-detail-panel-side">
                 <div class="card-header">
                     <div>
                         <div class="small text-secondary tb-detail-meta"></div>
                         <h3 class="card-title mb-0 tb-detail-title">Offer Details</h3>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary tb-detail-close tb-detail-close-icon ms-auto" aria-label="Close details panel"><i class="ti ti-x"></i></button>
                 </div>
                 <div class="card-body">
-                    <p class="mb-3 tb-detail-text">Select a card to preview details and available actions.</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
-                        {% if role == 'recruiter' %}
-                            <form method="post" action="#" class="tb-detail-secondary-form d-inline-block">
-                                <input type="hidden" name="_token" value="">
-                                <button class="btn btn-outline-danger tb-detail-secondary">Secondary Action</button>
+                    <p class="mb-3 tb-detail-text">Select an offer card to display details here.</p>
+                    <div class="tb-detail-extra small text-secondary mb-0"></div>
+                </div>
+            </div>
+                </div>
+            </div>
+
+            <div id="offerActionDock" class="tb-interview-action-dock tb-generic-action-dock d-none">
+                <div class="container-xl">
+                    <div class="tb-interview-action-dock-inner">
+                        <div class="small text-secondary">Selected offer actions</div>
+                        <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
+                            <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-edit me-1"></i>Primary Action</a>
+                            <form method="post" action="#" class="d-inline tb-dock-secondary-form">
+                                <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
                             </form>
-                        {% else %}
-                            <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
-                        {% endif %}
-                        <a href="#" class="btn btn-outline-secondary tb-detail-tertiary">Tertiary Action</a>
+                            <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
+                        </div>
                     </div>
                 </div>
-
-                {# Add some inline JS or rely on base.html.twig behavior if it exists #}
-                <script>
-                    document.addEventListener('DOMContentLoaded', () => {
-                        const panel = document.querySelector('#offerDetailPanel');
-                        const primaryBtn = panel.querySelector('.tb-detail-primary');
-                        const secondaryForm = panel.querySelector('.tb-detail-secondary-form');
-                        const secondaryBtn = panel.querySelector('.tb-detail-secondary');
-                        const tokenInput = panel.querySelector('input[name="_token"]');
-
-                        document.querySelectorAll('.tb-module-card').forEach(card => {
-                            card.addEventListener('click', () => {
-                                const pUrl = card.dataset.actionPrimaryUrl;
-                                if (pUrl && primaryBtn) primaryBtn.href = pUrl;
-                                
-                                const sUrl = card.dataset.actionSecondaryUrl;
-                                const csrf = card.dataset.actionSecondaryCsrf;
-                                if (sUrl && secondaryForm) {
-                                    secondaryForm.action = sUrl;
-                                    if (tokenInput) tokenInput.value = csrf;
-                                    if (secondaryBtn) secondaryBtn.textContent = card.dataset.actionSecondary;
-                                }
-                            });
-                        });
-                    });
-                </script>
             </div>
         </div>
     </div>

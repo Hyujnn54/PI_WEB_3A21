@@ -1,0 +1,100 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | {{ mode == 'edit' ? 'Edit Interview' : 'Create Interview' }}{% endblock %}
+
+{% block body %}
+{% set role = authUser.role|default('recruiter') %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="page-title"><i class="ti ti-calendar-plus me-1"></i>{{ mode == 'edit' ? 'Modify Interview' : 'Create Interview' }}</h2>
+                <p class="text-secondary mb-0">Scheduling window: future date only, maximum 90 days ahead.</p>
+            </div>
+            <a href="{{ path('front_interviews', app.request.query.all|merge({role: role})) }}" class="btn btn-outline-primary">Back to Interviews</a>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card tb-admin-card">
+                <div class="card-body">
+                    <form method="post" class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Scheduled At</label>
+                            <input type="datetime-local" name="scheduled_at" class="form-control" value="{{ formData.scheduled_at|default('') }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Duration (minutes)</label>
+                            <input type="number" min="15" max="240" name="duration_minutes" class="form-control" value="{{ formData.duration_minutes|default('60') }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Mode</label>
+                            <select name="mode" class="form-select" required>
+                                <option value="online" {{ formData.mode|default('online') == 'online' ? 'selected' : '' }}>Online</option>
+                                <option value="onsite" {{ formData.mode|default('online') == 'onsite' ? 'selected' : '' }}>Onsite</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" data-online-field>
+                            <label class="form-label">Meeting Link (required for online)</label>
+                            <input type="url" name="meeting_link" class="form-control" placeholder="https://..." value="{{ formData.meeting_link|default('') }}">
+                        </div>
+                        <div class="col-md-6" data-onsite-field>
+                            <label class="form-label">Room (required for onsite)</label>
+                            <input type="text" name="location" class="form-control" placeholder="Room / Office location" value="{{ formData.location|default('') }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Additional Notes</label>
+                            <textarea name="notes" rows="4" class="form-control" placeholder="Additional interview details...">{{ formData.notes|default('') }}</textarea>
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">{{ mode == 'edit' ? 'Save Changes' : 'Create Interview' }}</button>
+                            <a href="{{ path('front_interviews', app.request.query.all|merge({role: role})) }}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.querySelector('form');
+        if (!form) return;
+
+        const modeSelect = form.querySelector('select[name="mode"]');
+        const meetingInput = form.querySelector('input[name="meeting_link"]');
+        const locationInput = form.querySelector('input[name="location"]');
+        const onlineField = form.querySelector('[data-online-field]');
+        const onsiteField = form.querySelector('[data-onsite-field]');
+
+        const applyModeFields = function () {
+            const mode = modeSelect ? modeSelect.value : 'online';
+            if (mode === 'onsite') {
+                if (onlineField) onlineField.classList.add('d-none');
+                if (onsiteField) onsiteField.classList.remove('d-none');
+                if (meetingInput) {
+                    meetingInput.value = '';
+                    meetingInput.required = false;
+                }
+                if (locationInput) locationInput.required = true;
+            } else {
+                if (onsiteField) onsiteField.classList.add('d-none');
+                if (onlineField) onlineField.classList.remove('d-none');
+                if (locationInput) {
+                    locationInput.value = '';
+                    locationInput.required = false;
+                }
+                if (meetingInput) meetingInput.required = true;
+            }
+        };
+
+        if (modeSelect) {
+            modeSelect.addEventListener('change', applyModeFields);
+        }
+
+        applyModeFields();
+    });
+</script>
+{% endblock %}

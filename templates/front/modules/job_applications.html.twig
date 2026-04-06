@@ -18,7 +18,9 @@
         </div>
     </div>
     <div class="page-body">
-        <div class="container-xl">
+        <div class="container-xl tb-interviews-page">
+            <div class="row g-3 tb-interviews-layout">
+                <div class="col-12 col-xl-8">
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
                     <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#applicationCardsGrid">
@@ -47,10 +49,21 @@
             <div id="applicationCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Track Status' }}" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : 'Update Profile' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : 'Withdraw Application' }}">
+                        <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Track Status' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : 'Update Profile' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : 'Withdraw Application' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Application: {{ card.meta }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
+                            {% if role == 'recruiter' %}
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <form method="post" action="{{ card.accept_url|default('#') }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Accept</button>
+                                    </form>
+                                    <form method="post" action="{{ card.decline_url|default('#') }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Decline</button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal" data-application-id="{{ card.id|default(0) }}" data-create-url="{{ card.create_interview_url|default('#') }}">Create Interview</button>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 {% else %}
@@ -62,24 +75,161 @@
                 {% endfor %}
             </div>
 
-            <div id="applicationDetailPanel" class="card tb-detail-panel mt-4 d-none">
+                </div>
+                <div class="col-12 col-xl-4">
+            <div id="applicationDetailPanel" class="card tb-detail-panel tb-detail-panel-side">
                 <div class="card-header">
                     <div>
                         <div class="small text-secondary tb-detail-meta"></div>
                         <h3 class="card-title mb-0 tb-detail-title">Application Details</h3>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary tb-detail-close tb-detail-close-icon ms-auto" aria-label="Close details panel"><i class="ti ti-x"></i></button>
                 </div>
                 <div class="card-body">
-                    <p class="mb-3 tb-detail-text">Click an application card to reveal timeline and action placeholders.</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
-                        <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
-                        <a href="#" class="btn btn-outline-secondary tb-detail-tertiary">Tertiary Action</a>
+                    <p class="mb-3 tb-detail-text">Select an application card to display details here.</p>
+                    <div class="tb-detail-extra small text-secondary mb-0"></div>
+                </div>
+            </div>
+                </div>
+            </div>
+
+            <div id="applicationActionDock" class="tb-interview-action-dock tb-generic-action-dock d-none">
+                <div class="container-xl">
+                    <div class="tb-interview-action-dock-inner">
+                        <div class="small text-secondary">Selected application actions</div>
+                        <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
+                            <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-edit me-1"></i>Primary Action</a>
+                            <form method="post" action="#" class="d-inline tb-dock-secondary-form">
+                                <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
+                            </form>
+                            <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="createInterviewModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content tb-admin-card">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="ti ti-calendar-plus me-1"></i>Create Interview</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form id="createInterviewForm" method="post">
+                            <div class="modal-body row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Scheduled At</label>
+                                    <input type="datetime-local" name="scheduled_at" class="form-control" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Duration</label>
+                                    <input type="number" min="15" max="240" name="duration_minutes" class="form-control" value="60" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Mode</label>
+                                    <select name="mode" class="form-select" required>
+                                        <option value="online">Online</option>
+                                        <option value="onsite">Onsite</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6" data-online-field>
+                                    <label class="form-label">Meeting Link (online)</label>
+                                    <input type="url" name="meeting_link" class="form-control" placeholder="https://...">
+                                </div>
+                                <div class="col-md-6" data-onsite-field>
+                                    <label class="form-label">Room (onsite)</label>
+                                    <input type="text" name="location" class="form-control" placeholder="Room / Office location">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Additional Notes</label>
+                                    <textarea name="notes" rows="3" class="form-control"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Confirm</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const modalEl = document.getElementById('createInterviewModal');
+        const formEl = document.getElementById('createInterviewForm');
+        if (!modalEl || !formEl || typeof bootstrap === 'undefined') {
+            return;
+        }
+
+        const modal = new bootstrap.Modal(modalEl);
+        const modeSelect = formEl.querySelector('select[name="mode"]');
+        const scheduleInput = formEl.querySelector('input[name="scheduled_at"]');
+        const meetingInput = formEl.querySelector('input[name="meeting_link"]');
+        const locationInput = formEl.querySelector('input[name="location"]');
+        const onlineField = formEl.querySelector('[data-online-field]');
+        const onsiteField = formEl.querySelector('[data-onsite-field]');
+
+        const now = new Date();
+        const minValue = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        if (scheduleInput) {
+            scheduleInput.min = minValue;
+        }
+
+        const applyModeFields = function () {
+            const mode = modeSelect ? modeSelect.value : 'online';
+            if (mode === 'onsite') {
+                if (onlineField) onlineField.classList.add('d-none');
+                if (onsiteField) onsiteField.classList.remove('d-none');
+                if (meetingInput) {
+                    meetingInput.value = '';
+                    meetingInput.required = false;
+                }
+                if (locationInput) locationInput.required = true;
+            } else {
+                if (onsiteField) onsiteField.classList.add('d-none');
+                if (onlineField) onlineField.classList.remove('d-none');
+                if (locationInput) {
+                    locationInput.value = '';
+                    locationInput.required = false;
+                }
+                if (meetingInput) meetingInput.required = true;
+            }
+        };
+
+        if (modeSelect) {
+            modeSelect.addEventListener('change', applyModeFields);
+        }
+
+        const openCreateModalForBtn = function (btn) {
+            if (!btn) return;
+            const createUrl = btn.getAttribute('data-create-url');
+            if (!createUrl) return;
+            formEl.setAttribute('action', createUrl);
+            if (modeSelect) modeSelect.value = 'online';
+            if (scheduleInput) scheduleInput.min = minValue;
+            applyModeFields();
+            modal.show();
+        };
+
+        document.querySelectorAll('.tb-open-interview-modal').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                openCreateModalForBtn(btn);
+            });
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        const openCreateFor = params.get('openCreateFor');
+        if (openCreateFor) {
+            const btn = document.querySelector('.tb-open-interview-modal[data-application-id="' + openCreateFor + '"]');
+            if (btn) {
+                openCreateModalForBtn(btn);
+            }
+        }
+
+        applyModeFields();
+    });
+</script>
 {% endblock %}

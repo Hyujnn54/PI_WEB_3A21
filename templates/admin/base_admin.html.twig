@@ -1,0 +1,132 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | Admin{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" type="text/css" href="{{ asset('assets/vendor/apexcharts/css/apexcharts.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ asset('assets/vendor/overlay-scrollbar/css/overlayscrollbars.min.css') }}">
+    <style>
+        main {
+            min-height: 100vh;
+        }
+
+        .navbar.sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 270px;
+            z-index: 1030;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            padding: 1rem 0.75rem;
+            overflow-y: auto;
+        }
+
+        .navbar.sidebar .navbar-nav {
+            flex-direction: column !important;
+        }
+
+        .page-content {
+            margin-left: 270px;
+            min-height: 100vh;
+            width: calc(100% - 270px);
+            background: transparent;
+        }
+
+        .sidebar.bg-dark,
+        .sidebar .offcanvas-body.bg-dark {
+            background: #0d5bd7 !important;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.9) !important;
+            border-radius: 8px;
+            margin-bottom: 0.35rem;
+            background: transparent !important;
+            background-image: none !important;
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0.55rem 0.7rem;
+            transition: background-color 0.16s ease, color 0.16s ease;
+            filter: none !important;
+        }
+
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background: rgba(255, 255, 255, 0.16) !important;
+            background-image: none !important;
+            color: #ffffff !important;
+            border: none !important;
+            filter: none !important;
+        }
+
+        .sidebar .nav-link i {
+            width: 1.1rem;
+            text-align: center;
+            margin-right: 0.5rem;
+            opacity: 0.95;
+        }
+
+        .navbar-brand .tb-brand-label {
+            display: inline-block !important;
+            font-size: 1rem !important;
+            line-height: 1.2 !important;
+            letter-spacing: 0.01em;
+            vertical-align: middle;
+        }
+
+        .sidebar .navbar-brand .tb-brand-label {
+            color: #ffffff !important;
+        }
+
+        .page-content .btn {
+            background-image: none !important;
+            box-shadow: none !important;
+            border-radius: 8px;
+        }
+
+        .page-content .btn:focus {
+            box-shadow: 0 0 0 0.2rem rgba(13, 91, 215, 0.18) !important;
+        }
+
+        .page-content .card {
+            border-color: #dbe7ff;
+        }
+
+        @media (max-width: 1199.98px) {
+            .navbar.sidebar {
+                position: relative;
+                width: 100%;
+                height: auto;
+                min-height: auto;
+            }
+
+            .page-content {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <main>
+        {% include 'admin/partials/sidebar.html.twig' %}
+
+        <div class="page-content">
+            <section class="pt-4 px-3 px-xl-5">
+                {% block admin_content %}{% endblock %}
+            </section>
+        </div>
+    </main>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="{{ asset('assets/vendor/purecounterjs/dist/purecounter_vanilla.js') }}"></script>
+    <script src="{{ asset('assets/vendor/apexcharts/js/apexcharts.min.js') }}"></script>
+    <script src="{{ asset('assets/vendor/overlay-scrollbar/js/overlayscrollbars.min.js') }}"></script>
+{% endblock %}
