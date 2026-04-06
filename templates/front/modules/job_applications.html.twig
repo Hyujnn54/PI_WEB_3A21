@@ -72,7 +72,7 @@
                 {% for card in cards %}
                     {% set canCreateInterview = card.can_create_interview|default(true) %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-accept-url="{{ card.accept_url|default('#') }}" data-decline-url="{{ card.decline_url|default('#') }}" data-create-url="{{ card.create_interview_url|default('#') }}" data-create-disabled="{{ canCreateInterview ? '0' : '1' }}" data-create-reason="{{ card.interview_block_reason|default('Interview already exists for this application.')|e('html_attr') }}" data-detail-extra="Application: {{ card.meta }}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already exists for this application.') }}{% endif %}">
+                        <div class="tb-module-card h-100" data-application-id="{{ card.id|default(0) }}" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-accept-url="{{ card.accept_url|default('#') }}" data-decline-url="{{ card.decline_url|default('#') }}" data-create-url="{{ card.create_interview_url|default('#') }}" data-create-disabled="{{ canCreateInterview ? '0' : '1' }}" data-create-reason="{{ card.interview_block_reason|default('Interview already exists for this application.')|e('html_attr') }}" data-detail-extra="Application: {{ card.meta }}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already exists for this application.') }}{% endif %}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
@@ -104,18 +104,18 @@
                 </div>
             </div>
 
-            <div id="applicationActionDock" class="tb-interview-action-dock d-none">
+            <div id="applicationActionDock" class="tb-interview-action-dock">
                 <div class="container-xl">
                     <div class="tb-interview-action-dock-inner">
-                        <div class="small text-secondary" id="applicationActionLabel">Select an application to unlock actions</div>
+                        <div class="small text-secondary" id="applicationActionLabel">Select an application card to unlock actions</div>
                         <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
                             <form method="post" action="#" class="d-inline" id="applicationAcceptForm">
-                                <button type="submit" class="btn btn-outline-success" id="applicationAcceptBtn"><i class="ti ti-check me-1"></i>Accept</button>
+                                <button type="submit" class="btn btn-outline-success" id="applicationAcceptBtn" disabled aria-disabled="true"><i class="ti ti-check me-1"></i>Accept</button>
                             </form>
                             <form method="post" action="#" class="d-inline" id="applicationDeclineForm">
-                                <button type="submit" class="btn btn-outline-danger" id="applicationDeclineBtn"><i class="ti ti-x me-1"></i>Decline</button>
+                                <button type="submit" class="btn btn-outline-danger" id="applicationDeclineBtn" disabled aria-disabled="true"><i class="ti ti-x me-1"></i>Decline</button>
                             </form>
-                            <button type="button" class="btn btn-primary" id="applicationCreateBtn"><i class="ti ti-calendar-plus me-1"></i>Create Interview</button>
+                            <button type="button" class="btn btn-primary" id="applicationCreateBtn" disabled aria-disabled="true"><i class="ti ti-calendar-plus me-1"></i>Create Interview</button>
                             <span class="tb-dock-reason d-none" id="applicationCreateReason"><i class="ti ti-alert-circle me-1"></i><span></span></span>
                         </div>
                     </div>
@@ -190,6 +190,8 @@
         const actionLabel = document.getElementById('applicationActionLabel');
         const acceptForm = document.getElementById('applicationAcceptForm');
         const declineForm = document.getElementById('applicationDeclineForm');
+        const acceptBtn = document.getElementById('applicationAcceptBtn');
+        const declineBtn = document.getElementById('applicationDeclineBtn');
         const createBtn = document.getElementById('applicationCreateBtn');
         const createReason = document.getElementById('applicationCreateReason');
         let selectedCard = null;
@@ -244,12 +246,23 @@
 
             if (acceptForm) acceptForm.setAttribute('action', acceptUrl);
             if (declineForm) declineForm.setAttribute('action', declineUrl);
+            if (acceptBtn) {
+                acceptBtn.disabled = false;
+                acceptBtn.setAttribute('aria-disabled', 'false');
+            }
+            if (declineBtn) {
+                declineBtn.disabled = false;
+                declineBtn.setAttribute('aria-disabled', 'false');
+            }
 
             if (createBtn) {
                 createBtn.setAttribute('data-create-url', createUrl);
                 createBtn.classList.toggle('tb-create-locked', createDisabled);
                 createBtn.toggleAttribute('disabled', createDisabled);
                 createBtn.setAttribute('aria-disabled', createDisabled ? 'true' : 'false');
+                createBtn.innerHTML = createDisabled
+                    ? '<i class="ti ti-lock me-1"></i>Interview Already Exists'
+                    : '<i class="ti ti-calendar-plus me-1"></i>Create Interview';
             }
 
             if (createReason) {
@@ -267,7 +280,6 @@
                 actionLabel.textContent = (card.getAttribute('data-detail-title') || 'Selected application') + ' actions';
             }
 
-            actionDock.classList.remove('d-none');
         };
 
         document.querySelectorAll('#applicationCardsGrid .tb-module-card').forEach(function (card) {
@@ -290,7 +302,7 @@
         const params = new URLSearchParams(window.location.search);
         const openCreateFor = params.get('openCreateFor');
         if (openCreateFor) {
-            const card = document.querySelector('#applicationCardsGrid .tb-module-card[data-create-url*="/' + openCreateFor + '"]');
+            const card = document.querySelector('#applicationCardsGrid .tb-module-card[data-application-id="' + openCreateFor + '"]');
             if (card) {
                 selectedCard = card;
                 syncDockFromCard(card);
