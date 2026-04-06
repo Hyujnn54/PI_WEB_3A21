@@ -69,7 +69,7 @@ class FrontPortalController extends AbstractController
                 'status' => (string) $application->getCurrent_status(),
                 'create_interview_url' => $hasActiveInterview ? '#' : $createInterviewUrl,
                 'can_create_interview' => !$hasActiveInterview,
-                'interview_block_reason' => $hasActiveInterview ? 'Interview already exists for this application.' : '',
+                'interview_block_reason' => $hasActiveInterview ? 'Interview already exists for this application. Only one interview is allowed.' : '',
                 'accept_url' => $acceptUrl,
                 'decline_url' => $declineUrl,
             ];
@@ -272,7 +272,7 @@ class FrontPortalController extends AbstractController
             ];
 
             if ($this->hasActiveInterviewForApplication($application)) {
-                $this->addFlash('warning', 'This application already has an active interview. Update the existing one or complete/cancel it first.');
+                $this->addFlash('warning', 'This application already has an interview. Creating another one is not allowed.');
                 return $this->redirectToRoute('front_job_applications', $request->query->all() + ['openCreateFor' => $applicationId]);
             }
 
@@ -638,14 +638,7 @@ class FrontPortalController extends AbstractController
     private function hasActiveInterviewForApplication(Job_application $application): bool
     {
         $existing = $this->doctrine->getRepository(Interview::class)->findBy(['application_id' => $application], ['id' => 'DESC']);
-        foreach ($existing as $interview) {
-            $status = strtolower(trim((string) $interview->getStatus()));
-            if (!in_array($status, ['cancelled', 'done', 'completed'], true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return !empty($existing);
     }
 
     private function nextNumericId(string $entityClass): string
