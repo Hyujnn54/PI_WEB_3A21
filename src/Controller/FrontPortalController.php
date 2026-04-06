@@ -637,8 +637,21 @@ class FrontPortalController extends AbstractController
 
     private function hasActiveInterviewForApplication(Job_application $application): bool
     {
-        $existing = $this->doctrine->getRepository(Interview::class)->findBy(['application_id' => $application], ['id' => 'DESC']);
-        return !empty($existing);
+        $applicationId = (string) $application->getId();
+
+        try {
+            $connection = $this->doctrine->getConnection();
+            $result = $connection->fetchOne(
+                'SELECT 1 FROM interview WHERE application_id = :applicationId LIMIT 1',
+                ['applicationId' => $applicationId]
+            );
+
+            return $result !== false && $result !== null;
+        } catch (Throwable) {
+            // Fallback to ORM lookup if direct SQL fails for any reason.
+            $existing = $this->doctrine->getRepository(Interview::class)->findBy(['application_id' => $application], ['id' => 'DESC'], 1);
+            return !empty($existing);
+        }
     }
 
     private function nextNumericId(string $entityClass): string
