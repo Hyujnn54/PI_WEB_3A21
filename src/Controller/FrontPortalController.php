@@ -56,6 +56,7 @@ class FrontPortalController extends AbstractController
             $offer = $application->getOffer_id();
             $coverLetter = trim((string) $application->getCover_letter());
             $meta = sprintf('Application #%s | %s', (string) $application->getId(), (string) $application->getCurrent_status());
+            $hasActiveInterview = $this->hasActiveInterviewForApplication($application);
             $createInterviewUrl = $this->generateUrl('front_interview_create', ['applicationId' => (string) $application->getId(), 'role' => $role] + $request->query->all());
             $acceptUrl = $this->generateUrl('front_application_set_status', ['applicationId' => (string) $application->getId(), 'status' => 'accepted', 'role' => $role] + $request->query->all());
             $declineUrl = $this->generateUrl('front_application_set_status', ['applicationId' => (string) $application->getId(), 'status' => 'declined', 'role' => $role] + $request->query->all());
@@ -66,7 +67,9 @@ class FrontPortalController extends AbstractController
                 'title' => sprintf('Offer: %s', (string) $offer->getTitle()),
                 'text' => $coverLetter === '' ? 'No cover letter provided.' : substr($coverLetter, 0, 190),
                 'status' => (string) $application->getCurrent_status(),
-                'create_interview_url' => $createInterviewUrl,
+                'create_interview_url' => $hasActiveInterview ? '#' : $createInterviewUrl,
+                'can_create_interview' => !$hasActiveInterview,
+                'interview_block_reason' => $hasActiveInterview ? 'Interview already exists for this application.' : '',
                 'accept_url' => $acceptUrl,
                 'decline_url' => $declineUrl,
             ];

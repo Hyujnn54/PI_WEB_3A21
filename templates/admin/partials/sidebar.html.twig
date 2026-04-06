@@ -1,0 +1,30 @@
+<nav class="navbar sidebar navbar-expand-xl navbar-dark bg-dark">
+    <div class="d-flex align-items-center">
+        <a class="navbar-brand" href="{{ path('app_home') }}">
+            <img class="navbar-brand-item" src="{{ asset('assets/team_uploads/logo.png') }}" alt="Talent Bridge logo" style="max-height: 34px; width: auto;">
+            <span class="tb-brand-label ms-2 fw-bold text-white">Talent Bridge</span>
+        </a>
+    </div>
+
+    <div class="flex-row custom-scrollbar h-100" id="offcanvasSidebar">
+        <div class="offcanvas-body sidebar-content d-flex flex-column bg-dark">
+            <ul class="navbar-nav flex-column" id="navbar-sidebar">
+                <li class="nav-item">
+                    <a href="{{ path('app_admin') }}" class="nav-link">
+                        <i class="ti ti-layout-dashboard"></i>Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('app_admin_add_user') }}">
+                        <i class="ti ti-user-plus"></i>Add User
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('front_home', {role: 'candidate'}) }}" data-turbo="false">
+                        <i class="ti ti-home"></i>Front Office
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>

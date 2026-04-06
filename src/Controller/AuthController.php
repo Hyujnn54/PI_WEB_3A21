@@ -13,7 +13,7 @@ class AuthController extends AbstractController
     #[Route('/', name: 'app_entry')]
     public function entry(): Response
     {
-        return $this->redirectToRoute('app_login');
+        return $this->redirectToRoute('front_home');
     }
 
     #[Route('/login', name: 'app_login', methods: ['GET', 'POST'])]

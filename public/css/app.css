@@ -558,6 +558,18 @@
     padding: 0.45rem 0.6rem;
 }
 
+.tb-interview-create-disabled,
+.tb-interview-create-disabled:hover,
+.tb-interview-create-disabled:focus,
+.tb-interview-create-disabled:active {
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    filter: none !important;
+    box-shadow: none !important;
+    opacity: 0.55 !important;
+}
+
 .tb-calendar-title {
     font-weight: 700;
     margin-bottom: 0.6rem;

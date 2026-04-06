@@ -30,10 +30,11 @@
         {% set queryRole = app.request.query.get('role') %}
         {% set currentRole = queryRole in ['candidate', 'recruiter'] ? queryRole : 'candidate' %}
         {% set routeName = app.request.attributes.get('_route') %}
-        {% set isAdminPage = routeName starts with 'management_' or routeName == 'back_dashboard' %}
+        {% set isAdminPage = routeName starts with 'management_' or routeName == 'back_dashboard' or routeName starts with 'app_admin' %}
         {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status'] %}
         {% set roleSwitchRoute = routeName in unsafeRoleRoutes ? 'front_interviews' : routeName %}
         <div class="page tb-page-shell">
+            {% if not isAdminPage %}
             <header class="navbar navbar-expand-md navbar-light d-print-none tb-topbar">
                 <div class="container-xl">
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#tbMainNav" aria-controls="tbMainNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -49,6 +50,7 @@
                                 <li class="nav-item"><a class="nav-link" href="{{ path('management_users') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('back_dashboard') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span><span class="nav-link-title">Admin Dashboard</span></a></li>
                             {% else %}
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_home', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-home"></i></span><span class="nav-link-title">Home</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-check"></i></span><span class="nav-link-title">Applications</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_events', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
@@ -82,6 +84,7 @@
                     </div>
                 </div>
             </header>
+            {% endif %}
             <div class="container-xl mt-2">
                 {% for label in ['success', 'warning', 'error'] %}
                     {% for message in app.flashes(label) %}
@@ -297,6 +300,43 @@
                                 } else {
                                     tertiary.classList.add('d-none');
                                 }
+                            }
+
+                            const pageWrapper = card.closest('.page-wrapper') || document;
+                            const actionDock = pageWrapper.querySelector('.tb-generic-action-dock');
+                            if (actionDock) {
+                                const dockPrimary = actionDock.querySelector('.tb-dock-primary');
+                                const dockSecondary = actionDock.querySelector('.tb-dock-secondary');
+                                const dockTertiary = actionDock.querySelector('.tb-dock-tertiary');
+                                const dockSecondaryForm = actionDock.querySelector('.tb-dock-secondary-form');
+
+                                if (dockPrimary) {
+                                    dockPrimary.textContent = card.getAttribute('data-action-primary') || 'Primary Action';
+                                    dockPrimary.setAttribute('href', card.getAttribute('data-action-primary-href') || '#');
+                                    const disabled = card.getAttribute('data-action-primary-disabled') === '1';
+                                    dockPrimary.classList.toggle('disabled', disabled);
+                                }
+
+                                if (dockSecondary) {
+                                    dockSecondary.textContent = card.getAttribute('data-action-secondary') || 'Secondary Action';
+                                    const secondaryHref = card.getAttribute('data-action-secondary-href') || '#';
+                                    if (dockSecondaryForm) {
+                                        dockSecondaryForm.setAttribute('action', secondaryHref);
+                                    }
+                                    const disabled = card.getAttribute('data-action-secondary-disabled') === '1';
+                                    dockSecondary.classList.toggle('disabled', disabled);
+                                    dockSecondary.toggleAttribute('disabled', disabled);
+                                }
+
+                                if (dockTertiary) {
+                                    const label = card.getAttribute('data-action-tertiary') || 'Tertiary Action';
+                                    dockTertiary.textContent = label;
+                                    dockTertiary.setAttribute('href', card.getAttribute('data-action-tertiary-href') || '#');
+                                    const disabled = card.getAttribute('data-action-tertiary-disabled') === '1';
+                                    dockTertiary.classList.toggle('disabled', disabled);
+                                }
+
+                                actionDock.classList.remove('d-none');
                             }
 
                             panel.classList.remove('d-none');

@@ -18,7 +18,9 @@
         </div>
     </div>
     <div class="page-body">
-        <div class="container-xl">
+        <div class="container-xl tb-interviews-page">
+            <div class="row g-3 tb-interviews-layout">
+                <div class="col-12 col-xl-8">
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
                     <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#eventCardsGrid">
@@ -47,7 +49,7 @@
             <div id="eventCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}">
+                        <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
@@ -62,20 +64,34 @@
                 {% endfor %}
             </div>
 
-            <div id="eventDetailPanel" class="card tb-detail-panel mt-4 d-none">
+                </div>
+                <div class="col-12 col-xl-4">
+            <div id="eventDetailPanel" class="card tb-detail-panel tb-detail-panel-side">
                 <div class="card-header">
                     <div>
                         <div class="small text-secondary tb-detail-meta"></div>
                         <h3 class="card-title mb-0 tb-detail-title">Event Details</h3>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary tb-detail-close tb-detail-close-icon ms-auto" aria-label="Close details panel"><i class="ti ti-x"></i></button>
                 </div>
                 <div class="card-body">
-                    <p class="mb-3 tb-detail-text">Select an event card to show details and contextual actions.</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="#" class="btn btn-primary tb-detail-primary">Primary Action</a>
-                        <a href="#" class="btn btn-outline-primary tb-detail-secondary">Secondary Action</a>
-                        <a href="#" class="btn btn-outline-secondary tb-detail-tertiary">Tertiary Action</a>
+                    <p class="mb-3 tb-detail-text">Select an event card to display details here.</p>
+                    <div class="tb-detail-extra small text-secondary mb-0"></div>
+                </div>
+            </div>
+                </div>
+            </div>
+
+            <div id="eventActionDock" class="tb-interview-action-dock tb-generic-action-dock d-none">
+                <div class="container-xl">
+                    <div class="tb-interview-action-dock-inner">
+                        <div class="small text-secondary">Selected event actions</div>
+                        <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
+                            <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-edit me-1"></i>Primary Action</a>
+                            <form method="post" action="#" class="d-inline tb-dock-secondary-form">
+                                <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
+                            </form>
+                            <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
+                        </div>
                     </div>
                 </div>
             </div>

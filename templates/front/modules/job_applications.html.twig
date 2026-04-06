@@ -52,6 +52,7 @@
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
                             {% if role == 'recruiter' %}
+                                {% set canCreateInterview = card.can_create_interview|default(true) %}
                                 <div class="d-flex flex-wrap gap-2 mt-3">
                                     <form method="post" action="{{ card.accept_url }}">
                                         <button type="submit" class="btn btn-sm btn-outline-success">Accept</button>
@@ -59,8 +60,11 @@
                                     <form method="post" action="{{ card.decline_url }}">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Decline</button>
                                     </form>
-                                    <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal" data-application-id="{{ card.id }}" data-create-url="{{ card.create_interview_url }}">Create Interview</button>
+                                    <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal {{ not canCreateInterview ? 'disabled tb-interview-create-disabled' : '' }}" data-application-id="{{ card.id }}" data-create-url="{{ card.create_interview_url }}" data-create-disabled="{{ canCreateInterview ? '0' : '1' }}" {% if not canCreateInterview %}disabled aria-disabled="true" title="{{ card.interview_block_reason|default('Interview already exists for this application.') }}"{% endif %}>Create Interview</button>
                                 </div>
+                                {% if not canCreateInterview %}
+                                    <div class="small text-warning mt-2"><i class="ti ti-alert-circle me-1"></i>{{ card.interview_block_reason|default('Interview already exists for this application.') }}</div>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>
@@ -189,8 +193,9 @@
 
         const openCreateModalForBtn = function (btn) {
             if (!btn) return;
+            if (btn.disabled || btn.getAttribute('data-create-disabled') === '1') return;
             const createUrl = btn.getAttribute('data-create-url');
-            if (!createUrl) return;
+            if (!createUrl || createUrl === '#') return;
             formEl.setAttribute('action', createUrl);
             if (modeSelect) modeSelect.value = 'online';
             if (scheduleInput) scheduleInput.min = minValue;

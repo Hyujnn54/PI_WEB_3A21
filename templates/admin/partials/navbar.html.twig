@@ -1,0 +1,17 @@
+<nav class="navbar top-bar navbar-light border-bottom py-0 py-xl-3">
+    <div class="container-fluid p-0">
+        <div class="d-flex align-items-center w-100">
+            <div class="d-flex align-items-center d-xl-none">
+                <a class="navbar-brand" href="{{ path('app_home') }}">
+                    <img class="navbar-brand-item h-30px" src="{{ asset('assets/team_uploads/logo.png') }}" alt="Talent Bridge logo">
+                    <span class="tb-brand-label ms-2 fw-bold">Talent Bridge</span>
+                </a>
+            </div>
+
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <a class="btn btn-sm btn-primary mb-0" href="{{ path('app_admin_add_user') }}">New User</a>
+                <a class="btn btn-sm btn-outline-secondary mb-0" href="{{ path('front_home', {role: 'candidate'}) }}" data-turbo="false">Back to Home</a>
+            </div>
+        </div>
+    </div>
+</nav>
