@@ -56,8 +56,9 @@
                         <select class="form-select" style="max-width: 220px;" data-filter-criteria>
                             <option value="all">Search In: All</option>
                             <option value="title">Title</option>
-                            <option value="meta">Meta</option>
-                            <option value="description">Description</option>
+                            <option value="location">Location</option>
+                            <option value="contract_type">Contract Type</option>
+                            <option value="status">Status</option>
                         </select>
                         <select class="form-select" style="max-width: 230px;" data-filter-sort>
                             <option value="default">Default Order</option>
@@ -74,7 +75,7 @@
             <div id="offerCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     {% set isPendingReview = card.warning_status|default(null) == 'RESOLVED' %}
-                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
+                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.title ~ ' ' ~ (card.location|default('')) ~ ' ' ~ (card.contract_type|default('')) ~ ' ' ~ (card.status|default('')))|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-location="{{ card.location|default('')|lower }}" data-filter-contract-type="{{ card.contract_type|default('')|lower }}" data-filter-status="{{ card.status|default('')|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
                         <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ (card.meta|split(' | ')|last) ~ '||Location: ' ~ (card.meta|split(' | ')|first)) }}">
                             {% if isPendingReview %}
                                 <div class="badge bg-info mb-2" style="position: absolute; top: 8px; right: 8px;">Pending Review</div>

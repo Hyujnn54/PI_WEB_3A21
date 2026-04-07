@@ -13,6 +13,7 @@ class FrontPortalController extends AbstractController
     private const STATIC_RECRUITER_ID = '1';
     private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
+    private const JOB_STATUSES = ['open', 'paused', 'closed'];
 
     #[Route('/front/job-offers', name: 'front_job_offers')]
     public function jobOffers(Request $request, Connection $connection): Response
@@ -22,14 +23,14 @@ class FrontPortalController extends AbstractController
         $warningStatuses = [];
 
         $cards = [
-            ['id' => 1, 'meta' => 'Tunis | CDI', 'title' => 'Frontend Engineer', 'text' => 'Build and iterate candidate-facing experiences with reusable UI modules.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Tunis'], 'warning_status' => null],
-            ['id' => 2, 'meta' => 'Sfax | CDI', 'title' => 'Symfony Backend Developer', 'text' => 'Maintain recruitment workflows and implement stable API endpoints.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Sfax'], 'warning_status' => null],
-            ['id' => 3, 'meta' => 'Remote | Contract', 'title' => 'Recruitment Data Analyst', 'text' => 'Track funnel metrics and transform hiring data into useful insights.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: Contract', 'Location: Remote'], 'warning_status' => null],
+            ['id' => 1, 'meta' => 'Tunis | CDI | Open', 'title' => 'Frontend Engineer', 'text' => 'Build and iterate candidate-facing experiences with reusable UI modules.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Tunis', 'Status: Open'], 'warning_status' => null, 'location' => 'Tunis', 'contract_type' => 'CDI', 'status' => 'open'],
+            ['id' => 2, 'meta' => 'Sfax | CDI | Open', 'title' => 'Symfony Backend Developer', 'text' => 'Maintain recruitment workflows and implement stable API endpoints.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Sfax', 'Status: Open'], 'warning_status' => null, 'location' => 'Sfax', 'contract_type' => 'CDI', 'status' => 'open'],
+            ['id' => 3, 'meta' => 'Remote | Contract | Paused', 'title' => 'Recruitment Data Analyst', 'text' => 'Track funnel metrics and transform hiring data into useful insights.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: Contract', 'Location: Remote', 'Status: Paused'], 'warning_status' => null, 'location' => 'Remote', 'contract_type' => 'Contract', 'status' => 'paused'],
         ];
 
         try {
             $rows = $connection->fetchAllAssociative(
-                'SELECT id, recruiter_id, title, description, location, contract_type FROM job_offer ORDER BY created_at DESC LIMIT 25'
+                'SELECT id, recruiter_id, title, description, location, contract_type, status FROM job_offer ORDER BY created_at DESC LIMIT 25'
             );
 
             $dbCards = array_map(function (array $row) use ($connection): array {
@@ -41,6 +42,7 @@ class FrontPortalController extends AbstractController
                 $detailExtra = [
                     'Type: ' . (string) $row['contract_type'],
                     'Location: ' . (string) $row['location'],
+                    'Status: ' . ucfirst((string) $row['status']),
                 ];
 
                 if (count($skills) > 0) {
@@ -57,12 +59,15 @@ class FrontPortalController extends AbstractController
 
                 return [
                     'id' => (string) $row['id'],
-                    'meta' => sprintf('%s | %s', (string) $row['location'], (string) $row['contract_type']),
+                    'meta' => sprintf('%s | %s | %s', (string) $row['location'], (string) $row['contract_type'], ucfirst((string) $row['status'])),
                     'title' => (string) $row['title'],
                     'text' => (string) $row['description'],
                     'can_delete' => (string) $row['recruiter_id'] === self::STATIC_RECRUITER_ID,
                     'detail_extra' => $detailExtra,
                     'recruiter_id' => (string) $row['recruiter_id'],
+                    'location' => (string) $row['location'],
+                    'contract_type' => (string) $row['contract_type'],
+                    'status' => (string) $row['status'],
                 ];
             }, $rows);
 
@@ -126,13 +131,16 @@ class FrontPortalController extends AbstractController
             $description = trim((string) $request->request->get('description', ''));
             $location = trim((string) $request->request->get('location', ''));
             $contractType = trim((string) $request->request->get('contract_type', ''));
+            $jobStatus = trim((string) $request->request->get('status', 'open'));
             $deadlineInput = trim((string) $request->request->get('deadline', ''));
             $skills = $this->normalizeSkills((array) $request->request->all('skills'));
 
-            if ($title === '' || $description === '' || $location === '' || $contractType === '' || $deadlineInput === '' || count($skills) === 0) {
+            if ($title === '' || $description === '' || $location === '' || $contractType === '' || $jobStatus === '' || $deadlineInput === '' || count($skills) === 0) {
                 $this->addFlash('error', 'Please fill in all required fields.');
             } elseif (!in_array($contractType, self::CONTRACT_TYPES, true)) {
                 $this->addFlash('error', 'Please select a valid contract type.');
+            } elseif (!in_array($jobStatus, self::JOB_STATUSES, true)) {
+                $this->addFlash('error', 'Please select a valid status.');
             } else {
                 $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $deadlineInput);
                 if (!$deadline) {
@@ -154,7 +162,7 @@ class FrontPortalController extends AbstractController
                             'contract_type' => $contractType,
                             'created_at' => $now->format('Y-m-d H:i:s'),
                             'deadline' => $deadline->format('Y-m-d H:i:s'),
-                            'status' => 'open',
+                            'status' => $jobStatus,
                             'quality_score' => 100,
                             'ai_suggestions' => '',
                             'is_flagged' => 0,
@@ -187,6 +195,7 @@ class FrontPortalController extends AbstractController
         return $this->render('front/modules/job_offer_new.html.twig', [
             'authUser' => ['role' => $role],
             'contractTypes' => self::CONTRACT_TYPES,
+            'jobStatuses' => self::JOB_STATUSES,
             'skillLevels' => self::SKILL_LEVELS,
         ]);
     }

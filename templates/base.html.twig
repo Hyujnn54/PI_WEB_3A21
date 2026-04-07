@@ -128,10 +128,10 @@
                         let haystack = (item.dataset.filterText || '').toLowerCase();
                         if (criteria === 'title') {
                             haystack = (item.dataset.filterTitle || '').toLowerCase();
-                        } else if (criteria === 'meta') {
-                            haystack = (item.dataset.filterMeta || '').toLowerCase();
-                        } else if (criteria === 'description') {
-                            haystack = (item.dataset.filterDescription || '').toLowerCase();
+                        } else if (criteria === 'location') {
+                            haystack = (item.dataset.filterLocation || '').toLowerCase();
+                        } else if (criteria === 'contract_type') {
+                            haystack = (item.dataset.filterContractType || '').toLowerCase();
                         } else if (criteria === 'status') {
                             haystack = (item.dataset.filterStatus || '').toLowerCase();
                         }

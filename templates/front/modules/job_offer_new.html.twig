@@ -35,6 +35,15 @@
                             </select>
                         </div>
 
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select" required>
+                                {% for status in jobStatuses %}
+                                    <option value="{{ status }}" {{ status == 'open' ? 'selected' : '' }}>{{ status|capitalize }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
                         <div class="col-12">
                             <label class="form-label d-block">Required Skills</label>
                             <div id="skillsContainer" class="d-flex flex-column gap-2">
