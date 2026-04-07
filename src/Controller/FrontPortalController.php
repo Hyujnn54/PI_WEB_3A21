@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Candidate;
 use App\Entity\Interview;
 use App\Entity\Interview_feedback;
 use App\Entity\Job_application;
@@ -34,13 +35,33 @@ class FrontPortalController extends AbstractController
         $role = (string) $request->query->get('role', 'candidate');
         $offers = $this->doctrine->getRepository(Job_offer::class)->findBy([], ['id' => 'DESC']);
 
-        $cards = array_map(static function (Job_offer $offer): array {
+        $candidateId = 3;
+        $appliedOfferIds = [];
+        $candidate = $this->doctrine->getRepository(Candidate::class)->find($candidateId);
+        if ($candidate instanceof Candidate) {
+            $activeApplications = $this->doctrine->getRepository(Job_application::class)->findBy([
+                'candidate_id' => $candidate,
+                'is_archived' => false,
+            ]);
+
+            foreach ($activeApplications as $activeApplication) {
+                $offer = $activeApplication->getOffer_id();
+                if ($offer instanceof Job_offer) {
+                    $appliedOfferIds[(string) $offer->getId()] = true;
+                }
+            }
+        }
+
+        $cards = array_map(static function (Job_offer $offer) use ($appliedOfferIds): array {
             $description = trim((string) $offer->getDescription());
+            $offerId = (string) $offer->getId();
 
             return [
+                'id' => $offerId,
                 'meta' => sprintf('%s | %s', (string) $offer->getLocation(), (string) $offer->getContract_type()),
                 'title' => (string) $offer->getTitle(),
                 'text' => $description === '' ? 'No description available yet.' : substr($description, 0, 190),
+                'already_applied' => isset($appliedOfferIds[$offerId]),
             ];
         }, $offers);
 
@@ -521,7 +542,7 @@ class FrontPortalController extends AbstractController
 
         $feedback->setOverall_score($score);
         $feedback->setDecision($decision);
-    $feedback->setComment((string) $commentValidation['value']);
+        $feedback->setComment((string) $commentValidation['value']);
         $feedback->setCreated_at(new \DateTime());
 
         $interview->setStatus('completed');

@@ -1,7 +1,7 @@
 <nav class="navbar sidebar navbar-expand-xl navbar-dark bg-dark">
     <div class="d-flex align-items-center">
         <a class="navbar-brand" href="{{ path('app_home') }}">
-            <img class="navbar-brand-item" src="{{ asset('assets/team_uploads/logo.png') }}" alt="Talent Bridge logo" style="max-height: 34px; width: auto;">
+            <img class="navbar-brand-item" src="{{ asset('team_uploads/logo.png') }}" alt="Talent Bridge logo" style="max-height: 34px; width: auto;">
             <span class="tb-brand-label ms-2 fw-bold text-white">Talent Bridge</span>
         </a>
     </div>
@@ -17,6 +17,16 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ path('app_admin_add_user') }}">
                         <i class="ti ti-user-plus"></i>Add User
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('management_job_applications') }}">
+                        <i class="ti ti-file-check"></i>Applications
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('management_job_applications_statistics') }}">
+                        <i class="ti ti-chart-pie"></i>Applications Statistics
                     </a>
                 </li>
                 <li class="nav-item">

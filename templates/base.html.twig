@@ -4,7 +4,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{% block title %}Talent Bridge{% endblock %}</title>
-        <link rel="icon" type="image/png" href="{{ asset('assets/team_uploads/logo.png') }}">
+        <link rel="icon" type="image/png" href="{{ asset('team_uploads/logo.png') }}">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -31,7 +31,7 @@
         {% set currentRole = queryRole in ['candidate', 'recruiter'] ? queryRole : 'candidate' %}
         {% set routeName = app.request.attributes.get('_route') %}
         {% set isAdminPage = routeName starts with 'management_' or routeName == 'back_dashboard' or routeName starts with 'app_admin' %}
-        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status'] %}
+        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status', 'app_candidate_apply', 'app_candidate_application_details', 'app_candidate_application_edit', 'app_candidate_application_withdraw', 'app_recruiter_application_details', 'management_job_applications_details'] %}
         {% set roleSwitchRoute = routeName in unsafeRoleRoutes ? 'front_interviews' : routeName %}
         <div class="page tb-page-shell">
             {% if not isAdminPage %}
@@ -41,7 +41,7 @@
                         <span class="navbar-toggler-icon"></span>
                     </button>
                     <h1 class="navbar-brand navbar-brand-autodark mb-0 d-flex align-items-center">
-                        <img src="{{ asset('assets/team_uploads/logo.png') }}" alt="Talent Bridge logo" class="tb-logo me-2">
+                        <img src="{{ asset('team_uploads/logo.png') }}" alt="Talent Bridge logo" class="tb-logo me-2">
                         <span class="tb-brand-text">Talent Bridge</span>
                     </h1>
                     <div class="collapse navbar-collapse" id="tbMainNav">
@@ -85,13 +85,15 @@
                 </div>
             </header>
             {% endif %}
-            <div class="container-xl mt-2">
-                {% for label in ['success', 'warning', 'error'] %}
-                    {% for message in app.flashes(label) %}
-                        <div class="alert alert-{{ label == 'error' ? 'danger' : (label == 'warning' ? 'warning' : 'success') }}" role="alert">{{ message }}</div>
+            {% if not isAdminPage %}
+                <div class="container-xl mt-2">
+                    {% for label in ['success', 'warning', 'error'] %}
+                        {% for message in app.flashes(label) %}
+                            <div class="alert alert-{{ label == 'error' ? 'danger' : (label == 'warning' ? 'warning' : 'success') }}" role="alert">{{ message }}</div>
+                        {% endfor %}
                     {% endfor %}
-                {% endfor %}
-            </div>
+                </div>
+            {% endif %}
             {% block body %}{% endblock %}
         </div>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
