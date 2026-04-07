@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\Entity\Job_offer;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -10,14 +12,21 @@ use Symfony\Component\Routing\Attribute\Route;
 class FrontPortalController extends AbstractController
 {
     #[Route('/front/job-offers', name: 'front_job_offers')]
-    public function jobOffers(Request $request): Response
+    public function jobOffers(Request $request, EntityManagerInterface $em): Response
     {
         $role = (string) $request->query->get('role', 'candidate');
-        $cards = [
-            ['id' => 1, 'meta' => 'Tunis | CDI', 'title' => 'Frontend Engineer', 'text' => 'Build and iterate candidate-facing experiences with reusable UI modules.'],
-            ['id' => 2, 'meta' => 'Sfax | CDI', 'title' => 'Symfony Backend Developer', 'text' => 'Maintain recruitment workflows and implement stable API endpoints.'],
-            ['id' => 3, 'meta' => 'Remote | Contract', 'title' => 'Recruitment Data Analyst', 'text' => 'Track funnel metrics and transform hiring data into useful insights.'],
-        ];
+        
+        $jobOffers = $em->getRepository(Job_offer::class)->findAll();
+        
+        $cards = [];
+        foreach ($jobOffers as $offer) {
+            $cards[] = [
+                'id' => $offer->getId(),
+                'meta' => $offer->getLocation() . ' | ' . $offer->getContract_type(),
+                'title' => $offer->getTitle(),
+                'text' => $offer->getDescription(),
+            ];
+        }
 
         return $this->render('front/modules/job_offers.html.twig', [
             'authUser' => ['role' => $role],

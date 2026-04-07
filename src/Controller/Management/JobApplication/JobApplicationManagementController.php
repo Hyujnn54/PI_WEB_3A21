@@ -8,7 +8,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class JobApplicationManagementController extends AbstractController
 {
-    #[Route('/admin/job-applications', name: 'management_job_applications')]
+    #[Route('/applicationmanagement/admin/job-applications', name: 'management_job_applications')]
     public function index(): Response
     {
         return $this->render('management/job_application/index.html.twig', [

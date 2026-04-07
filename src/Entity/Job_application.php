@@ -13,6 +13,7 @@ class Job_application
 {
 
     #[ORM\Id]
+    #[ORM\GeneratedValue(strategy: "IDENTITY")]
     #[ORM\Column(type: "bigint")]
     private string $id;
 
@@ -87,7 +88,17 @@ class Job_application
         return $this->cover_letter;
     }
 
+    public function getCoverLetter()
+    {
+        return $this->cover_letter;
+    }
+
     public function setCover_letter($value)
+    {
+        $this->cover_letter = $value;
+    }
+
+    public function setCoverLetter($value)
     {
         $this->cover_letter = $value;
     }
