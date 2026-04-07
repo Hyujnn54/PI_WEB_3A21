@@ -22,6 +22,28 @@
 
     <div class="page-body">
         <div class="container-xl tb-interviews-page">
+            {% if role == 'recruiter' and warnings|default([])|length > 0 %}
+                <div class="card tb-admin-card border-warning mb-3">
+                    <div class="card-header">
+                        <h3 class="card-title text-warning-emphasis mb-0"><i class="ti ti-alert-triangle me-1"></i>Warnings from Admin</h3>
+                    </div>
+                    <div class="card-body d-flex flex-column gap-2">
+                        {% for warning in warnings %}
+                            <div class="border rounded p-2 bg-warning-subtle">
+                                <div class="fw-semibold">{{ warning.title }}</div>
+                                <div class="small text-secondary mb-2">Reason: {{ warning.reason }}</div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <a href="{{ path('front_job_offer_edit', {id: warning.job_offer_id, role: 'recruiter'}) }}" class="btn btn-sm btn-outline-primary">Modify Job</a>
+                                    <form method="post" action="{{ path('front_job_offer_delete', {id: warning.job_offer_id, role: 'recruiter'}) }}" onsubmit="return confirm('Delete this warned job offer?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete Job</button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
             <div class="row g-3 tb-interviews-layout">
                 <div class="col-12 col-xl-8">
             <div class="card tb-admin-card mb-3 tb-filter-bar">
@@ -51,8 +73,12 @@
 
             <div id="offerCardsGrid" class="row row-cards">
                 {% for card in cards %}
+                    {% set isPendingReview = card.warning_status|default(null) == 'RESOLVED' %}
                     <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ (card.meta|split(' | ')|last) ~ '||Location: ' ~ (card.meta|split(' | ')|first)) }}">
+                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ (card.meta|split(' | ')|last) ~ '||Location: ' ~ (card.meta|split(' | ')|first)) }}">
+                            {% if isPendingReview %}
+                                <div class="badge bg-info mb-2" style="position: absolute; top: 8px; right: 8px;">Pending Review</div>
+                            {% endif %}
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
@@ -86,6 +112,13 @@
                     <div class="card-body">
                         <p class="mb-3 tb-detail-text">Select an offer card to display details here.</p>
                         <div class="tb-detail-extra small text-secondary mb-0"></div>
+                        <div class="mt-3 d-flex flex-column gap-2">
+                            <a href="#" class="btn btn-primary btn-sm tb-detail-primary">Modify Offer</a>
+                            <form method="post" action="#" class="d-inline">
+                                <button type="submit" class="btn btn-outline-danger btn-sm w-100 tb-detail-secondary">Delete Offer</button>
+                            </form>
+                            <a href="#" class="btn btn-outline-primary btn-sm tb-detail-tertiary">View Applicants</a>
+                        </div>
                     </div>
                 </div>
                     </div>

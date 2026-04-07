@@ -18,11 +18,13 @@ class FrontPortalController extends AbstractController
     public function jobOffers(Request $request, Connection $connection): Response
     {
         $role = (string) $request->query->get('role', 'candidate');
+        $warnings = [];
+        $warningStatuses = [];
 
         $cards = [
-            ['id' => 1, 'meta' => 'Tunis | CDI', 'title' => 'Frontend Engineer', 'text' => 'Build and iterate candidate-facing experiences with reusable UI modules.', 'can_delete' => false],
-            ['id' => 2, 'meta' => 'Sfax | CDI', 'title' => 'Symfony Backend Developer', 'text' => 'Maintain recruitment workflows and implement stable API endpoints.', 'can_delete' => false],
-            ['id' => 3, 'meta' => 'Remote | Contract', 'title' => 'Recruitment Data Analyst', 'text' => 'Track funnel metrics and transform hiring data into useful insights.', 'can_delete' => false],
+            ['id' => 1, 'meta' => 'Tunis | CDI', 'title' => 'Frontend Engineer', 'text' => 'Build and iterate candidate-facing experiences with reusable UI modules.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Tunis'], 'warning_status' => null],
+            ['id' => 2, 'meta' => 'Sfax | CDI', 'title' => 'Symfony Backend Developer', 'text' => 'Maintain recruitment workflows and implement stable API endpoints.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Sfax'], 'warning_status' => null],
+            ['id' => 3, 'meta' => 'Remote | Contract', 'title' => 'Recruitment Data Analyst', 'text' => 'Track funnel metrics and transform hiring data into useful insights.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: Contract', 'Location: Remote'], 'warning_status' => null],
         ];
 
         try {
@@ -60,6 +62,7 @@ class FrontPortalController extends AbstractController
                     'text' => (string) $row['description'],
                     'can_delete' => (string) $row['recruiter_id'] === self::STATIC_RECRUITER_ID,
                     'detail_extra' => $detailExtra,
+                    'recruiter_id' => (string) $row['recruiter_id'],
                 ];
             }, $rows);
 
@@ -68,9 +71,44 @@ class FrontPortalController extends AbstractController
             // Keep UI usable even if table is not ready in current environment.
         }
 
+        if ($role === 'recruiter') {
+            try {
+                $warnings = $connection->fetchAllAssociative(
+                    'SELECT w.job_offer_id, w.reason, w.created_at, jo.title
+                     FROM job_offer_warning w
+                     INNER JOIN job_offer jo ON jo.id = w.job_offer_id
+                     WHERE w.recruiter_id = :recruiter_id AND w.status = :status
+                     ORDER BY w.created_at DESC',
+                    ['recruiter_id' => self::STATIC_RECRUITER_ID, 'status' => 'SENT']
+                );
+            } catch (\Throwable $exception) {
+                $warnings = [];
+            }
+
+            // Fetch warning statuses for all recruiter's jobs (for blue highlighting when pending review)
+            try {
+                $resolvedWarnings = $connection->fetchAllAssociative(
+                    'SELECT job_offer_id FROM job_offer_warning WHERE recruiter_id = :recruiter_id AND status = :status',
+                    ['recruiter_id' => self::STATIC_RECRUITER_ID, 'status' => 'RESOLVED']
+                );
+                
+                foreach ($resolvedWarnings as $row) {
+                    $warningStatuses[(string) $row['job_offer_id']] = 'RESOLVED';
+                }
+            } catch (\Throwable $exception) {
+                // Keep UI usable even if query fails
+            }
+        }
+
+        // Add warning status to cards
+        foreach ($cards as &$card) {
+            $card['warning_status'] = $warningStatuses[$card['id']] ?? null;
+        }
+
         return $this->render('front/modules/job_offers.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
+            'warnings' => $warnings,
         ]);
     }
 
@@ -222,9 +260,25 @@ class FrontPortalController extends AbstractController
                             ]);
                         }
 
+                        // If job has an active warning, mark it as resolved (recruiter edited)
+                        $hasActiveWarning = (int) $connection->fetchOne(
+                            'SELECT COUNT(*) FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status',
+                            ['job_offer_id' => $id, 'status' => 'SENT']
+                        );
+
+                        if ($hasActiveWarning > 0) {
+                            $connection->update('job_offer_warning', [
+                                'status' => 'RESOLVED',
+                                'edited_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                            ], [
+                                'job_offer_id' => $id,
+                                'status' => 'SENT',
+                            ]);
+                        }
+
                         $connection->commit();
 
-                        $this->addFlash('success', 'Job offer updated successfully.');
+                        $this->addFlash('success', 'Job offer updated successfully.' . ($hasActiveWarning > 0 ? ' Admin has been notified about the changes.' : ''));
                         return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
                     } catch (\Throwable $exception) {
                         if ($connection->isTransactionActive()) {

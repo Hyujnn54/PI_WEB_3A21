@@ -43,17 +43,15 @@ class BackOfficeController extends AbstractController
         try {
             $offers = $connection->fetchAllAssociative(
                 'SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
-                        CASE WHEN jw.job_offer_id IS NULL THEN 0 ELSE 1 END AS is_warned,
-                        jw.reason AS warning_reason
+                        COALESCE(jw.status, NULL) AS warning_status,
+                        jw.reason AS warning_reason,
+                        jw.edited_at AS warning_edited_at
                  FROM job_offer jo
                  LEFT JOIN (
-                     SELECT w1.job_offer_id, w1.reason
+                     SELECT w1.job_offer_id, w1.status, w1.reason, w1.edited_at, w1.created_at
                      FROM job_offer_warning w1
-                     INNER JOIN (
-                         SELECT job_offer_id, MAX(created_at) AS max_created_at
-                         FROM job_offer_warning
-                         GROUP BY job_offer_id
-                     ) latest ON latest.job_offer_id = w1.job_offer_id AND latest.max_created_at = w1.created_at
+                     WHERE w1.status IN ("SENT", "RESOLVED")
+                     ORDER BY w1.created_at DESC
                  ) jw ON jw.job_offer_id = jo.id
                  ORDER BY jo.created_at DESC'
             );
@@ -87,35 +85,79 @@ class BackOfficeController extends AbstractController
                 return $this->redirectToRoute('app_admin_job_offers');
             }
 
-            $alreadyWarned = (int) $connection->fetchOne(
-                'SELECT COUNT(*) FROM job_offer_warning WHERE job_offer_id = :job_offer_id',
-                ['job_offer_id' => (string) $offer['id']]
+            // Check if there's an active (SENT) warning
+            $activeWarning = $connection->fetchOne(
+                'SELECT id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status LIMIT 1',
+                ['job_offer_id' => (string) $offer['id'], 'status' => 'SENT']
             );
 
-            if ($alreadyWarned > 0) {
-                $this->addFlash('warning', 'This offer is already warned. A second warning is not allowed.');
+            if ($activeWarning) {
+                $this->addFlash('warning', 'This offer already has an active warning. Wait for recruiter to edit or delete the warning first.');
                 return $this->redirectToRoute('app_admin_job_offers');
             }
 
-            $now = new \DateTimeImmutable();
-            $warningId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
+            $connection->beginTransaction();
 
-            $connection->insert('job_offer_warning', [
-                'id' => $warningId,
-                'job_offer_id' => (string) $offer['id'],
-                'recruiter_id' => (string) $offer['recruiter_id'],
-                'admin_id' => self::STATIC_ADMIN_ID,
-                'reason' => $reason,
-                'message' => $reason,
-                'status' => 'pending',
-                'created_at' => $now->format('Y-m-d H:i:s'),
-                'seen_at' => $now->format('Y-m-d H:i:s'),
-                'resolved_at' => $now->format('Y-m-d H:i:s'),
-            ]);
+            try {
+                // If there's a RESOLVED warning (recruiter edited), delete it and create a new warning
+                $connection->delete('job_offer_warning', [
+                    'job_offer_id' => (string) $offer['id'],
+                    'status' => 'RESOLVED',
+                ]);
 
-            $this->addFlash('success', 'Warning sent to recruiter successfully.');
+                $now = new \DateTimeImmutable();
+                $warningId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
+
+                $connection->insert('job_offer_warning', [
+                    'id' => $warningId,
+                    'job_offer_id' => (string) $offer['id'],
+                    'recruiter_id' => (string) $offer['recruiter_id'],
+                    'admin_id' => self::STATIC_ADMIN_ID,
+                    'reason' => $reason,
+                    'message' => $reason,
+                    'status' => 'SENT',
+                    'created_at' => $now->format('Y-m-d H:i:s'),
+                    'seen_at' => $now->format('Y-m-d H:i:s'),
+                    'resolved_at' => $now->format('Y-m-d H:i:s'),
+                ]);
+
+                $connection->commit();
+
+                $this->addFlash('success', 'Warning sent to recruiter successfully.');
+            } catch (\Throwable $exception) {
+                $connection->rollBack();
+                throw $exception;
+            }
         } catch (\Throwable $exception) {
             $this->addFlash('error', 'Unable to send warning for this offer.');
+        }
+
+        return $this->redirectToRoute('app_admin_job_offers');
+    }
+
+    #[Route('/admin/job-offers/{id}/accept-changes', name: 'app_admin_accept_job_offer_changes', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function acceptJobOfferWarning(string $id, Connection $connection): Response
+    {
+        try {
+            $warning = $connection->fetchAssociative(
+                'SELECT id, job_offer_id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status LIMIT 1',
+                ['job_offer_id' => $id, 'status' => 'RESOLVED']
+            );
+
+            if (!$warning) {
+                $this->addFlash('error', 'No pending review found for this offer.');
+                return $this->redirectToRoute('app_admin_job_offers');
+            }
+
+            $connection->update('job_offer_warning', [
+                'status' => 'DISMISSED',
+            ], [
+                'id' => (string) $warning['id'],
+            ]);
+
+            $this->addFlash('success', 'Changes accepted. Warning cleared for this offer.');
+        } catch (\Throwable $exception) {
+            $this->addFlash('error', 'Unable to accept changes for this offer.');
         }
 
         return $this->redirectToRoute('app_admin_job_offers');

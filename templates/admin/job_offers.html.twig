@@ -33,8 +33,11 @@
                 </thead>
                 <tbody>
                 {% for offer in offers %}
-                    {% set warned = offer.is_warned|default(0) == 1 %}
-                    <tr class="{{ warned ? 'table-warning' : '' }}">
+                    {% set warningStatus = offer.warning_status|default(null) %}
+                    {% set isActive = warningStatus == 'SENT' %}
+                    {% set isPendingReview = warningStatus == 'RESOLVED' %}
+                    {% set rowClass = isActive ? 'table-warning' : (isPendingReview ? 'table-info' : '') %}
+                    <tr class="{{ rowClass }}">
                         <td>#{{ offer.id }}</td>
                         <td>{{ offer.title }}</td>
                         <td>{{ offer.recruiter_id }}</td>
@@ -43,9 +46,33 @@
                         <td>{{ offer.status }}</td>
                         <td>{{ offer.created_at ? offer.created_at|date('Y-m-d H:i') : '-' }}</td>
                         <td>{{ offer.deadline ? offer.deadline|date('Y-m-d H:i') : '-' }}</td>
-                        <td style="min-width: 280px;">
-                            {% if warned %}
-                                <div class="small fw-semibold text-warning-emphasis mb-1">Already warned</div>
+                        <td style="min-width: 320px;">
+                            {% if isPendingReview %}
+                                <div class="small fw-semibold text-info-emphasis mb-2">
+                                    <i class="ti ti-refresh me-1"></i>Pending Review
+                                </div>
+                                <div class="small text-secondary mb-2">Original reason: {{ offer.warning_reason|default('-') }}</div>
+                                <div class="small text-muted mb-2">Modified: {{ offer.warning_edited_at ? offer.warning_edited_at|date('Y-m-d H:i') : '-' }}</div>
+                                <div class="d-flex flex-column gap-2">
+                                    <form method="post" action="{{ path('app_admin_accept_job_offer_changes', {id: offer.id}) }}" style="display: inline;">
+                                        <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Accept this job modification?');">
+                                            <i class="ti ti-check me-1"></i>Accept Changes
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="collapse" data-bs-target="#warning-form-{{ offer.id }}">
+                                        <i class="ti ti-alert-triangle me-1"></i>Send Another Warning
+                                    </button>
+                                    <div class="collapse mt-2" id="warning-form-{{ offer.id }}">
+                                        <form method="post" action="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}" class="d-flex flex-column gap-2">
+                                            <textarea name="reason" rows="2" class="form-control form-control-sm" placeholder="New warning reason..." required></textarea>
+                                            <button type="submit" class="btn btn-sm btn-danger">Submit Warning</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            {% elseif isActive %}
+                                <div class="small fw-semibold text-warning-emphasis mb-1">
+                                    <i class="ti ti-alert-circle me-1"></i>Active Warning
+                                </div>
                                 <div class="small text-secondary">Reason: {{ offer.warning_reason|default('-') }}</div>
                             {% else %}
                                 <form method="post" action="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}" class="d-flex flex-column gap-2">
