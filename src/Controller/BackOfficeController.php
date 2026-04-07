@@ -39,8 +39,18 @@ class BackOfficeController extends AbstractController
     public function jobOffers(Connection $connection): Response
     {
         $offers = [];
+        $expiredOffers = [];
+        $now = new \DateTimeImmutable();
 
         try {
+            $connection->executeStatement(
+                'UPDATE job_offer SET status = :closed_status WHERE deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
+                [
+                    'closed_status' => 'closed',
+                    'now' => $now->format('Y-m-d H:i:s'),
+                ]
+            );
+
             $offers = $connection->fetchAllAssociative(
                 'SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
                         COALESCE(jw.status, NULL) AS warning_status,
@@ -55,6 +65,21 @@ class BackOfficeController extends AbstractController
                  ) jw ON jw.job_offer_id = jo.id
                  ORDER BY jo.created_at DESC'
             );
+
+            foreach ($offers as $offer) {
+                if (empty($offer['deadline'])) {
+                    continue;
+                }
+
+                try {
+                    $deadlineAt = new \DateTimeImmutable((string) $offer['deadline']);
+                    if ($deadlineAt < $now) {
+                        $expiredOffers[] = $offer;
+                    }
+                } catch (\Throwable $exception) {
+                    // Ignore invalid dates in legacy rows.
+                }
+            }
         } catch (\Throwable $exception) {
             // Keep admin page available even if table/query is unavailable.
         }
@@ -62,6 +87,7 @@ class BackOfficeController extends AbstractController
         return $this->render('admin/job_offers.html.twig', [
             'authUser' => ['role' => 'admin'],
             'offers' => $offers,
+            'expiredOffers' => $expiredOffers,
         ]);
     }
 

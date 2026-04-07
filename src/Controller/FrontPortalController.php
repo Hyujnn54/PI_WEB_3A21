@@ -21,6 +21,8 @@ class FrontPortalController extends AbstractController
         $role = (string) $request->query->get('role', 'candidate');
         $warnings = [];
         $warningStatuses = [];
+        $expiredOffers = [];
+        $now = new \DateTimeImmutable();
 
         $cards = [
             ['id' => 1, 'meta' => 'Tunis | CDI | Open', 'title' => 'Frontend Engineer', 'text' => 'Build and iterate candidate-facing experiences with reusable UI modules.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Tunis', 'Status: Open', 'Deadline: 2026-05-20'], 'warning_status' => null, 'location' => 'Tunis', 'contract_type' => 'CDI', 'status' => 'open', 'deadline' => '2026-05-20'],
@@ -29,16 +31,30 @@ class FrontPortalController extends AbstractController
         ];
 
         try {
+            if ($role === 'recruiter') {
+                $connection->executeStatement(
+                    'UPDATE job_offer SET status = :closed_status WHERE deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
+                    [
+                        'closed_status' => 'closed',
+                        'now' => $now->format('Y-m-d H:i:s'),
+                    ]
+                );
+            }
+
             $rows = $connection->fetchAllAssociative(
                 'SELECT id, recruiter_id, title, description, location, contract_type, status, deadline FROM job_offer ORDER BY created_at DESC LIMIT 25'
             );
 
-            $dbCards = array_map(function (array $row) use ($connection): array {
+            $dbCards = array_map(function (array $row) use ($connection, $now): array {
                 $formattedDeadline = '';
+                $isExpired = false;
                 try {
-                    $formattedDeadline = (new \DateTimeImmutable((string) ($row['deadline'] ?? '')))->format('Y-m-d');
+                    $deadlineAt = new \DateTimeImmutable((string) ($row['deadline'] ?? ''));
+                    $formattedDeadline = $deadlineAt->format('Y-m-d');
+                    $isExpired = $deadlineAt < $now;
                 } catch (\Throwable $exception) {
                     $formattedDeadline = '';
+                    $isExpired = false;
                 }
 
                 $skills = $connection->fetchAllAssociative(
@@ -77,10 +93,22 @@ class FrontPortalController extends AbstractController
                     'contract_type' => (string) $row['contract_type'],
                     'status' => (string) $row['status'],
                     'deadline' => $formattedDeadline,
+                    'is_expired' => $isExpired,
                 ];
             }, $rows);
 
-            $cards = array_merge($dbCards, $cards);
+            foreach ($dbCards as $dbCard) {
+                if (($dbCard['is_expired'] ?? false) === true) {
+                    $expiredOffers[] = $dbCard;
+                }
+
+                // Candidates should not see expired offers.
+                if ($role === 'candidate' && ($dbCard['is_expired'] ?? false) === true) {
+                    continue;
+                }
+
+                $cards[] = $dbCard;
+            }
         } catch (\Throwable $exception) {
             // Keep UI usable even if table is not ready in current environment.
         }
@@ -123,6 +151,7 @@ class FrontPortalController extends AbstractController
             'authUser' => ['role' => $role],
             'cards' => $cards,
             'warnings' => $warnings,
+            'expiredOffers' => $expiredOffers,
         ]);
     }
 
