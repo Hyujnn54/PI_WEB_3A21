@@ -154,15 +154,18 @@
                                     </div>
                                     <div class="col-md-6" data-online-field>
                                         <label class="form-label">Meeting Link (online)</label>
-                                        <input type="url" name="meeting_link" class="form-control" placeholder="https://...">
+                                        <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" maxlength="500">
+                                        <div class="form-hint">Use a complete http(s) URL.</div>
                                     </div>
                                     <div class="col-md-6" data-onsite-field>
                                         <label class="form-label">Room (onsite)</label>
-                                        <input type="text" name="location" class="form-control" placeholder="Room / Office location">
+                                        <input type="text" name="location" class="form-control" placeholder="Room / Office location" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
+                                        <div class="form-hint">3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label">Additional Notes</label>
-                                        <textarea name="notes" rows="3" class="form-control"></textarea>
+                                        <textarea name="notes" rows="3" class="form-control" maxlength="1000"></textarea>
+                                        <div class="form-hint"><span data-edit-notes-count>0</span>/1000 characters</div>
                                     </div>
                                 </div>
                                 <div class="modal-footer">
@@ -196,7 +199,8 @@
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label">Comment</label>
-                                        <textarea name="comment" rows="4" class="form-control" required></textarea>
+                                        <textarea name="comment" rows="4" class="form-control" required minlength="10" maxlength="1000"></textarea>
+                                        <div class="form-hint"><span data-review-comment-count>0</span>/1000 characters, minimum 10.</div>
                                     </div>
                                 </div>
                                 <div class="modal-footer">
@@ -317,6 +321,8 @@
             const scheduleInput = editForm.querySelector('input[name="scheduled_at"]');
             const meetingInput = editForm.querySelector('input[name="meeting_link"]');
             const locationInput = editForm.querySelector('input[name="location"]');
+            const notesInput = editForm.querySelector('textarea[name="notes"]');
+            const notesCount = editForm.querySelector('[data-edit-notes-count]');
             const onlineField = editForm.querySelector('[data-online-field]');
             const onsiteField = editForm.querySelector('[data-onsite-field]');
 
@@ -327,17 +333,41 @@
                 if (mode === 'onsite') {
                     if (onlineField) onlineField.classList.add('d-none');
                     if (onsiteField) onsiteField.classList.remove('d-none');
-                    if (meetingInput) { meetingInput.required = false; }
+                    if (meetingInput) {
+                        meetingInput.required = false;
+                        meetingInput.setCustomValidity('');
+                    }
                     if (locationInput) { locationInput.required = true; }
                 } else {
                     if (onsiteField) onsiteField.classList.add('d-none');
                     if (onlineField) onlineField.classList.remove('d-none');
-                    if (locationInput) { locationInput.required = false; }
+                    if (locationInput) {
+                        locationInput.required = false;
+                        locationInput.setCustomValidity('');
+                    }
                     if (meetingInput) { meetingInput.required = true; }
                 }
             };
 
             if (modeSelect) modeSelect.addEventListener('change', applyModeFields);
+
+            if (locationInput) {
+                locationInput.addEventListener('input', function () {
+                    if (!locationInput.value || locationInput.checkValidity()) {
+                        locationInput.setCustomValidity('');
+                    } else {
+                        locationInput.setCustomValidity('Use 3-120 chars: letters, numbers and , . / # ( ) - only.');
+                    }
+                });
+            }
+
+            if (notesInput && notesCount) {
+                const syncNotesCount = function () {
+                    notesCount.textContent = String(notesInput.value.length);
+                };
+                notesInput.addEventListener('input', syncNotesCount);
+                syncNotesCount();
+            }
 
             const openEditModalForCard = function (card) {
                 if (!card) return;
@@ -359,6 +389,7 @@
                 if (locationInput) locationInput.value = location;
                 if (notesInput) notesInput.value = notes;
                 applyModeFields();
+                if (notesCount && notesInput) notesCount.textContent = String(notesInput.value.length);
                 editModal.show();
             };
 
@@ -386,6 +417,15 @@
             const reviewScore = reviewForm.querySelector('input[name="overall_score"]');
             const reviewDecision = reviewForm.querySelector('select[name="decision"]');
             const reviewComment = reviewForm.querySelector('textarea[name="comment"]');
+            const reviewCommentCount = reviewForm.querySelector('[data-review-comment-count]');
+
+            if (reviewComment && reviewCommentCount) {
+                const syncReviewCommentCount = function () {
+                    reviewCommentCount.textContent = String(reviewComment.value.length);
+                };
+                reviewComment.addEventListener('input', syncReviewCommentCount);
+                syncReviewCommentCount();
+            }
 
             const openReviewModalForCard = function (card) {
                 if (!card) return;
@@ -394,6 +434,7 @@
                 if (reviewScore) reviewScore.value = card.getAttribute('data-review-score') || '80';
                 if (reviewDecision) reviewDecision.value = card.getAttribute('data-review-decision') || 'accepted';
                 if (reviewComment) reviewComment.value = card.getAttribute('data-review-comment') || '';
+                if (reviewCommentCount && reviewComment) reviewCommentCount.textContent = String(reviewComment.value.length);
                 reviewModal.show();
             };
 

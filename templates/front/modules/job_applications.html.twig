@@ -20,11 +20,6 @@
         color: #ffffff !important;
     }
 
-    .tb-dock-reason {
-        font-size: 0.82rem;
-        color: #c06d00;
-        white-space: nowrap;
-    }
 </style>
 <div class="page-wrapper">
     <div class="page-header d-print-none">
@@ -72,7 +67,7 @@
                 {% for card in cards %}
                     {% set canCreateInterview = card.can_create_interview|default(true) %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-application-id="{{ card.id|default(0) }}" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-accept-url="{{ card.accept_url|default('#') }}" data-decline-url="{{ card.decline_url|default('#') }}" data-create-url="{{ card.create_interview_url|default('#') }}" data-create-disabled="{{ canCreateInterview ? '0' : '1' }}" data-create-reason="{{ card.interview_block_reason|default('Interview already exists for this application.')|e('html_attr') }}" data-detail-extra="Application: {{ card.meta }}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already exists for this application.') }}{% endif %}">
+                        <div class="tb-module-card h-100" data-application-id="{{ card.id|default(0) }}" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-accept-url="{{ card.accept_url|default('#') }}" data-decline-url="{{ card.decline_url|default('#') }}" data-create-url="{{ card.create_interview_url|default('#') }}" data-create-disabled="{{ canCreateInterview ? '0' : '1' }}" data-create-reason="{{ card.interview_block_reason|default('Interview already created for this application.')|e('html_attr') }}" data-create-check-url="{{ path('front_application_interview_availability', {applicationId: card.id}|merge(app.request.query.all|merge({role: role}))) }}" data-detail-extra="Application: {{ card.meta }}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already created for this application.') }}{% endif %}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
@@ -107,7 +102,7 @@
             <div id="applicationActionDock" class="tb-interview-action-dock">
                 <div class="container-xl">
                     <div class="tb-interview-action-dock-inner">
-                        <div class="small text-secondary" id="applicationActionLabel">Select an application card to unlock actions</div>
+                        <div class="small text-secondary" id="applicationActionLabel">Choose an application to unlock actions</div>
                         <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
                             <form method="post" action="#" class="d-inline" id="applicationAcceptForm">
                                 <button type="submit" class="btn btn-outline-success" id="applicationAcceptBtn" disabled aria-disabled="true"><i class="ti ti-check me-1"></i>Accept</button>
@@ -115,8 +110,7 @@
                             <form method="post" action="#" class="d-inline" id="applicationDeclineForm">
                                 <button type="submit" class="btn btn-outline-danger" id="applicationDeclineBtn" disabled aria-disabled="true"><i class="ti ti-x me-1"></i>Decline</button>
                             </form>
-                            <button type="button" class="btn btn-primary" id="applicationCreateBtn" disabled aria-disabled="true"><i class="ti ti-lock me-1"></i>Select Application</button>
-                            <span class="tb-dock-reason d-none" id="applicationCreateReason"><i class="ti ti-alert-circle me-1"></i><span></span></span>
+                            <button type="button" class="btn btn-primary" id="applicationCreateBtn" disabled aria-disabled="true"><i class="ti ti-hand-click me-1"></i>Choose Application</button>
                         </div>
                     </div>
                 </div>
@@ -148,15 +142,18 @@
                                 </div>
                                 <div class="col-md-6" data-online-field>
                                     <label class="form-label">Meeting Link (online)</label>
-                                    <input type="url" name="meeting_link" class="form-control" placeholder="https://...">
+                                    <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" maxlength="500">
+                                    <div class="form-hint">Use a complete http(s) URL.</div>
                                 </div>
                                 <div class="col-md-6" data-onsite-field>
                                     <label class="form-label">Room (onsite)</label>
-                                    <input type="text" name="location" class="form-control" placeholder="Room / Office location">
+                                    <input type="text" name="location" class="form-control" placeholder="Room / Office location" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
+                                    <div class="form-hint">3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Additional Notes</label>
-                                    <textarea name="notes" rows="3" class="form-control"></textarea>
+                                    <textarea name="notes" rows="3" class="form-control" maxlength="1000"></textarea>
+                                    <div class="form-hint"><span data-notes-count>0</span>/1000 characters</div>
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -172,20 +169,32 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const modalEl = document.getElementById('createInterviewModal');
-        const formEl = document.getElementById('createInterviewForm');
-        if (!modalEl || !formEl || typeof bootstrap === 'undefined') {
+    const initJobApplicationsPage = function () {
+        const pageRoot = document.querySelector('.tb-interviews-page');
+        if (!pageRoot) {
             return;
         }
 
-        const modal = new bootstrap.Modal(modalEl);
+        if (pageRoot.dataset.tbApplicationsInitialized === '1') {
+            return;
+        }
+        pageRoot.dataset.tbApplicationsInitialized = '1';
+
+        const modalEl = document.getElementById('createInterviewModal');
+        const formEl = document.getElementById('createInterviewForm');
+        if (!formEl) {
+            return;
+        }
+
+        const modal = (modalEl && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(modalEl) : null;
         const modeSelect = formEl.querySelector('select[name="mode"]');
         const scheduleInput = formEl.querySelector('input[name="scheduled_at"]');
         const meetingInput = formEl.querySelector('input[name="meeting_link"]');
         const locationInput = formEl.querySelector('input[name="location"]');
         const onlineField = formEl.querySelector('[data-online-field]');
         const onsiteField = formEl.querySelector('[data-onsite-field]');
+        const notesInput = formEl.querySelector('textarea[name="notes"]');
+        const notesCount = formEl.querySelector('[data-notes-count]');
         const actionDock = document.getElementById('applicationActionDock');
         const actionLabel = document.getElementById('applicationActionLabel');
         const acceptForm = document.getElementById('applicationAcceptForm');
@@ -193,7 +202,6 @@
         const acceptBtn = document.getElementById('applicationAcceptBtn');
         const declineBtn = document.getElementById('applicationDeclineBtn');
         const createBtn = document.getElementById('applicationCreateBtn');
-        const createReason = document.getElementById('applicationCreateReason');
         let selectedCard = null;
 
         const now = new Date();
@@ -210,6 +218,7 @@
                 if (meetingInput) {
                     meetingInput.value = '';
                     meetingInput.required = false;
+                    meetingInput.setCustomValidity('');
                 }
                 if (locationInput) locationInput.required = true;
             } else {
@@ -218,6 +227,7 @@
                 if (locationInput) {
                     locationInput.value = '';
                     locationInput.required = false;
+                    locationInput.setCustomValidity('');
                 }
                 if (meetingInput) meetingInput.required = true;
             }
@@ -227,8 +237,26 @@
             modeSelect.addEventListener('change', applyModeFields);
         }
 
+        if (locationInput) {
+            locationInput.addEventListener('input', function () {
+                if (!locationInput.value || locationInput.checkValidity()) {
+                    locationInput.setCustomValidity('');
+                } else {
+                    locationInput.setCustomValidity('Use 3-120 chars: letters, numbers and , . / # ( ) - only.');
+                }
+            });
+        }
+
+        if (notesInput && notesCount) {
+            const syncNotesCount = function () {
+                notesCount.textContent = String(notesInput.value.length);
+            };
+            notesInput.addEventListener('input', syncNotesCount);
+            syncNotesCount();
+        }
+
         const openCreateModal = function (createUrl) {
-            if (!createUrl || createUrl === '#') return;
+            if (!createUrl || createUrl === '#' || !modal) return;
             formEl.setAttribute('action', createUrl);
             if (modeSelect) modeSelect.value = 'online';
             if (scheduleInput) scheduleInput.min = minValue;
@@ -242,7 +270,6 @@
             const declineUrl = card.getAttribute('data-decline-url') || '#';
             const createUrl = card.getAttribute('data-create-url') || '#';
             const createDisabled = card.getAttribute('data-create-disabled') === '1';
-            const reason = card.getAttribute('data-create-reason') || 'Interview already exists for this application.';
 
             if (acceptForm) acceptForm.setAttribute('action', acceptUrl);
             if (declineForm) declineForm.setAttribute('action', declineUrl);
@@ -265,36 +292,61 @@
                     : '<i class="ti ti-calendar-plus me-1"></i>Create Interview';
             }
 
-            if (createReason) {
-                const text = createReason.querySelector('span');
-                if (createDisabled) {
-                    if (text) text.textContent = reason;
-                    createReason.classList.remove('d-none');
-                } else {
-                    createReason.classList.add('d-none');
-                    if (text) text.textContent = '';
-                }
-            }
-
             if (actionLabel) {
                 actionLabel.textContent = (card.getAttribute('data-detail-title') || 'Selected application') + ' actions';
             }
 
         };
 
+        const refreshCreateAvailability = async function (card) {
+            if (!card) return false;
+            const checkUrl = card.getAttribute('data-create-check-url') || '';
+            if (!checkUrl) {
+                syncDockFromCard(card);
+                return card.getAttribute('data-create-disabled') !== '1';
+            }
+
+            try {
+                const response = await fetch(checkUrl, {
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!response.ok) {
+                    syncDockFromCard(card);
+                    return card.getAttribute('data-create-disabled') !== '1';
+                }
+
+                const payload = await response.json();
+                if (!payload || payload.ok !== true) {
+                    syncDockFromCard(card);
+                    return card.getAttribute('data-create-disabled') !== '1';
+                }
+
+                card.setAttribute('data-create-disabled', payload.canCreateInterview ? '0' : '1');
+                card.setAttribute('data-create-url', payload.createUrl || '#');
+            } catch (e) {
+                // Keep existing card state when live check fails.
+            }
+
+            syncDockFromCard(card);
+            return card.getAttribute('data-create-disabled') !== '1';
+        };
+
         document.querySelectorAll('#applicationCardsGrid .tb-module-card').forEach(function (card) {
             card.addEventListener('click', function () {
                 selectedCard = card;
-                setTimeout(function () {
-                    syncDockFromCard(card);
-                }, 0);
+                // Render immediately from current card data (instant response).
+                syncDockFromCard(card);
             });
         });
 
         if (createBtn) {
-            createBtn.addEventListener('click', function () {
+            createBtn.addEventListener('click', async function () {
                 if (!selectedCard) return;
-                if (createBtn.disabled || createBtn.classList.contains('tb-create-locked')) return;
+                if (createBtn.disabled || createBtn.classList.contains('tb-create-locked')) {
+                    const canCreate = await refreshCreateAvailability(selectedCard);
+                    if (!canCreate) return;
+                }
                 openCreateModal(createBtn.getAttribute('data-create-url') || '#');
             });
         }
@@ -305,14 +357,30 @@
             const card = document.querySelector('#applicationCardsGrid .tb-module-card[data-application-id="' + openCreateFor + '"]');
             if (card) {
                 selectedCard = card;
-                syncDockFromCard(card);
-                if (card.getAttribute('data-create-disabled') !== '1') {
-                    openCreateModal(card.getAttribute('data-create-url') || '#');
-                }
+                refreshCreateAvailability(card).then(function () {
+                    if (card.getAttribute('data-create-disabled') !== '1') {
+                        openCreateModal(card.getAttribute('data-create-url') || '#');
+                    }
+                });
             }
         }
 
+        const initiallySelected = document.querySelector('#applicationCardsGrid .tb-module-card.is-selected');
+        if (initiallySelected) {
+            selectedCard = initiallySelected;
+            refreshCreateAvailability(initiallySelected);
+        }
+
+        window.addEventListener('pageshow', function () {
+            if (selectedCard) {
+                refreshCreateAvailability(selectedCard);
+            }
+        });
+
         applyModeFields();
-    });
+    };
+
+    document.addEventListener('DOMContentLoaded', initJobApplicationsPage);
+    document.addEventListener('turbo:load', initJobApplicationsPage);
 </script>
 {% endblock %}

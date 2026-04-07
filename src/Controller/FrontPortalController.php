@@ -12,6 +12,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
 
@@ -19,6 +20,9 @@ class FrontPortalController extends AbstractController
 {
     private const MAX_FUTURE_DAYS = 90;
     private const EDIT_LOCK_HOURS = 2;
+    private const LOCATION_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,120}$/u';
+    private const TEXTAREA_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{0,1000}$/u';
+    private const REVIEW_COMMENT_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,1000}$/u';
 
     public function __construct(private readonly ManagerRegistry $doctrine)
     {
@@ -69,7 +73,7 @@ class FrontPortalController extends AbstractController
                 'status' => (string) $application->getCurrent_status(),
                 'create_interview_url' => $hasActiveInterview ? '#' : $createInterviewUrl,
                 'can_create_interview' => !$hasActiveInterview,
-                'interview_block_reason' => $hasActiveInterview ? 'Interview already exists for this application. Only one interview is allowed.' : '',
+                'interview_block_reason' => $hasActiveInterview ? 'Interview already created for this application.' : '',
                 'accept_url' => $acceptUrl,
                 'decline_url' => $declineUrl,
             ];
@@ -238,6 +242,37 @@ class FrontPortalController extends AbstractController
         return $this->redirectToRoute('front_job_applications', $request->query->all());
     }
 
+    #[Route('/front/job-applications/{applicationId}/interview-availability', name: 'front_application_interview_availability', methods: ['GET'])]
+    public function applicationInterviewAvailability(string $applicationId, Request $request): JsonResponse
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        $application = $this->doctrine->getRepository(Job_application::class)->find($applicationId);
+        if (!$application instanceof Job_application) {
+            return new JsonResponse(['ok' => false, 'error' => 'Application not found.'], 404);
+        }
+
+        if ($role !== 'recruiter') {
+            return new JsonResponse([
+                'ok' => true,
+                'canCreateInterview' => false,
+                'createUrl' => '#',
+                'reason' => 'Only recruiters can create interviews.',
+            ]);
+        }
+
+        $hasActiveInterview = $this->hasActiveInterviewForApplication($application);
+        $createUrl = $this->generateUrl('front_interview_create', ['applicationId' => $applicationId, 'role' => $role] + $request->query->all());
+
+        return new JsonResponse([
+            'ok' => true,
+            'canCreateInterview' => !$hasActiveInterview,
+            'createUrl' => $hasActiveInterview ? '#' : $createUrl,
+            'reason' => $hasActiveInterview
+                ? 'Interview already created for this application.'
+                : '',
+        ]);
+    }
+
     #[Route('/front/interviews/create/{applicationId}', name: 'front_interview_create', methods: ['GET', 'POST'])]
     public function createInterview(string $applicationId, Request $request): Response
     {
@@ -290,7 +325,7 @@ class FrontPortalController extends AbstractController
                 $interview->setMode($validation['mode']);
                 $interview->setMeeting_link($validation['meetingLink']);
                 $interview->setLocation($validation['location']);
-                $interview->setNotes($formData['notes']);
+                $interview->setNotes($validation['notes']);
                 $interview->setStatus('scheduled');
                 $interview->setCreated_at(new \DateTime());
                 $interview->setReminder_sent(false);
@@ -366,7 +401,7 @@ class FrontPortalController extends AbstractController
                 $interview->setMode($validation['mode']);
                 $interview->setMeeting_link($validation['meetingLink']);
                 $interview->setLocation($validation['location']);
-                $interview->setNotes($formData['notes']);
+                $interview->setNotes($validation['notes']);
                 $this->doctrine->getManager()->flush();
 
                 $this->addFlash('success', 'Interview updated successfully.');
@@ -405,9 +440,16 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_interviews', $request->query->all());
         }
 
+        $application = $interview->getApplication_id();
         $entityManager = $this->doctrine->getManager();
         $entityManager->remove($interview);
         $entityManager->flush();
+
+        if (!$this->hasActiveInterviewForApplication($application) && (string) $application->getCurrent_status() === 'interview_scheduled') {
+            $application->setCurrent_status('under_review');
+            $entityManager->flush();
+        }
+
         $this->addFlash('success', 'Interview deleted successfully.');
 
         return $this->redirectToRoute('front_interviews', $request->query->all());
@@ -462,6 +504,12 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_interviews', $request->query->all() + ['openReviewFor' => $id]);
         }
 
+        $commentValidation = $this->validateReviewComment($comment);
+        if (!$commentValidation['ok']) {
+            $this->addFlash('warning', (string) $commentValidation['error']);
+            return $this->redirectToRoute('front_interviews', $request->query->all() + ['openReviewFor' => $id]);
+        }
+
         $entityManager = $this->doctrine->getManager();
         if (!$feedback instanceof Interview_feedback) {
             $feedback = new Interview_feedback();
@@ -473,7 +521,7 @@ class FrontPortalController extends AbstractController
 
         $feedback->setOverall_score($score);
         $feedback->setDecision($decision);
-        $feedback->setComment($comment);
+    $feedback->setComment((string) $commentValidation['value']);
         $feedback->setCreated_at(new \DateTime());
 
         $interview->setStatus('completed');
@@ -515,13 +563,26 @@ class FrontPortalController extends AbstractController
 
         $meetingLink = trim((string) ($data['meeting_link'] ?? ''));
         $location = trim((string) ($data['location'] ?? ''));
+        $notes = trim((string) ($data['notes'] ?? ''));
 
         if ($mode === 'online' && $meetingLink === '') {
             return ['ok' => false, 'error' => 'Meeting link is required for online interviews.'];
         }
 
+        if ($mode === 'online' && !$this->isValidMeetingLink($meetingLink)) {
+            return ['ok' => false, 'error' => 'Meeting link must be a valid http(s) URL.'];
+        }
+
         if ($mode === 'onsite' && $location === '') {
             return ['ok' => false, 'error' => 'Location is required for onsite interviews.'];
+        }
+
+        if ($mode === 'onsite' && !$this->isValidLocation($location)) {
+            return ['ok' => false, 'error' => 'Location can contain letters, numbers and common punctuation (3-120 chars).'];
+        }
+
+        if (!$this->isValidTextarea($notes)) {
+            return ['ok' => false, 'error' => 'Notes contain unsupported characters or exceed 1000 characters.'];
         }
 
         return [
@@ -531,7 +592,45 @@ class FrontPortalController extends AbstractController
             'mode' => $mode,
             'meetingLink' => $meetingLink,
             'location' => $location,
+            'notes' => $notes,
         ];
+    }
+
+    private function isValidMeetingLink(string $meetingLink): bool
+    {
+        if (!filter_var($meetingLink, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        return (bool) preg_match('/^https?:\/\/[\S]+$/i', $meetingLink);
+    }
+
+    private function isValidLocation(string $location): bool
+    {
+        return (bool) preg_match(self::LOCATION_REGEX, $location);
+    }
+
+    private function isValidTextarea(string $value): bool
+    {
+        if (mb_strlen($value) > 1000) {
+            return false;
+        }
+
+        return (bool) preg_match(self::TEXTAREA_REGEX, $value);
+    }
+
+    private function validateReviewComment(string $comment): array
+    {
+        $trimmed = trim($comment);
+        if ($trimmed === '') {
+            return ['ok' => false, 'error' => 'Comment is required.'];
+        }
+
+        if (!preg_match(self::REVIEW_COMMENT_REGEX, $trimmed)) {
+            return ['ok' => false, 'error' => 'Comment must be 10-1000 chars and use letters, numbers or common punctuation.'];
+        }
+
+        return ['ok' => true, 'value' => $trimmed];
     }
 
     private function canModifyInterview(Interview $interview): bool
@@ -637,21 +736,16 @@ class FrontPortalController extends AbstractController
 
     private function hasActiveInterviewForApplication(Job_application $application): bool
     {
-        $applicationId = (string) $application->getId();
+        $count = (int) $this->doctrine
+            ->getRepository(Interview::class)
+            ->createQueryBuilder('i')
+            ->select('COUNT(i.id)')
+            ->andWhere('i.application_id = :application')
+            ->setParameter('application', $application)
+            ->getQuery()
+            ->getSingleScalarResult();
 
-        try {
-            $connection = $this->doctrine->getConnection();
-            $result = $connection->fetchOne(
-                'SELECT 1 FROM interview WHERE application_id = :applicationId LIMIT 1',
-                ['applicationId' => $applicationId]
-            );
-
-            return $result !== false && $result !== null;
-        } catch (Throwable) {
-            // Fallback to ORM lookup if direct SQL fails for any reason.
-            $existing = $this->doctrine->getRepository(Interview::class)->findBy(['application_id' => $application], ['id' => 'DESC'], 1);
-            return !empty($existing);
-        }
+        return $count > 0;
     }
 
     private function nextNumericId(string $entityClass): string

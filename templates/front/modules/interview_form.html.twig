@@ -37,15 +37,18 @@
                         </div>
                         <div class="col-md-6" data-online-field>
                             <label class="form-label">Meeting Link (required for online)</label>
-                            <input type="url" name="meeting_link" class="form-control" placeholder="https://..." value="{{ formData.meeting_link|default('') }}">
+                            <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" value="{{ formData.meeting_link|default('') }}" maxlength="500">
+                            <div class="form-hint">Use a complete http(s) URL.</div>
                         </div>
                         <div class="col-md-6" data-onsite-field>
                             <label class="form-label">Room (required for onsite)</label>
-                            <input type="text" name="location" class="form-control" placeholder="Room / Office location" value="{{ formData.location|default('') }}">
+                            <input type="text" name="location" class="form-control" placeholder="Room / Office location" value="{{ formData.location|default('') }}" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
+                            <div class="form-hint">3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Additional Notes</label>
-                            <textarea name="notes" rows="4" class="form-control" placeholder="Additional interview details...">{{ formData.notes|default('') }}</textarea>
+                            <textarea name="notes" rows="4" class="form-control" placeholder="Additional interview details..." maxlength="1000">{{ formData.notes|default('') }}</textarea>
+                            <div class="form-hint"><span data-notes-count>0</span>/1000 characters</div>
                         </div>
                         <div class="col-12 d-flex gap-2">
                             <button type="submit" class="btn btn-primary">{{ mode == 'edit' ? 'Save Changes' : 'Create Interview' }}</button>
@@ -68,6 +71,8 @@
         const locationInput = form.querySelector('input[name="location"]');
         const onlineField = form.querySelector('[data-online-field]');
         const onsiteField = form.querySelector('[data-onsite-field]');
+        const notesInput = form.querySelector('textarea[name="notes"]');
+        const notesCount = form.querySelector('[data-notes-count]');
 
         const applyModeFields = function () {
             const mode = modeSelect ? modeSelect.value : 'online';
@@ -77,6 +82,7 @@
                 if (meetingInput) {
                     meetingInput.value = '';
                     meetingInput.required = false;
+                    meetingInput.setCustomValidity('');
                 }
                 if (locationInput) locationInput.required = true;
             } else {
@@ -85,6 +91,7 @@
                 if (locationInput) {
                     locationInput.value = '';
                     locationInput.required = false;
+                    locationInput.setCustomValidity('');
                 }
                 if (meetingInput) meetingInput.required = true;
             }
@@ -92,6 +99,24 @@
 
         if (modeSelect) {
             modeSelect.addEventListener('change', applyModeFields);
+        }
+
+        if (locationInput) {
+            locationInput.addEventListener('input', function () {
+                if (!locationInput.value || locationInput.checkValidity()) {
+                    locationInput.setCustomValidity('');
+                } else {
+                    locationInput.setCustomValidity('Use 3-120 chars: letters, numbers and , . / # ( ) - only.');
+                }
+            });
+        }
+
+        if (notesInput && notesCount) {
+            const syncNotesCount = function () {
+                notesCount.textContent = String(notesInput.value.length);
+            };
+            notesInput.addEventListener('input', syncNotesCount);
+            syncNotesCount();
         }
 
         applyModeFields();

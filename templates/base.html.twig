@@ -241,6 +241,25 @@
                             if (extra) {
                                 const rawExtra = card.getAttribute('data-detail-extra') || '';
                                 extra.innerHTML = '';
+
+                                const appendValue = function (container, rawValue) {
+                                    const valueText = (rawValue || '').trim();
+                                    const isUrl = /^https?:\/\//i.test(valueText);
+                                    if (isUrl) {
+                                        const link = document.createElement('a');
+                                        link.href = valueText;
+                                        link.target = '_blank';
+                                        link.rel = 'noopener noreferrer';
+                                        link.textContent = valueText;
+                                        container.appendChild(link);
+                                        return;
+                                    }
+
+                                    const value = document.createElement('span');
+                                    value.textContent = valueText;
+                                    container.appendChild(value);
+                                };
+
                                 rawExtra.split('||').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (line) {
                                     const item = document.createElement('div');
                                     item.className = 'tb-detail-row';
@@ -248,12 +267,10 @@
                                     if (splitIndex > -1) {
                                         const key = document.createElement('strong');
                                         key.textContent = line.slice(0, splitIndex + 1) + ' ';
-                                        const value = document.createElement('span');
-                                        value.textContent = line.slice(splitIndex + 1).trim();
                                         item.appendChild(key);
-                                        item.appendChild(value);
+                                        appendValue(item, line.slice(splitIndex + 1));
                                     } else {
-                                        item.textContent = line;
+                                        appendValue(item, line);
                                     }
                                     extra.appendChild(item);
                                 });
