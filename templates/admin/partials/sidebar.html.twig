@@ -5,7 +5,6 @@
             <span class="tb-brand-label">Talent Bridge</span>
         </a>
     </div>
-
     <div class="sidebar-content">
         <ul class="navbar-nav flex-column" id="navbar-sidebar">
             <li class="nav-item">
@@ -18,6 +17,12 @@
                 <a class="nav-link {{ app.request.attributes.get('_route') == 'app_admin_add_user' ? 'active' : '' }}" href="{{ path('app_admin_add_user') }}">
                     <i class="ti ti-user-plus"></i>
                     <span>Add User</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ app.request.attributes.get('_route') == 'app_admin_job_offers' ? 'active' : '' }}" href="{{ path('app_admin_job_offers') }}">
+                    <i class="ti ti-briefcase-2"></i>
+                    <span>Job Offers</span>
                 </a>
             </li>
             

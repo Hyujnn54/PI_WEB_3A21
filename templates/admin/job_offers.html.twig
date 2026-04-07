@@ -1,0 +1,471 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Talent Bridge | Admin Job Offers{% endblock %}
+
+{% block admin_content %}
+    <div class="row mb-4 align-items-center">
+        <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h1 class="h3 mb-1">All Job Offers</h1>
+                <p class="mb-0 text-muted">Admin view of all published offers.</p>
+            </div>
+            <a href="{{ path('app_admin') }}" class="btn btn-outline-primary">
+                <i class="ti ti-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    {% if offerStats is not null %}
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="card border shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="small text-secondary mb-1">Offres publiées</div>
+                        <div class="h2 mb-0">{{ offerStats.total_published }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border border-success shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="small text-secondary mb-1">Offres ouvertes</div>
+                        <div class="h2 mb-1">{{ offerStats.total_open }}</div>
+                        <span class="badge bg-success-lt text-success">{{ offerStats.open_percentage }}%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border border-danger shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="small text-secondary mb-1">Offres fermées</div>
+                        <div class="h2 mb-1">{{ offerStats.total_closed }}</div>
+                        <span class="badge bg-red-lt text-danger">{{ offerStats.closed_percentage }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-xl-6">
+                <div class="card border shadow-sm">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Pie Chart: Offres ouvertes vs fermées</h3>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="adminStatusPie" height="220"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-xl-6">
+                <div class="card border shadow-sm">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Pie Chart: Types de contrat</h3>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="adminContractPie" height="220"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-xl-7">
+                <div class="card border shadow-sm">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Répartition par ville (Ouvertes vs Fermées)</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm card-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Ville</th>
+                                    <th>Total</th>
+                                    <th>Ouvertes</th>
+                                    <th>Fermées</th>
+                                    <th>Taux ouvertes</th>
+                                    <th>Taux fermées</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for city in offerStats.city_stats %}
+                                    <tr>
+                                        <td>{{ city.city }}</td>
+                                        <td>{{ city.total }}</td>
+                                        <td>{{ city.open }}</td>
+                                        <td>{{ city.closed }}</td>
+                                        <td>{{ city.open_rate }}%</td>
+                                        <td>{{ city.closed_rate }}%</td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-secondary">Aucune donnée.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-xl-5">
+                <div class="card border shadow-sm">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Statistiques par type de contrat</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm card-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Total</th>
+                                    <th>Part</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contract in offerStats.contract_stats %}
+                                    <tr>
+                                        <td>{{ contract.contract_type }}</td>
+                                        <td>{{ contract.total }}</td>
+                                        <td style="min-width: 160px;">
+                                            <div class="d-flex justify-content-between small mb-1">
+                                                <span>{{ contract.percentage }}%</span>
+                                            </div>
+                                            <div class="progress progress-xs">
+                                                <div class="progress-bar bg-primary" style="width: {{ contract.percentage }}%;"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="3" class="text-secondary">Aucune donnée.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if expiredOffers|default([])|length > 0 %}
+        <div class="card border-danger mb-3">
+            <div class="card-header">
+                <h3 class="card-title text-danger mb-0"><i class="ti ti-clock-exclamation me-1"></i>Expired Offers (Auto-Closed)</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Location</th>
+                                <th>Contract</th>
+                                <th>Status</th>
+                                <th>Deadline</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for expired in expiredOffers %}
+                                <tr>
+                                    <td>#{{ expired.id }}</td>
+                                    <td>{{ expired.title }}</td>
+                                    <td>{{ expired.location|default('-') }}</td>
+                                    <td>{{ expired.contract_type|default('-') }}</td>
+                                    <td><span class="badge bg-danger">{{ expired.status|default('closed')|capitalize }}</span></td>
+                                    <td>{{ expired.deadline ? expired.deadline|date('Y-m-d H:i') : '-' }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="card border mb-3">
+        <div class="card-body d-flex flex-wrap gap-2 align-items-center" id="adminOfferMultiFilter">
+            <input type="text" class="form-control" style="max-width: 180px;" placeholder="Location" id="adminFilterLocation">
+            <select class="form-select" style="max-width: 190px;" id="adminFilterContractType">
+                <option value="">All contract types</option>
+            </select>
+            <select class="form-select" style="max-width: 170px;" id="adminFilterStatus">
+                <option value="">All status</option>
+                <option value="open">Open</option>
+                <option value="paused">Paused</option>
+                <option value="closed">Closed</option>
+            </select>
+            <input type="date" class="form-control" style="max-width: 170px;" id="adminFilterDeadline">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="adminClearOfferFilters">Reset</button>
+            <div class="small text-secondary ms-auto" id="adminOfferFilterResults"></div>
+        </div>
+    </div>
+
+    <div class="card border">
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Recruiter ID</th>
+                        <th>Location</th>
+                        <th>Contract</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Deadline</th>
+                        <th>Warning</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for offer in offers %}
+                    {% set warningStatus = offer.warning_status|default(null) %}
+                    {% set isActive = warningStatus == 'SENT' %}
+                    {% set isPendingReview = warningStatus == 'RESOLVED' %}
+                    {% set rowClass = isActive ? 'table-warning' : (isPendingReview ? 'table-info' : '') %}
+                    <tr class="{{ rowClass }} admin-offer-row"
+                        data-filter-location="{{ offer.location|default('')|lower }}"
+                        data-filter-contract-type="{{ offer.contract_type|default('')|lower }}"
+                        data-filter-status="{{ offer.status|default('')|lower }}"
+                        data-filter-deadline="{{ offer.deadline ? offer.deadline|date('Y-m-d') : '' }}">
+                        <td>#{{ offer.id }}</td>
+                        <td>{{ offer.title }}</td>
+                        <td>{{ offer.recruiter_id }}</td>
+                        <td>{{ offer.location }}</td>
+                        <td>{{ offer.contract_type }}</td>
+                        <td>{{ offer.status }}</td>
+                        <td>{{ offer.created_at ? offer.created_at|date('Y-m-d H:i') : '-' }}</td>
+                        <td>{{ offer.deadline ? offer.deadline|date('Y-m-d H:i') : '-' }}</td>
+                        <td style="min-width: 320px;">
+                            {% if isPendingReview %}
+                                <div class="small fw-semibold text-info-emphasis mb-2">
+                                    <i class="ti ti-refresh me-1"></i>Pending Review
+                                </div>
+                                <div class="small text-secondary mb-2">Original reason: {{ offer.warning_reason|default('-') }}</div>
+                                <div class="small text-muted mb-2">Modified: {{ offer.warning_edited_at ? offer.warning_edited_at|date('Y-m-d H:i') : '-' }}</div>
+                                <div class="d-flex flex-column gap-2">
+                                    <form method="post" action="{{ path('app_admin_accept_job_offer_changes', {id: offer.id}) }}" style="display: inline;">
+                                        <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Accept this job modification?');">
+                                            <i class="ti ti-check me-1"></i>Accept Changes
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="collapse" data-bs-target="#warning-form-{{ offer.id }}">
+                                        <i class="ti ti-alert-triangle me-1"></i>Send Another Warning
+                                    </button>
+                                    <div class="collapse mt-2" id="warning-form-{{ offer.id }}">
+                                        <form method="post" action="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}" class="d-flex flex-column gap-2 warning-reason-form" novalidate>
+                                            <textarea name="reason" rows="2" class="form-control form-control-sm" placeholder="New warning reason..."></textarea>
+                                            <div class="invalid-feedback d-block" data-warning-error></div>
+                                            <button type="submit" class="btn btn-sm btn-danger">Submit Warning</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            {% elseif isActive %}
+                                <div class="small fw-semibold text-warning-emphasis mb-1">
+                                    <i class="ti ti-alert-circle me-1"></i>Active Warning
+                                </div>
+                                <div class="small text-secondary">Reason: {{ offer.warning_reason|default('-') }}</div>
+                            {% else %}
+                                <form method="post" action="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}" class="d-flex flex-column gap-2 warning-reason-form" novalidate>
+                                    <textarea name="reason" rows="2" class="form-control form-control-sm" placeholder="Reason for warning..."></textarea>
+                                    <div class="invalid-feedback d-block" data-warning-error></div>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Send Warning</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="text-secondary">No job offers found.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const stats = {{ offerStats is not null ? offerStats|json_encode|raw : 'null' }};
+
+            const initCharts = function () {
+                if (!stats || !window.Chart) return;
+
+                const statusCanvas = document.getElementById('adminStatusPie');
+                const contractCanvas = document.getElementById('adminContractPie');
+
+                if (statusCanvas) {
+                    new Chart(statusCanvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Open', 'Closed'],
+                            datasets: [{
+                                data: [Number(stats.total_open || 0), Number(stats.total_closed || 0)],
+                                backgroundColor: ['#2fb344', '#d63939']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            cutout: '58%',
+                            plugins: {
+                                legend: { position: 'bottom' },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            const value = Number(context.parsed || 0);
+                                            const data = context.dataset.data || [];
+                                            const total = data.reduce(function (sum, item) { return sum + Number(item || 0); }, 0);
+                                            const pct = total > 0 ? ((value / total) * 100).toFixed(2) : '0.00';
+                                            return context.label + ': ' + value + ' (' + pct + '%)';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if (contractCanvas) {
+                    const labels = (stats.contract_stats || []).map(function (item) { return item.contract_type; });
+                    const values = (stats.contract_stats || []).map(function (item) { return Number(item.total || 0); });
+                    new Chart(contractCanvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: values,
+                                backgroundColor: ['#206bc4', '#4299e1', '#17a2b8', '#f59f00', '#2fb344', '#d63939', '#7950f2']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            cutout: '58%',
+                            plugins: {
+                                legend: { position: 'bottom' },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            const value = Number(context.parsed || 0);
+                                            const data = context.dataset.data || [];
+                                            const total = data.reduce(function (sum, item) { return sum + Number(item || 0); }, 0);
+                                            const pct = total > 0 ? ((value / total) * 100).toFixed(2) : '0.00';
+                                            return context.label + ': ' + value + ' (' + pct + '%)';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            };
+
+            if (stats) {
+                if (window.Chart) {
+                    initCharts();
+                } else {
+                    const chartScript = document.createElement('script');
+                    chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+                    chartScript.onload = initCharts;
+                    document.head.appendChild(chartScript);
+                }
+            }
+
+            const table = document.querySelector('.table.table-vcenter.card-table');
+            if (!table) return;
+
+            const rows = Array.from(table.querySelectorAll('tbody .admin-offer-row'));
+            if (rows.length === 0) return;
+
+            const locationInput = document.getElementById('adminFilterLocation');
+            const contractTypeSelect = document.getElementById('adminFilterContractType');
+            const statusSelect = document.getElementById('adminFilterStatus');
+            const deadlineInput = document.getElementById('adminFilterDeadline');
+            const resetBtn = document.getElementById('adminClearOfferFilters');
+            const resultLabel = document.getElementById('adminOfferFilterResults');
+
+            if (contractTypeSelect) {
+                const seen = new Set();
+                rows.forEach(function (row) {
+                    const value = (row.dataset.filterContractType || '').trim();
+                    if (!value) return;
+                    seen.add(value);
+                });
+
+                Array.from(seen).sort().forEach(function (value) {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value.charAt(0).toUpperCase() + value.slice(1);
+                    contractTypeSelect.appendChild(option);
+                });
+            }
+
+            const warningForms = Array.from(document.querySelectorAll('.warning-reason-form'));
+            warningForms.forEach(function (form) {
+                const reasonInput = form.querySelector('textarea[name="reason"]');
+                const errorNode = form.querySelector('[data-warning-error]');
+                if (!reasonInput || !errorNode) return;
+
+                form.addEventListener('submit', function (event) {
+                    const reasonValue = reasonInput.value.trim();
+                    if (reasonValue === '') {
+                        event.preventDefault();
+                        reasonInput.classList.add('is-invalid');
+                        errorNode.textContent = 'Warning reason is required.';
+                    }
+                });
+
+                reasonInput.addEventListener('input', function () {
+                    if (reasonInput.value.trim() !== '') {
+                        reasonInput.classList.remove('is-invalid');
+                        errorNode.textContent = '';
+                    }
+                });
+            });
+
+            const runFilters = function () {
+                const locationQuery = ((locationInput && locationInput.value) || '').trim().toLowerCase();
+                const contractQuery = ((contractTypeSelect && contractTypeSelect.value) || '').trim().toLowerCase();
+                const statusQuery = ((statusSelect && statusSelect.value) || '').trim().toLowerCase();
+                const deadlineQuery = ((deadlineInput && deadlineInput.value) || '').trim();
+
+                let visibleCount = 0;
+                rows.forEach(function (row) {
+                    const rowLocation = (row.dataset.filterLocation || '').toLowerCase();
+                    const rowContractType = (row.dataset.filterContractType || '').toLowerCase();
+                    const rowStatus = (row.dataset.filterStatus || '').toLowerCase();
+                    const rowDeadline = (row.dataset.filterDeadline || '').trim();
+
+                    const locationMatch = locationQuery === '' || rowLocation.includes(locationQuery);
+                    const contractMatch = contractQuery === '' || rowContractType.includes(contractQuery);
+                    const statusMatch = statusQuery === '' || rowStatus === statusQuery;
+                    const deadlineMatch = deadlineQuery === '' || rowDeadline === deadlineQuery;
+
+                    const isMatch = locationMatch && contractMatch && statusMatch && deadlineMatch;
+                    row.classList.toggle('d-none', !isMatch);
+                    if (isMatch) visibleCount += 1;
+                });
+
+                if (resultLabel) {
+                    resultLabel.textContent = visibleCount + ' result(s)';
+                }
+            };
+
+            if (locationInput) locationInput.addEventListener('input', runFilters);
+            if (contractTypeSelect) contractTypeSelect.addEventListener('change', runFilters);
+            if (statusSelect) statusSelect.addEventListener('change', runFilters);
+            if (deadlineInput) deadlineInput.addEventListener('change', runFilters);
+
+            if (resetBtn) {
+                resetBtn.addEventListener('click', function () {
+                    if (locationInput) locationInput.value = '';
+                    if (contractTypeSelect) contractTypeSelect.value = '';
+                    if (statusSelect) statusSelect.value = '';
+                    if (deadlineInput) deadlineInput.value = '';
+                    runFilters();
+                });
+            }
+
+            runFilters();
+        })();
+    </script>
+{% endblock %}

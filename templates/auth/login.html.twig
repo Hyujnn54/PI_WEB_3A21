@@ -15,18 +15,18 @@
                     {% for message in app.flashes('error') %}
                         <div class="alert alert-danger">{{ message }}</div>
                     {% endfor %}
-                    <form method="post" action="{{ path('app_login') }}">
+                    <form method="post" action="{{ path('app_login') }}" novalidate>
                         <div class="mb-3">
                             <label class="form-label">Full Name</label>
-                            <input type="text" name="full_name" class="form-control" required>
+                            <input type="text" name="full_name" class="form-control">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Email</label>
-                            <input type="email" name="email" class="form-control" required>
+                            <input type="text" name="email" class="form-control">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Role</label>
-                            <select name="role" class="form-select" required>
+                            <select name="role" class="form-select">
                                 <option value="candidate">Candidate</option>
                                 <option value="recruiter">Recruiter</option>
                                 <option value="admin">Admin</option>

@@ -9,6 +9,7 @@ use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
+use Doctrine\DBAL\Connection;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,6 +19,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
 
+#[Route('/offermanagement')]
 class FrontPortalController extends AbstractController
 {
     private const MAX_FUTURE_DAYS = 90;
@@ -25,59 +27,527 @@ class FrontPortalController extends AbstractController
     private const LOCATION_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,120}$/u';
     private const TEXTAREA_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{0,1000}$/u';
     private const REVIEW_COMMENT_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,1000}$/u';
+    private const STATIC_RECRUITER_ID = '1';
+    private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
+    private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
+    private const JOB_STATUSES = ['open', 'paused', 'closed'];
 
     public function __construct(private readonly ManagerRegistry $doctrine)
     {
     }
 
     #[Route('/front/job-offers', name: 'front_job_offers')]
-    public function jobOffers(Request $request): Response
+    public function jobOffers(Request $request, Connection $connection): Response
     {
         $role = (string) $request->query->get('role', 'candidate');
-        $offers = $this->doctrine->getRepository(Job_offer::class)->findBy([], ['id' => 'DESC']);
+        $warnings = [];
+        $warningStatuses = [];
+        $expiredOffers = [];
+        $now = new \DateTimeImmutable();
+        $offerStats = null;
+        $cards = [];
 
-        $candidateId = 3;
         $appliedOfferIds = [];
-        $candidate = $this->doctrine->getRepository(Candidate::class)->find($candidateId);
-        if ($candidate instanceof Candidate) {
-            $activeApplications = $this->doctrine->getRepository(Job_application::class)->findBy([
-                'candidate_id' => $candidate,
-                'is_archived' => false,
-            ]);
+        if ($role === 'candidate') {
+            $candidateId = 3;
+            $candidate = $this->doctrine->getRepository(Candidate::class)->find($candidateId);
+            if ($candidate instanceof Candidate) {
+                $activeApplications = $this->doctrine->getRepository(Job_application::class)->findBy([
+                    'candidate_id' => $candidate,
+                    'is_archived' => false,
+                ]);
 
-            foreach ($activeApplications as $activeApplication) {
-                $offer = $activeApplication->getOffer_id();
-                if ($offer instanceof Job_offer) {
-                    $appliedOfferIds[(string) $offer->getId()] = true;
+                foreach ($activeApplications as $activeApplication) {
+                    $offer = $activeApplication->getOffer_id();
+                    if ($offer instanceof Job_offer) {
+                        $appliedOfferIds[(string) $offer->getId()] = true;
+                    }
                 }
             }
         }
 
-        $cards = array_map(static function (Job_offer $offer) use ($appliedOfferIds): array {
-            $description = trim((string) $offer->getDescription());
-            $offerId = (string) $offer->getId();
+        
 
-            return [
-                'id' => $offerId,
-                'meta' => sprintf('%s | %s', (string) $offer->getLocation(), (string) $offer->getContract_type()),
-                'title' => (string) $offer->getTitle(),
-                'text' => $description === '' ? 'No description available yet.' : substr($description, 0, 190),
-                'already_applied' => isset($appliedOfferIds[$offerId]),
-            ];
-        }, $offers);
+        try {
+            if ($role === 'recruiter') {
+                $connection->executeStatement(
+                    'UPDATE job_offer SET status = :closed_status WHERE recruiter_id = :recruiter_id AND deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
+                    [
+                        'recruiter_id' => self::STATIC_RECRUITER_ID,
+                        'closed_status' => 'closed',
+                        'now' => $now->format('Y-m-d H:i:s'),
+                    ]
+                );
+            }
+
+            $rowsSql = 'SELECT id, recruiter_id, title, description, location, contract_type, status, deadline FROM job_offer';
+            $rowsParams = [];
+            if ($role === 'recruiter') {
+                $rowsSql .= ' WHERE recruiter_id = :recruiter_id';
+                $rowsParams['recruiter_id'] = self::STATIC_RECRUITER_ID;
+            }
+            $rowsSql .= ' ORDER BY created_at DESC LIMIT 25';
+
+            $rows = $connection->fetchAllAssociative($rowsSql, $rowsParams);
+
+            $dbCards = array_map(function (array $row) use ($connection, $now): array {
+                $formattedDeadline = '';
+                $isExpired = false;
+                try {
+                    $deadlineAt = new \DateTimeImmutable((string) ($row['deadline'] ?? ''));
+                    $formattedDeadline = $deadlineAt->format('Y-m-d');
+                    $isExpired = $deadlineAt < $now;
+                } catch (\Throwable $exception) {
+                    $formattedDeadline = '';
+                    $isExpired = false;
+                }
+
+                $skills = $connection->fetchAllAssociative(
+                    'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
+                    ['offer_id' => (string) $row['id']]
+                );
+
+                $detailExtra = [
+                    'Type: ' . (string) $row['contract_type'],
+                    'Location: ' . (string) $row['location'],
+                    'Status: ' . ucfirst((string) $row['status']),
+                    'Deadline: ' . ($formattedDeadline !== '' ? $formattedDeadline : 'N/A'),
+                ];
+
+                if (count($skills) > 0) {
+                    foreach ($skills as $skill) {
+                        $detailExtra[] = sprintf(
+                            'Skill: %s (%s)',
+                            (string) $skill['skill_name'],
+                            ucfirst((string) $skill['level_required'])
+                        );
+                    }
+                } else {
+                    $detailExtra[] = 'Skills: Not specified';
+                }
+
+                return [
+                    'id' => (string) $row['id'],
+                    'meta' => sprintf('%s | %s | %s', (string) $row['location'], (string) $row['contract_type'], ucfirst((string) $row['status'])),
+                    'title' => (string) $row['title'],
+                    'text' => (string) $row['description'],
+                    'already_applied' => isset($appliedOfferIds[(string) $row['id']]),
+                    'can_delete' => (string) $row['recruiter_id'] === self::STATIC_RECRUITER_ID,
+                    'detail_extra' => $detailExtra,
+                    'recruiter_id' => (string) $row['recruiter_id'],
+                    'location' => (string) $row['location'],
+                    'contract_type' => (string) $row['contract_type'],
+                    'status' => (string) $row['status'],
+                    'deadline' => $formattedDeadline,
+                    'is_expired' => $isExpired,
+                ];
+            }, $rows);
+
+            foreach ($dbCards as $dbCard) {
+                if (($dbCard['is_expired'] ?? false) === true) {
+                    $expiredOffers[] = $dbCard;
+                }
+
+                // Candidates should not see expired offers.
+                if ($role === 'candidate' && ($dbCard['is_expired'] ?? false) === true) {
+                    continue;
+                }
+
+                $cards[] = $dbCard;
+            }
+        } catch (\Throwable $exception) {
+            // Keep UI usable even if table is not ready in current environment.
+        }
+
+        if ($role === 'recruiter') {
+            try {
+                $warnings = $connection->fetchAllAssociative(
+                    'SELECT w.job_offer_id, w.reason, w.created_at, jo.title
+                     FROM job_offer_warning w
+                     INNER JOIN job_offer jo ON jo.id = w.job_offer_id
+                     WHERE w.recruiter_id = :recruiter_id AND w.status = :status
+                     ORDER BY w.created_at DESC',
+                    ['recruiter_id' => self::STATIC_RECRUITER_ID, 'status' => 'SENT']
+                );
+            } catch (\Throwable $exception) {
+                $warnings = [];
+            }
+
+            // Fetch warning statuses for all recruiter's jobs (for blue highlighting when pending review)
+            try {
+                $resolvedWarnings = $connection->fetchAllAssociative(
+                    'SELECT job_offer_id FROM job_offer_warning WHERE recruiter_id = :recruiter_id AND status = :status',
+                    ['recruiter_id' => self::STATIC_RECRUITER_ID, 'status' => 'RESOLVED']
+                );
+                
+                foreach ($resolvedWarnings as $row) {
+                    $warningStatuses[(string) $row['job_offer_id']] = 'RESOLVED';
+                }
+            } catch (\Throwable $exception) {
+                // Keep UI usable even if query fails
+            }
+        }
+
+        // Add warning status to cards
+        foreach ($cards as &$card) {
+            $card['warning_status'] = $warningStatuses[$card['id']] ?? null;
+        }
+
+        if ($role === 'recruiter') {
+            $offerStats = $this->buildOfferStats($cards);
+        }
 
         return $this->render('front/modules/job_offers.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
+            'contractTypes' => self::CONTRACT_TYPES,
+            'warnings' => $warnings,
+            'expiredOffers' => $expiredOffers,
+            'offerStats' => $offerStats,
         ]);
     }
 
-    /**
-     * Job Applications listing - MERGED from both branches
-     * - For recruiters: shows applications for their offers with interview creation
-     * - For candidates: shows their applications with edit/withdraw options
-     * - Interview creation blocked if application already has an interview
-     */
+    #[Route('/front/job-offers/new', name: 'front_job_offer_new', methods: ['GET', 'POST'])]
+    public function createJobOffer(Request $request, Connection $connection): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ($role !== 'recruiter') {
+            $this->addFlash('error', 'Only recruiters can create job offers.');
+            return $this->redirectToRoute('front_job_offers', ['role' => $role]);
+        }
+
+        $formData = [
+            'title' => '',
+            'contract_type' => '',
+            'status' => 'open',
+            'description' => '',
+            'location' => '',
+            'deadline' => '',
+            'skills' => [['name' => '', 'level' => '']],
+        ];
+        $fieldErrors = [];
+
+        if ($request->isMethod('POST')) {
+            $formData = [
+                'title' => trim((string) $request->request->get('title', '')),
+                'contract_type' => trim((string) $request->request->get('contract_type', '')),
+                'status' => trim((string) $request->request->get('status', 'open')),
+                'description' => trim((string) $request->request->get('description', '')),
+                'location' => trim((string) $request->request->get('location', '')),
+                'deadline' => trim((string) $request->request->get('deadline', '')),
+                'skills' => array_map(static function ($entry): array {
+                    return [
+                        'name' => trim((string) ($entry['name'] ?? '')),
+                        'level' => trim((string) ($entry['level'] ?? '')),
+                    ];
+                }, (array) $request->request->all('skills')),
+            ];
+
+            if (count($formData['skills']) === 0) {
+                $formData['skills'] = [['name' => '', 'level' => '']];
+            }
+
+            if ($formData['title'] === '') {
+                $fieldErrors['title'] = 'Title is required.';
+            }
+            if ($formData['contract_type'] === '') {
+                $fieldErrors['contract_type'] = 'Contract type is required.';
+            } elseif (!in_array($formData['contract_type'], self::CONTRACT_TYPES, true)) {
+                $fieldErrors['contract_type'] = 'Please select a valid contract type.';
+            }
+            if ($formData['status'] === '') {
+                $fieldErrors['status'] = 'Status is required.';
+            } elseif (!in_array($formData['status'], self::JOB_STATUSES, true)) {
+                $fieldErrors['status'] = 'Please select a valid status.';
+            }
+            if ($formData['description'] === '') {
+                $fieldErrors['description'] = 'Description is required.';
+            }
+            if ($formData['location'] === '') {
+                $fieldErrors['location'] = 'Location is required.';
+            }
+            if ($formData['deadline'] === '') {
+                $fieldErrors['deadline'] = 'Deadline is required.';
+            } else {
+                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                if (!$deadline) {
+                    $fieldErrors['deadline'] = 'Invalid deadline format.';
+                } elseif ($deadline <= new \DateTimeImmutable()) {
+                    $fieldErrors['deadline'] = 'Deadline must be greater than today.';
+                }
+            }
+            foreach ($formData['skills'] as $index => $skill) {
+                if ($skill['name'] === '') {
+                    $fieldErrors['skills'][$index]['name'] = 'Skill name is required.';
+                }
+                if ($skill['level'] === '') {
+                    $fieldErrors['skills'][$index]['level'] = 'Skill level is required.';
+                } elseif (!in_array($skill['level'], self::SKILL_LEVELS, true)) {
+                    $fieldErrors['skills'][$index]['level'] = 'Invalid skill level.';
+                }
+            }
+
+            if (empty($fieldErrors)) {
+                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                if ($deadline) {
+                    $now = new \DateTimeImmutable();
+                    $newId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
+                    try {
+                        $connection->beginTransaction();
+
+                        $connection->insert('job_offer', [
+                            'id' => $newId,
+                            'recruiter_id' => self::STATIC_RECRUITER_ID,
+                            'title' => $formData['title'],
+                            'description' => $formData['description'],
+                            'location' => $formData['location'],
+                            'latitude' => 0,
+                            'longitude' => 0,
+                            'contract_type' => $formData['contract_type'],
+                            'created_at' => $now->format('Y-m-d H:i:s'),
+                            'deadline' => $deadline->format('Y-m-d H:i:s'),
+                            'status' => $formData['status'],
+                            'quality_score' => 100,
+                            'ai_suggestions' => '',
+                            'is_flagged' => 0,
+                            'flagged_at' => $now->format('Y-m-d H:i:s'),
+                        ]);
+
+                        foreach ($formData['skills'] as $skill) {
+                            $connection->insert('offer_skill', [
+                                'id' => (string) ((int) round(microtime(true) * 1000) . random_int(100, 999)),
+                                'offer_id' => $newId,
+                                'skill_name' => $skill['name'],
+                                'level_required' => $skill['level'],
+                            ]);
+                        }
+
+                        $connection->commit();
+
+                        $this->addFlash('success', 'Job offer created successfully.');
+                        return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
+                    } catch (\Throwable $exception) {
+                        if ($connection->isTransactionActive()) {
+                            $connection->rollBack();
+                        }
+                        $this->addFlash('error', 'Failed to create job offer. Check DB constraints for recruiter_id and offer_skill.');
+                    }
+                }
+            }
+        }
+
+        return $this->render('front/modules/job_offer_new.html.twig', [
+            'authUser' => ['role' => $role],
+            'contractTypes' => self::CONTRACT_TYPES,
+            'jobStatuses' => self::JOB_STATUSES,
+            'skillLevels' => self::SKILL_LEVELS,
+            'formData' => $formData,
+            'fieldErrors' => $fieldErrors,
+        ]);
+    }
+
+    #[Route('/front/job-offers/{id}/edit', name: 'front_job_offer_edit', requirements: ['id' => '\\d+'], methods: ['GET', 'POST'])]
+    public function editJobOffer(string $id, Request $request, Connection $connection): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ($role !== 'recruiter') {
+            $this->addFlash('error', 'Only recruiters can update job offers.');
+            return $this->redirectToRoute('front_job_offers', ['role' => $role]);
+        }
+
+        $offer = $connection->fetchAssociative(
+            'SELECT id, recruiter_id, title, description, location, contract_type, deadline FROM job_offer WHERE id = :id AND recruiter_id = :recruiter_id LIMIT 1',
+            [
+                'id' => $id,
+                'recruiter_id' => self::STATIC_RECRUITER_ID,
+            ]
+        );
+        $skills = $connection->fetchAllAssociative(
+            'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
+            ['offer_id' => $id]
+        );
+
+        if (!$offer) {
+            $this->addFlash('error', 'You can update only job offers created by you.');
+            return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
+        }
+
+        $deadlineValue = (string) ($offer['deadline'] ?? '');
+        if ($deadlineValue !== '' && str_contains($deadlineValue, ' ')) {
+            $deadlineValue = substr(str_replace(' ', 'T', $deadlineValue), 0, 16);
+        }
+
+        $formData = [
+            'title' => (string) ($offer['title'] ?? ''),
+            'contract_type' => (string) ($offer['contract_type'] ?? ''),
+            'description' => (string) ($offer['description'] ?? ''),
+            'location' => (string) ($offer['location'] ?? ''),
+            'deadline' => $deadlineValue,
+            'skills' => array_map(static function (array $skill): array {
+                return [
+                    'name' => (string) ($skill['skill_name'] ?? ''),
+                    'level' => (string) ($skill['level_required'] ?? ''),
+                ];
+            }, $skills),
+        ];
+        if (count($formData['skills']) === 0) {
+            $formData['skills'] = [['name' => '', 'level' => '']];
+        }
+
+        $fieldErrors = [];
+
+        if ($request->isMethod('POST')) {
+            $formData = [
+                'title' => trim((string) $request->request->get('title', '')),
+                'contract_type' => trim((string) $request->request->get('contract_type', '')),
+                'description' => trim((string) $request->request->get('description', '')),
+                'location' => trim((string) $request->request->get('location', '')),
+                'deadline' => trim((string) $request->request->get('deadline', '')),
+                'skills' => array_map(static function ($entry): array {
+                    return [
+                        'name' => trim((string) ($entry['name'] ?? '')),
+                        'level' => trim((string) ($entry['level'] ?? '')),
+                    ];
+                }, (array) $request->request->all('skills')),
+            ];
+
+            if (count($formData['skills']) === 0) {
+                $formData['skills'] = [['name' => '', 'level' => '']];
+            }
+
+            if ($formData['title'] === '') {
+                $fieldErrors['title'] = 'Title is required.';
+            }
+            if ($formData['contract_type'] === '') {
+                $fieldErrors['contract_type'] = 'Contract type is required.';
+            } elseif (!in_array($formData['contract_type'], self::CONTRACT_TYPES, true)) {
+                $fieldErrors['contract_type'] = 'Please select a valid contract type.';
+            }
+            if ($formData['description'] === '') {
+                $fieldErrors['description'] = 'Description is required.';
+            }
+            if ($formData['location'] === '') {
+                $fieldErrors['location'] = 'Location is required.';
+            }
+            if ($formData['deadline'] === '') {
+                $fieldErrors['deadline'] = 'Deadline is required.';
+            } else {
+                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                if (!$deadline) {
+                    $fieldErrors['deadline'] = 'Invalid deadline format.';
+                } elseif ($deadline <= new \DateTimeImmutable()) {
+                    $fieldErrors['deadline'] = 'Deadline must be greater than today.';
+                }
+            }
+
+            foreach ($formData['skills'] as $index => $skill) {
+                if ($skill['name'] === '') {
+                    $fieldErrors['skills'][$index]['name'] = 'Skill name is required.';
+                }
+                if ($skill['level'] === '') {
+                    $fieldErrors['skills'][$index]['level'] = 'Skill level is required.';
+                } elseif (!in_array($skill['level'], self::SKILL_LEVELS, true)) {
+                    $fieldErrors['skills'][$index]['level'] = 'Invalid skill level.';
+                }
+            }
+
+            if (empty($fieldErrors)) {
+                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                if ($deadline) {
+                    try {
+                        $connection->beginTransaction();
+
+                        $connection->update('job_offer', [
+                            'title' => $formData['title'],
+                            'description' => $formData['description'],
+                            'location' => $formData['location'],
+                            'contract_type' => $formData['contract_type'],
+                            'deadline' => $deadline->format('Y-m-d H:i:s'),
+                            'latitude' => 0,
+                            'longitude' => 0,
+                        ], [
+                            'id' => $id,
+                            'recruiter_id' => self::STATIC_RECRUITER_ID,
+                        ]);
+
+                        $connection->delete('offer_skill', ['offer_id' => $id]);
+                        foreach ($formData['skills'] as $skill) {
+                            $connection->insert('offer_skill', [
+                                'id' => (string) ((int) round(microtime(true) * 1000) . random_int(100, 999)),
+                                'offer_id' => $id,
+                                'skill_name' => $skill['name'],
+                                'level_required' => $skill['level'],
+                            ]);
+                        }
+
+                        // If job has an active warning, mark it as resolved (recruiter edited)
+                        $hasActiveWarning = (int) $connection->fetchOne(
+                            'SELECT COUNT(*) FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status',
+                            ['job_offer_id' => $id, 'status' => 'SENT']
+                        );
+
+                        if ($hasActiveWarning > 0) {
+                            $connection->update('job_offer_warning', [
+                                'status' => 'RESOLVED',
+                                'edited_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                            ], [
+                                'job_offer_id' => $id,
+                                'status' => 'SENT',
+                            ]);
+                        }
+
+                        $connection->commit();
+
+                        $this->addFlash('success', 'Job offer updated successfully.' . ($hasActiveWarning > 0 ? ' Admin has been notified about the changes.' : ''));
+                        return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
+                    } catch (\Throwable $exception) {
+                        if ($connection->isTransactionActive()) {
+                            $connection->rollBack();
+                        }
+                        $this->addFlash('error', 'Unable to update this job offer.');
+                    }
+                }
+            }
+        }
+
+        return $this->render('front/modules/job_offer_edit.html.twig', [
+            'authUser' => ['role' => $role],
+            'offer' => $offer,
+            'skills' => $skills,
+            'contractTypes' => self::CONTRACT_TYPES,
+            'skillLevels' => self::SKILL_LEVELS,
+            'formData' => $formData,
+            'fieldErrors' => $fieldErrors,
+        ]);
+    }
+
+    #[Route('/front/job-offers/{id}/delete', name: 'front_job_offer_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function deleteJobOffer(string $id, Request $request, Connection $connection): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ($role !== 'recruiter') {
+            $this->addFlash('error', 'Only recruiters can delete job offers.');
+            return $this->redirectToRoute('front_job_offers', ['role' => $role]);
+        }
+
+        try {
+            $deletedRows = $connection->delete('job_offer', [
+                'id' => $id,
+                'recruiter_id' => self::STATIC_RECRUITER_ID,
+            ]);
+
+            if ($deletedRows > 0) {
+                $this->addFlash('success', 'Job offer deleted successfully.');
+            } else {
+                $this->addFlash('error', 'You can delete only job offers created by you.');
+            }
+        } catch (\Throwable $exception) {
+            $this->addFlash('error', 'Unable to delete this job offer.');
+        }
+
+        return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
+    }
+
     #[Route('/front/job-applications', name: 'front_job_applications')]
     public function jobApplications(Request $request): Response
     {
@@ -883,5 +1353,107 @@ class FrontPortalController extends AbstractController
 
         $lastId = (int) $last[0]->getId();
         return (string) ($lastId + 1);
+    }
+
+    private function normalizeSkills(array $rawSkills): array
+    {
+        $skills = [];
+
+        foreach ($rawSkills as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $name = trim((string) ($entry['name'] ?? ''));
+            $level = trim((string) ($entry['level'] ?? ''));
+            if ($name === '' || !in_array($level, self::SKILL_LEVELS, true)) {
+                continue;
+            }
+
+            $skills[] = ['name' => $name, 'level' => $level];
+        }
+
+        return $skills;
+    }
+
+    private function buildOfferStats(array $offers): array
+    {
+        $totalPublished = count($offers);
+        $totalClosed = 0;
+        $totalOpen = 0;
+        $cityStats = [];
+        $contractStats = [];
+
+        foreach ($offers as $offer) {
+            $city = trim((string) ($offer['location'] ?? 'Unknown'));
+            if ($city === '') {
+                $city = 'Unknown';
+            }
+
+            $contractType = trim((string) ($offer['contract_type'] ?? 'Unknown'));
+            if ($contractType === '') {
+                $contractType = 'Unknown';
+            }
+
+            $status = strtolower(trim((string) ($offer['status'] ?? 'open')));
+            $isClosed = $status === 'closed';
+            $isOpen = $status === 'open';
+
+            if ($isClosed) {
+                $totalClosed += 1;
+            }
+            if ($isOpen) {
+                $totalOpen += 1;
+            }
+
+            if (!isset($cityStats[$city])) {
+                $cityStats[$city] = ['city' => $city, 'total' => 0, 'open' => 0, 'closed' => 0];
+            }
+            $cityStats[$city]['total'] += 1;
+            if ($isOpen) {
+                $cityStats[$city]['open'] += 1;
+            }
+            if ($isClosed) {
+                $cityStats[$city]['closed'] += 1;
+            }
+
+            if (!isset($contractStats[$contractType])) {
+                $contractStats[$contractType] = ['contract_type' => $contractType, 'total' => 0, 'open' => 0, 'closed' => 0];
+            }
+            $contractStats[$contractType]['total'] += 1;
+            if ($isOpen) {
+                $contractStats[$contractType]['open'] += 1;
+            }
+            if ($isClosed) {
+                $contractStats[$contractType]['closed'] += 1;
+            }
+        }
+
+        $closedPercentage = $totalPublished > 0 ? round(($totalClosed / $totalPublished) * 100, 2) : 0.0;
+        $openPercentage = $totalPublished > 0 ? round(($totalOpen / $totalPublished) * 100, 2) : 0.0;
+
+        $cityStatsList = array_values($cityStats);
+        foreach ($cityStatsList as &$row) {
+            $row['open_rate'] = $row['total'] > 0 ? round(($row['open'] / $row['total']) * 100, 2) : 0.0;
+            $row['closed_rate'] = $row['total'] > 0 ? round(($row['closed'] / $row['total']) * 100, 2) : 0.0;
+        }
+
+        $contractStatsList = array_values($contractStats);
+        foreach ($contractStatsList as &$row) {
+            $row['percentage'] = $totalPublished > 0 ? round(($row['total'] / $totalPublished) * 100, 2) : 0.0;
+        }
+
+        usort($cityStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+        usort($contractStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+
+        return [
+            'total_published' => $totalPublished,
+            'total_closed' => $totalClosed,
+            'total_open' => $totalOpen,
+            'closed_percentage' => $closedPercentage,
+            'open_percentage' => $openPercentage,
+            'city_stats' => $cityStatsList,
+            'contract_stats' => $contractStatsList,
+        ];
     }
 }

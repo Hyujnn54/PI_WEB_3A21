@@ -31,7 +31,7 @@
     <body class="tb-body {{ isAdminPage ? 'tb-admin-body' : 'tb-front-body' }}">
         {% set queryRole = app.request.query.get('role') %}
         {% set currentRole = queryRole in ['candidate', 'recruiter'] ? queryRole : 'candidate' %}
-        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status', 'app_candidate_apply', 'app_candidate_application_details', 'app_candidate_application_edit', 'app_candidate_application_withdraw', 'app_recruiter_application_details', 'management_job_applications_details'] %}
+        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status', 'front_job_offer_edit', 'front_job_offer_delete', 'app_candidate_apply', 'app_candidate_application_details', 'app_candidate_application_edit', 'app_candidate_application_withdraw', 'app_recruiter_application_details', 'management_job_applications_details'] %}
         {% set roleSwitchRoute = routeName in unsafeRoleRoutes ? 'front_interviews' : routeName %}
         <div class="page tb-page-shell">
             {% if not isAdminPage %}
@@ -131,10 +131,10 @@
                         let haystack = (item.dataset.filterText || '').toLowerCase();
                         if (criteria === 'title') {
                             haystack = (item.dataset.filterTitle || '').toLowerCase();
-                        } else if (criteria === 'meta') {
-                            haystack = (item.dataset.filterMeta || '').toLowerCase();
-                        } else if (criteria === 'description') {
-                            haystack = (item.dataset.filterDescription || '').toLowerCase();
+                        } else if (criteria === 'location') {
+                            haystack = (item.dataset.filterLocation || '').toLowerCase();
+                        } else if (criteria === 'contract_type') {
+                            haystack = (item.dataset.filterContractType || '').toLowerCase();
                         } else if (criteria === 'status') {
                             haystack = (item.dataset.filterStatus || '').toLowerCase();
                         }
