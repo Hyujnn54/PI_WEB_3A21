@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -42,22 +43,50 @@ class BackOfficeController extends AbstractController
         $offers = [];
         $expiredOffers = [];
         $now = new \DateTimeImmutable();
-        $offerStats = null;
 
         try {
-            $this->closeExpiredOffers($connection, $now);
+            try {
+                $this->closeExpiredOffers($connection, $now);
+            } catch (\Throwable) {
+                // Keep read-only view available even if auto-close update fails.
+            }
+
             $offers = $this->fetchAdminOffers($connection);
             $expiredOffers = $this->extractExpiredOffers($offers, $now);
-
-            $offerStats = $this->buildOfferStats($offers);
         } catch (\Throwable $exception) {
-            // Keep admin page available even if table/query is unavailable.
+            // Keep admin page available if any read query fails.
+            $this->addFlash('error', 'Unable to load complete job offer data right now.');
         }
 
         return $this->render('admin/job_offers.html.twig', [
             'authUser' => ['role' => 'admin'],
             'offers' => $offers,
             'expiredOffers' => $expiredOffers,
+        ]);
+    }
+
+    #[Route('/admin/job-offers/statistics', name: 'app_admin_job_offers_statistics')]
+    public function jobOffersStatistics(Connection $connection): Response
+    {
+        $offers = [];
+        $offerStats = $this->buildOfferStats([]);
+        $now = new \DateTimeImmutable();
+
+        try {
+            try {
+                $this->closeExpiredOffers($connection, $now);
+            } catch (\Throwable) {
+                // Keep read-only statistics available even if auto-close update fails.
+            }
+
+            $offers = $this->fetchAdminOffers($connection);
+            $offerStats = $this->buildOfferStats($offers);
+        } catch (\Throwable $exception) {
+            $this->addFlash('error', 'Unable to load job offer statistics right now.');
+        }
+
+        return $this->render('admin/job_offer_statistics.html.twig', [
+            'authUser' => ['role' => 'admin'],
             'offerStats' => $offerStats,
         ]);
     }
@@ -65,11 +94,14 @@ class BackOfficeController extends AbstractController
     #[Route('/admin/job-offers/{id}/warning', name: 'app_admin_job_offer_warning', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function sendJobOfferWarning(string $id, Request $request, Connection $connection): Response
     {
-        $reason = trim((string) $request->request->get('reason', ''));
-        if ($reason === '') {
+        $warningType = trim((string) $request->request->get('warning_type', ''));
+        $warningText = trim((string) $request->request->get('warning_text', ''));
+        if ($warningType === '' || $warningText === '') {
             $this->addFlash('error', 'Warning reason is required.');
             return $this->redirectToRoute('app_admin_job_offers');
         }
+
+        $reason = sprintf('[%s] %s', $warningType, $warningText);
 
         try {
             $offer = $connection->fetchAssociative(
@@ -96,6 +128,18 @@ class BackOfficeController extends AbstractController
             $connection->beginTransaction();
 
             try {
+                // Re-check inside transaction to avoid duplicate active warnings on concurrent requests.
+                $activeWarningInTx = $connection->fetchOne(
+                    'SELECT id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status LIMIT 1',
+                    ['job_offer_id' => (string) $offer['id'], 'status' => 'SENT']
+                );
+
+                if ($activeWarningInTx) {
+                    $connection->rollBack();
+                    $this->addFlash('warning', 'This offer already has an active warning. Resolve it before sending a new one.');
+                    return $this->redirectToRoute('app_admin_job_offers');
+                }
+
                 // If there's a RESOLVED warning (recruiter edited), delete it and create a new warning
                 $connection->delete('job_offer_warning', [
                     'job_offer_id' => (string) $offer['id'],
@@ -132,6 +176,46 @@ class BackOfficeController extends AbstractController
         return $this->redirectToRoute('app_admin_job_offers');
     }
 
+    #[Route('/admin/job-offers/{id}/reject-changes', name: 'app_admin_reject_job_offer_changes', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function rejectJobOfferWarning(string $id, Request $request, Connection $connection): Response
+    {
+        $warningType = trim((string) $request->request->get('warning_type', ''));
+        $warningText = trim((string) $request->request->get('warning_text', ''));
+        if ($warningType === '' || $warningText === '') {
+            $this->addFlash('error', 'Reject reason is required.');
+            return $this->redirectToRoute('app_admin_job_offers');
+        }
+
+        $reason = sprintf('[%s] %s', $warningType, $warningText);
+
+        try {
+            $warning = $connection->fetchAssociative(
+                'SELECT id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status LIMIT 1',
+                ['job_offer_id' => $id, 'status' => 'RESOLVED']
+            );
+
+            if (!$warning) {
+                $this->addFlash('error', 'No resolved warning found for this offer.');
+                return $this->redirectToRoute('app_admin_job_offers');
+            }
+
+            $connection->update('job_offer_warning', [
+                'status' => 'SENT',
+                'reason' => $reason,
+                'message' => $reason,
+                'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ], [
+                'id' => (string) $warning['id'],
+            ]);
+
+            $this->addFlash('warning', 'Changes rejected. Recruiter must resolve the warning again or delete the offer.');
+        } catch (\Throwable $exception) {
+            $this->addFlash('error', 'Unable to reject changes for this offer.');
+        }
+
+        return $this->redirectToRoute('app_admin_job_offers');
+    }
+
     #[Route('/admin/job-offers/{id}/accept-changes', name: 'app_admin_accept_job_offer_changes', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function acceptJobOfferWarning(string $id, Connection $connection): Response
     {
@@ -160,6 +244,48 @@ class BackOfficeController extends AbstractController
         return $this->redirectToRoute('app_admin_job_offers');
     }
 
+    #[Route('/admin/job-offers/{id}/details', name: 'app_admin_job_offer_details', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function jobOfferDetails(string $id, Connection $connection): JsonResponse
+    {
+        try {
+            $offer = $connection->fetchAssociative(
+                'SELECT id, recruiter_id, title, description, location, contract_type, status, created_at, deadline
+                 FROM job_offer
+                 WHERE id = :id
+                 LIMIT 1',
+                ['id' => $id]
+            );
+
+            if (!$offer) {
+                return new JsonResponse(['ok' => false, 'error' => 'Offer not found.'], 404);
+            }
+
+            $skills = $connection->fetchAllAssociative(
+                'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
+                ['offer_id' => $id]
+            );
+
+            $warningSql = <<<'SQL'
+SELECT status, reason, created_at
+FROM job_offer_warning
+WHERE job_offer_id = :job_offer_id AND status IN ('SENT', 'RESOLVED')
+ORDER BY created_at DESC
+LIMIT 1
+SQL;
+
+            $warning = $connection->fetchAssociative($warningSql, ['job_offer_id' => $id]);
+
+            return new JsonResponse([
+                'ok' => true,
+                'offer' => $offer,
+                'skills' => $skills,
+                'warning' => $warning ?: null,
+            ]);
+        } catch (\Throwable) {
+            return new JsonResponse(['ok' => false, 'error' => 'Unable to load offer details.'], 500);
+        }
+    }
+
     private function closeExpiredOffers(Connection $connection, \DateTimeImmutable $now): void
     {
         $connection->executeStatement(
@@ -176,20 +302,36 @@ class BackOfficeController extends AbstractController
      */
     private function fetchAdminOffers(Connection $connection): array
     {
-        return $connection->fetchAllAssociative(
-            'SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
-                    COALESCE(jw.status, NULL) AS warning_status,
-                    jw.reason AS warning_reason,
-                    jw.edited_at AS warning_edited_at
-             FROM job_offer jo
-             LEFT JOIN (
-                 SELECT w1.job_offer_id, w1.status, w1.reason, w1.edited_at, w1.created_at
-                 FROM job_offer_warning w1
-                 WHERE w1.status IN ("SENT", "RESOLVED")
-                 ORDER BY w1.created_at DESC
-             ) jw ON jw.job_offer_id = jo.id
-             ORDER BY jo.created_at DESC'
-        );
+        $sql = <<<'SQL'
+SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
+             COALESCE(jw.status, NULL) AS warning_status,
+             jw.reason AS warning_reason
+FROM job_offer jo
+LEFT JOIN job_offer_warning jw
+    ON jw.job_offer_id = jo.id
+ AND jw.status IN ('SENT', 'RESOLVED')
+ AND jw.created_at = (
+         SELECT MAX(w2.created_at)
+         FROM job_offer_warning w2
+         WHERE w2.job_offer_id = jo.id
+             AND w2.status IN ('SENT', 'RESOLVED')
+ )
+ORDER BY jo.created_at DESC
+SQL;
+
+        try {
+            return $connection->fetchAllAssociative($sql);
+        } catch (\Throwable) {
+            $fallbackSql = <<<'SQL'
+SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
+       NULL AS warning_status,
+    NULL AS warning_reason
+FROM job_offer jo
+ORDER BY jo.created_at DESC
+SQL;
+
+            return $connection->fetchAllAssociative($fallbackSql);
+        }
     }
 
     /**

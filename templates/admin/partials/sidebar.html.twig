@@ -19,10 +19,21 @@
                     <span>Add User</span>
                 </a>
             </li>
+
+            <div class="sidebar-section-title">
+                <i class="ti ti-briefcase-2"></i>
+                Job Offers
+            </div>
             <li class="nav-item">
                 <a class="nav-link {{ app.request.attributes.get('_route') == 'app_admin_job_offers' ? 'active' : '' }}" href="{{ path('app_admin_job_offers') }}">
                     <i class="ti ti-briefcase-2"></i>
-                    <span>Job Offers</span>
+                    <span>All Job Offers</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ app.request.attributes.get('_route') == 'app_admin_job_offers_statistics' ? 'active' : '' }}" href="{{ path('app_admin_job_offers_statistics') }}">
+                    <i class="ti ti-chart-pie"></i>
+                    <span>Statistics</span>
                 </a>
             </li>
             

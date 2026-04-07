@@ -211,5 +211,10 @@
     {{ parent() }}
     <script src="{{ asset('assets/vendor/purecounterjs/dist/purecounter_vanilla.js') }}"></script>
     <script src="{{ asset('assets/vendor/apexcharts/js/apexcharts.min.js') }}"></script>
+    <script>
+        if (typeof ApexCharts === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/apexcharts"><\\/script>');
+        }
+    </script>
     <script src="{{ asset('assets/vendor/overlay-scrollbar/js/overlayscrollbars.min.js') }}"></script>
 {% endblock %}

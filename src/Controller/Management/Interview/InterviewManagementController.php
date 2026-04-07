@@ -183,14 +183,15 @@ class InterviewManagementController extends AbstractController
         }
 
         foreach ($interviews as $interview) {
-            $status = strtoupper($interview->getStatus());
+            $status = strtoupper(trim((string) $interview->getStatus()));
             $interviewId = (string) $interview->getId();
             $hasReview = isset($reviewedInterviewIds[$interviewId]);
+            $normalizedStatus = $this->normalizeInterviewStatus($status, $hasReview);
 
-            if ($hasReview || $status === 'COMPLETED') {
+            if ($normalizedStatus === 'COMPLETED') {
                 $completed++;
             } else {
-                switch ($status) {
+                switch ($normalizedStatus) {
                     case 'SCHEDULED':
                         $scheduled++;
                         break;
@@ -202,7 +203,7 @@ class InterviewManagementController extends AbstractController
                 }
             }
 
-            $mode = strtolower($interview->getMode());
+            $mode = $this->normalizeInterviewMode((string) $interview->getMode());
             if ($mode === 'online') {
                 $online++;
             } else {
@@ -237,15 +238,16 @@ class InterviewManagementController extends AbstractController
             $offerCancelled = 0;
 
             foreach ($offerInterviews as $interview) {
-                $status = strtoupper($interview->getStatus());
+                $status = strtoupper(trim((string) $interview->getStatus()));
                 $interviewId = (string) $interview->getId();
                 $hasReview = isset($reviewedInterviewIds[$interviewId]);
+                $normalizedStatus = $this->normalizeInterviewStatus($status, $hasReview);
 
-                if ($hasReview || $status === 'COMPLETED') {
+                if ($normalizedStatus === 'COMPLETED') {
                     $offerCompleted++;
-                } elseif ($status === 'CANCELLED') {
+                } elseif ($normalizedStatus === 'CANCELLED') {
                     $offerCancelled++;
-                } elseif ($status === 'SCHEDULED') {
+                } elseif ($normalizedStatus === 'SCHEDULED') {
                     $offerScheduled++;
                 }
             }
@@ -308,5 +310,28 @@ class InterviewManagementController extends AbstractController
         }
 
         return $fallback;
+    }
+
+    private function normalizeInterviewStatus(string $status, bool $hasReview): string
+    {
+        if ($hasReview) {
+            return 'COMPLETED';
+        }
+
+        return match (strtoupper(trim($status))) {
+            'COMPLETED', 'DONE', 'FINISHED' => 'COMPLETED',
+            'CANCELLED', 'CANCELED', 'REJECTED' => 'CANCELLED',
+            'SCHEDULED' => 'SCHEDULED',
+            default => 'PENDING',
+        };
+    }
+
+    private function normalizeInterviewMode(string $mode): string
+    {
+        $value = strtolower(trim($mode));
+
+        return in_array($value, ['onsite', 'on_site', 'on-site', 'in_person', 'in-person', 'in person'], true)
+            ? 'onsite'
+            : 'online';
     }
 }

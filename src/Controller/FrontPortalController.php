@@ -27,7 +27,7 @@ class FrontPortalController extends AbstractController
     private const LOCATION_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,120}$/u';
     private const TEXTAREA_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{0,1000}$/u';
     private const REVIEW_COMMENT_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,1000}$/u';
-    private const STATIC_RECRUITER_ID = '1';
+    private const STATIC_RECRUITER_ID = '4';
     private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
@@ -44,7 +44,6 @@ class FrontPortalController extends AbstractController
         $warningStatuses = [];
         $expiredOffers = [];
         $now = new \DateTimeImmutable();
-        $offerStats = null;
         $cards = [];
 
         $appliedOfferIds = [];
@@ -193,16 +192,39 @@ class FrontPortalController extends AbstractController
             $card['warning_status'] = $warningStatuses[$card['id']] ?? null;
         }
 
-        if ($role === 'recruiter') {
-            $offerStats = $this->buildOfferStats($cards);
-        }
-
         return $this->render('front/modules/job_offers.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
             'contractTypes' => self::CONTRACT_TYPES,
             'warnings' => $warnings,
             'expiredOffers' => $expiredOffers,
+        ]);
+    }
+
+    #[Route('/front/job-offers/statistics', name: 'front_job_offers_statistics')]
+    public function jobOffersStatistics(Request $request, Connection $connection): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ($role !== 'recruiter') {
+            $this->addFlash('warning', 'Only recruiters can access offer statistics.');
+            return $this->redirectToRoute('front_job_offers', ['role' => $role]);
+        }
+
+        $rows = [];
+        $offerStats = $this->buildOfferStats([]);
+
+        try {
+            $rows = $connection->fetchAllAssociative(
+                'SELECT id, recruiter_id, title, location, contract_type, status, deadline FROM job_offer WHERE recruiter_id = :recruiter_id ORDER BY created_at DESC LIMIT 50',
+                ['recruiter_id' => self::STATIC_RECRUITER_ID]
+            );
+            $offerStats = $this->buildOfferStats($rows);
+        } catch (\Throwable) {
+            $this->addFlash('error', 'Unable to load offer statistics right now.');
+        }
+
+        return $this->render('front/modules/job_offer_statistics.html.twig', [
+            'authUser' => ['role' => $role],
             'offerStats' => $offerStats,
         ]);
     }
@@ -480,20 +502,24 @@ class FrontPortalController extends AbstractController
                             ]);
                         }
 
-                        // If job has an active warning, mark it as resolved (recruiter edited)
-                        $hasActiveWarning = (int) $connection->fetchOne(
-                            'SELECT COUNT(*) FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status',
-                            ['job_offer_id' => $id, 'status' => 'SENT']
-                        );
+                        // Keep offer edit successful even if warning schema differs in current DB.
+                        $hasActiveWarning = 0;
+                        try {
+                            $hasActiveWarning = (int) $connection->fetchOne(
+                                'SELECT COUNT(*) FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status',
+                                ['job_offer_id' => $id, 'status' => 'SENT']
+                            );
 
-                        if ($hasActiveWarning > 0) {
-                            $connection->update('job_offer_warning', [
-                                'status' => 'RESOLVED',
-                                'edited_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-                            ], [
-                                'job_offer_id' => $id,
-                                'status' => 'SENT',
-                            ]);
+                            if ($hasActiveWarning > 0) {
+                                $connection->update('job_offer_warning', [
+                                    'status' => 'RESOLVED',
+                                ], [
+                                    'job_offer_id' => $id,
+                                    'status' => 'SENT',
+                                ]);
+                            }
+                        } catch (\Throwable) {
+                            $hasActiveWarning = 0;
                         }
 
                         $connection->commit();

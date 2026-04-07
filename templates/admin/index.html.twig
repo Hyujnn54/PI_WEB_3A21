@@ -14,6 +14,9 @@
                     <a href="{{ path('app_admin_job_offers') }}" class="btn btn-primary">
                         <i class="ti ti-briefcase-2 me-1"></i>Job Offers
                     </a>
+                    <a href="{{ path('app_admin_job_offers_statistics') }}" class="btn btn-outline-warning">
+                        <i class="ti ti-chart-pie me-1"></i>Job Offer Statistics
+                    </a>
                     <a href="{{ path('management_job_applications_statistics') }}" class="btn btn-outline-primary">
                         <i class="ti ti-chart-pie me-1"></i>View Statistics
                     </a>
@@ -50,6 +53,16 @@
                         <i class="ti ti-rocket text-primary me-2"></i>Quick Actions
                     </h5>
                     <div class="d-grid gap-2">
+                        <a href="{{ path('app_admin_job_offers') }}" class="btn btn-light text-start d-flex align-items-center gap-3 py-3">
+                            <div class="rounded-2 bg-warning bg-opacity-10 p-2">
+                                <i class="ti ti-briefcase-2 text-warning"></i>
+                            </div>
+                            <div>
+                                <div class="fw-semibold">Manage Job Offers</div>
+                                <small class="text-muted">Review and moderate published offers</small>
+                            </div>
+                            <i class="ti ti-chevron-right ms-auto text-muted"></i>
+                        </a>
                         <a href="{{ path('management_job_applications') }}" class="btn btn-light text-start d-flex align-items-center gap-3 py-3">
                             <div class="rounded-2 bg-primary bg-opacity-10 p-2">
                                 <i class="ti ti-file-check text-primary"></i>
@@ -91,7 +104,17 @@
                         <i class="ti ti-chart-bar text-primary me-2"></i>Analytics Overview
                     </h5>
                     <div class="row g-3">
-                        <div class="col-6">
+                        <div class="col-md-6 col-xl-4">
+                            <div class="p-3 rounded-3 bg-warning bg-opacity-10">
+                                <div class="text-warning fw-bold h4 mb-1">
+                                    <a href="{{ path('app_admin_job_offers_statistics') }}" class="text-decoration-none text-warning">
+                                        <i class="ti ti-briefcase-2 me-1"></i>Job Offers
+                                    </a>
+                                </div>
+                                <small class="text-muted">Moderation and status overview</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-xl-4">
                             <div class="p-3 rounded-3 bg-primary bg-opacity-10">
                                 <div class="text-primary fw-bold h4 mb-1">
                                     <a href="{{ path('management_job_applications_statistics') }}" class="text-decoration-none text-primary">
@@ -101,7 +124,7 @@
                                 <small class="text-muted">View detailed statistics</small>
                             </div>
                         </div>
-                        <div class="col-6">
+                        <div class="col-md-6 col-xl-4">
                             <div class="p-3 rounded-3 bg-success bg-opacity-10">
                                 <div class="text-success fw-bold h4 mb-1">
                                     <a href="{{ path('management_interviews_statistics') }}" class="text-decoration-none text-success">
@@ -130,6 +153,15 @@
             <div class="table-responsive">
                 <table class="table table-borderless mb-0">
                     <tbody>
+                        <tr>
+                            <td class="ps-0">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-success rounded-circle p-1">&nbsp;</span>
+                                    <span>Job Offer Module</span>
+                                </div>
+                            </td>
+                            <td class="text-end text-success">Active</td>
+                        </tr>
                         <tr>
                             <td class="ps-0">
                                 <div class="d-flex align-items-center gap-2">
