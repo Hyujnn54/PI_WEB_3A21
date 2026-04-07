@@ -141,7 +141,6 @@
             </div>
 
                 </div>
-                {% if role == 'recruiter' %}
                     <div class="col-12 col-xl-4">
                 <div id="offerDetailPanel" class="card tb-detail-panel tb-detail-panel-side">
                     <div class="card-header">
@@ -156,7 +155,6 @@
                     </div>
                 </div>
                     </div>
-                {% endif %}
             </div>
 
             {% if role == 'recruiter' %}
@@ -180,7 +178,6 @@
 </div>
 
 <script>
-    (function () {
     (function () {
         const grid = document.getElementById('offerCardsGrid');
         if (!grid) return;
@@ -222,7 +219,7 @@
         };
 
         if (locationInput) locationInput.addEventListener('input', runFilters);
-        if (contractTypeInput) contractTypeInput.addEventListener('input', runFilters);
+        if (contractTypeInput) contractTypeInput.addEventListener('change', runFilters);
         if (statusSelect) statusSelect.addEventListener('change', runFilters);
         if (deadlineInput) deadlineInput.addEventListener('change', runFilters);
 
