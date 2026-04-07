@@ -2,235 +2,128 @@
 
 namespace App\Entity;
 
+use App\Repository\UsersRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
 
-use Doctrine\Common\Collections\Collection;
-use App\Entity\Application_status_history;
-
-#[ORM\Entity]
-class Users
+#[ORM\Entity(repositoryClass: UsersRepository::class)]
+#[ORM\Table(name: 'users')]
+#[ORM\InheritanceType("JOINED")]
+#[ORM\DiscriminatorColumn(name: "discr", type: "string")]
+#[ORM\DiscriminatorMap(["admin" => Admin::class, "candidate" => Candidate::class, "recruiter" => Recruiter::class])]
+class Users implements UserInterface, PasswordAuthenticatedUserInterface
 {
-
     #[ORM\Id]
-    #[ORM\Column(type: "bigint")]
-    private string $id;
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: Types::BIGINT)]
+    protected ?string $id = null;
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $email;
+    #[ORM\Column(length: 255, unique: true)]
+    protected ?string $email = null;
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $password;
+    #[ORM\Column(type: "json")]
+    protected array $roles = [];
 
-    #[ORM\Column(type: "string", length: 100)]
-    private string $first_name;
+    #[ORM\Column(length: 255)]
+    protected ?string $password = null;
 
-    #[ORM\Column(type: "string", length: 100)]
-    private string $last_name;
+    #[ORM\Column(name: "first_name", length: 100, nullable: true)]
+    protected ?string $firstName = null;
 
-    #[ORM\Column(type: "string", length: 30)]
-    private string $phone;
+    #[ORM\Column(name: "last_name", length: 100, nullable: true)]
+    protected ?string $lastName = null;
 
-    #[ORM\Column(type: "boolean")]
-    private bool $is_active;
+    #[ORM\Column(length: 30, nullable: true)]
+    protected ?string $phone = null;
 
-    #[ORM\Column(type: "datetime")]
-    private \DateTimeInterface $created_at;
+    #[ORM\Column(name: "is_active")]
+    protected bool $isActive = true;
 
-    #[ORM\Column(type: "string", length: 10)]
-    private string $forget_code;
+    #[ORM\Column(name: "created_at", type: Types::DATETIME_MUTABLE)]
+    protected ?\DateTimeInterface $createdAt = null;
 
-    #[ORM\Column(type: "datetime")]
-    private \DateTimeInterface $forget_code_expires;
+    #[ORM\Column(name: "forget_code", length: 10, nullable: true)]
+    protected ?string $forgetCode = null;
 
-    #[ORM\Column(type: "string", length: 128)]
-    private string $face_person_id;
+    #[ORM\Column(name: "forget_code_expires", type: Types::DATETIME_MUTABLE, nullable: true)]
+    protected ?\DateTimeInterface $forgetCodeExpires = null;
 
-    #[ORM\Column(type: "boolean")]
-    private bool $face_enabled;
+    #[ORM\Column(name: "face_person_id", length: 128, nullable: true)]
+    protected ?string $facePersonId = null;
 
-    public function getId()
+    #[ORM\Column(name: "face_enabled")]
+    protected bool $faceEnabled = false;
+
+    public function __construct()
     {
-        return $this->id;
+        $this->createdAt = new \DateTime();
     }
 
-    public function setId($value)
-    {
-        $this->id = $value;
+    public function getId(): ?string { return $this->id; }
+
+    public function getEmail(): ?string { return $this->email; }
+    public function setEmail(string $email): self { $this->email = $email; return $this; }
+
+    /**
+     * @see PasswordAuthenticatedUserInterface
+     */
+    public function getPassword(): ?string { return $this->password; }
+    public function setPassword(string $password): self { $this->password = $password; return $this; }
+
+    /**
+     * @see UserInterface
+     */
+    public function getRoles(): array 
+    { 
+        $roles = $this->roles;
+        // guarantee every user at least has ROLE_USER
+        $roles[] = 'ROLE_USER';
+
+        return array_unique($roles); 
     }
 
-    public function getEmail()
+    public function setRoles(array $roles): static
     {
-        return $this->email;
+        $this->roles = $roles;
+        return $this;
     }
 
-    public function setEmail($value)
-    {
-        $this->email = $value;
-    }
+    public function getFirstName(): ?string { return $this->firstName; }
+    public function setFirstName(?string $firstName): self { $this->firstName = $firstName; return $this; }
 
-    public function getPassword()
-    {
-        return $this->password;
-    }
+    public function getLastName(): ?string { return $this->lastName; }
+    public function setLastName(?string $lastName): self { $this->lastName = $lastName; return $this; }
 
-    public function setPassword($value)
-    {
-        $this->password = $value;
-    }
+    public function getPhone(): ?string { return $this->phone; }
+    public function setPhone(?string $phone): self { $this->phone = $phone; return $this; }
 
-    public function getFirst_name()
-    {
-        return $this->first_name;
-    }
+    public function isActive(): bool { return $this->isActive; }
+    public function setIsActive(bool $isActive): self { $this->isActive = $isActive; return $this; }
 
-    public function setFirst_name($value)
-    {
-        $this->first_name = $value;
-    }
+    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
+    public function setCreatedAt(\DateTimeInterface $createdAt): self { $this->createdAt = $createdAt; return $this; }
 
-    public function getLast_name()
-    {
-        return $this->last_name;
-    }
+    public function getForgetCode(): ?string { return $this->forgetCode; }
+    public function setForgetCode(?string $forgetCode): self { $this->forgetCode = $forgetCode; return $this; }
 
-    public function setLast_name($value)
-    {
-        $this->last_name = $value;
-    }
+    public function getForgetCodeExpires(): ?\DateTimeInterface { return $this->forgetCodeExpires; }
+    public function setForgetCodeExpires(?\DateTimeInterface $forgetCodeExpires): self { $this->forgetCodeExpires = $forgetCodeExpires; return $this; }
 
-    public function getPhone()
-    {
-        return $this->phone;
-    }
+    public function getFacePersonId(): ?string { return $this->facePersonId; }
+    public function setFacePersonId(?string $facePersonId): self { $this->facePersonId = $facePersonId; return $this; }
 
-    public function setPhone($value)
-    {
-        $this->phone = $value;
-    }
+    public function isFaceEnabled(): bool { return $this->faceEnabled; }
+    public function setFaceEnabled(bool $faceEnabled): self { $this->faceEnabled = $faceEnabled; return $this; }
 
-    public function getIs_active()
-    {
-        return $this->is_active;
-    }
+    /**
+     * @see UserInterface
+     */
+    public function eraseCredentials(): void {}
 
-    public function setIs_active($value)
-    {
-        $this->is_active = $value;
-    }
-
-    public function getCreated_at()
-    {
-        return $this->created_at;
-    }
-
-    public function setCreated_at($value)
-    {
-        $this->created_at = $value;
-    }
-
-    public function getForget_code()
-    {
-        return $this->forget_code;
-    }
-
-    public function setForget_code($value)
-    {
-        $this->forget_code = $value;
-    }
-
-    public function getForget_code_expires()
-    {
-        return $this->forget_code_expires;
-    }
-
-    public function setForget_code_expires($value)
-    {
-        $this->forget_code_expires = $value;
-    }
-
-    public function getFace_person_id()
-    {
-        return $this->face_person_id;
-    }
-
-    public function setFace_person_id($value)
-    {
-        $this->face_person_id = $value;
-    }
-
-    public function getFace_enabled()
-    {
-        return $this->face_enabled;
-    }
-
-    public function setFace_enabled($value)
-    {
-        $this->face_enabled = $value;
-    }
-
-    #[ORM\OneToMany(mappedBy: "id", targetEntity: Admin::class)]
-    private Collection $admins;
-
-        public function getAdmins(): Collection
-        {
-            return $this->admins;
-        }
-    
-        public function addAdmin(Admin $admin): self
-        {
-            if (!$this->admins->contains($admin)) {
-                $this->admins[] = $admin;
-                $admin->setId($this);
-            }
-    
-            return $this;
-        }
-    
-        public function removeAdmin(Admin $admin): self
-        {
-            if ($this->admins->removeElement($admin)) {
-                // set the owning side to null (unless already changed)
-                if ($admin->getId() === $this) {
-                    $admin->setId(null);
-                }
-            }
-    
-            return $this;
-        }
-
-    #[ORM\OneToMany(mappedBy: "id", targetEntity: Candidate::class)]
-    private Collection $candidates;
-
-    #[ORM\OneToMany(mappedBy: "id", targetEntity: Recruiter::class)]
-    private Collection $recruiters;
-
-    #[ORM\OneToMany(mappedBy: "changed_by", targetEntity: Application_status_history::class)]
-    private Collection $application_status_historys;
-
-        public function getApplication_status_historys(): Collection
-        {
-            return $this->application_status_historys;
-        }
-    
-        public function addApplication_status_history(Application_status_history $application_status_history): self
-        {
-            if (!$this->application_status_historys->contains($application_status_history)) {
-                $this->application_status_historys[] = $application_status_history;
-                $application_status_history->setChanged_by($this);
-            }
-    
-            return $this;
-        }
-    
-        public function removeApplication_status_history(Application_status_history $application_status_history): self
-        {
-            if ($this->application_status_historys->removeElement($application_status_history)) {
-                // set the owning side to null (unless already changed)
-                if ($application_status_history->getChanged_by() === $this) {
-                    $application_status_history->setChanged_by(null);
-                }
-            }
-    
-            return $this;
-        }
+    /**
+     * @see UserInterface
+     */
+    public function getUserIdentifier(): string { return (string) $this->email; }
 }

@@ -15,22 +15,17 @@
                     {% for message in app.flashes('error') %}
                         <div class="alert alert-danger">{{ message }}</div>
                     {% endfor %}
+
                     <form method="post" action="{{ path('app_login') }}">
                         <div class="mb-3">
-                            <label class="form-label">Full Name</label>
-                            <input type="text" name="full_name" class="form-control" required>
+                            <label class="form-label">Email Address</label>
+                            {# The 'name' must be 'email' for the Controller to find it #}
+                            <input type="email" name="email" class="form-control" placeholder="your@email.com" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" name="email" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Role</label>
-                            <select name="role" class="form-select" required>
-                                <option value="candidate">Candidate</option>
-                                <option value="recruiter">Recruiter</option>
-                                <option value="admin">Admin</option>
-                            </select>
+                            <label class="form-label">Password</label>
+                            {# The 'name' must be 'password' for the Controller to find it #}
+                            <input type="password" name="password" class="form-control" placeholder="Your password" required>
                         </div>
                         <div class="form-footer">
                             <button type="submit" class="btn btn-primary w-100">Sign In</button>

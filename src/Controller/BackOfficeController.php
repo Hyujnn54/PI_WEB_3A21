@@ -2,20 +2,28 @@
 
 namespace App\Controller;
 
+use App\Repository\UsersRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use App\Entity\Users;
+use App\Entity\Admin;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 class BackOfficeController extends AbstractController
 {
     #[Route('/admin', name: 'back_dashboard')]
-    #[Route('/admin', name: 'app_admin')]
-    public function index(): Response
+    #[Route('/admin/dashboard', name: 'app_admin')]
+    public function index(UsersRepository $userRepo): Response
     {
+        // Get the real count from your database
+        $totalUsers = count($userRepo->findAll());
+
         return $this->render('admin/index.html.twig', [
-            'authUser' => ['role' => 'admin'],
             'kpis' => [
-                ['label' => 'Total Users', 'value' => '1,378', 'icon' => 'ti ti-users'],
+                ['label' => 'Total Users', 'value' => $totalUsers, 'icon' => 'ti ti-users'],
                 ['label' => 'Open Offers', 'value' => '32', 'icon' => 'ti ti-briefcase-2'],
                 ['label' => 'Applications', 'value' => '3,580', 'icon' => 'ti ti-file-check'],
                 ['label' => 'Interviews', 'value' => '482', 'icon' => 'ti ti-message-2'],
@@ -23,11 +31,105 @@ class BackOfficeController extends AbstractController
         ]);
     }
 
-    #[Route('/admin/add-user', name: 'app_admin_add_user')]
-    public function addUser(): Response
-    {
-        return $this->render('admin/add_user.html.twig', [
-            'authUser' => ['role' => 'admin'],
-        ]);
+#[Route('/admin/users', name: 'app_admin_users')]
+public function listUsers(UsersRepository $userRepo, Request $request): Response
+{
+    $searchTerm = $request->query->get('search');
+    $roleFilter = $request->query->get('role');
+
+    if ($searchTerm || $roleFilter) {
+        $users = $userRepo->findBySearchAndRole($searchTerm, $roleFilter);
+    } else {
+        $users = $userRepo->findAll();
     }
+
+    if ($request->query->get('ajax')) {
+        return $this->render('admin/_user_table_rows.html.twig', ['users' => $users]);
+    }
+
+    return $this->render('admin/user_list.html.twig', [
+        'users' => $users,
+        'searchTerm' => $searchTerm,
+        'currentRole' => $roleFilter,
+        'totalCount' => count($userRepo->findAll()) // Added to fix variable error
+    ]);
+}
+#[Route('/admin/add-admin', name: 'app_admin_add_user', methods: ['GET', 'POST'])]
+public function addAdmin(
+    Request $request, 
+    UserPasswordHasherInterface $hasher, 
+    EntityManagerInterface $em
+): Response {
+    if ($request->isMethod('POST')) {
+        $user = new Admin(); 
+        
+        $user->setFirstName($request->request->get('first_name'));
+        $user->setLastName($request->request->get('last_name'));
+        $user->setEmail($request->request->get('email'));
+        $user->setPhone($request->request->get('phone'));
+        
+        // FIXED: Set the missing mandatory field
+        // You can use a value from a new form input or set a default like 'Management'
+        if (method_exists($user, 'setAssignedArea')) {
+            $user->setAssignedArea('General Management');
+        }
+        
+        $plainPassword = $request->request->get('password');
+        $hashedPassword = $hasher->hashPassword($user, $plainPassword);
+        $user->setPassword($hashedPassword);
+        
+        $user->setRoles(['ROLE_ADMIN']);
+        $user->setIsActive(true);
+
+        $em->persist($user);
+        $em->flush();
+
+        $this->addFlash('success', 'Admin created successfully!');
+        return $this->redirectToRoute('app_admin_users');
+    }
+
+    return $this->render('admin/add_user.html.twig');
+}
+
+
+#[Route('/admin/user/delete/{id}', name: 'app_admin_delete_user', methods: ['POST'])]
+public function deleteUser(int $id, UsersRepository $userRepo, EntityManagerInterface $em): Response
+{
+    $user = $userRepo->find($id);
+    if ($user) {
+        $em->remove($user);
+        $em->flush();
+        $this->addFlash('success', 'User deleted successfully.');
+    }
+    
+    return $this->redirectToRoute('app_admin_users');
+}
+
+#[Route('/admin/user/edit/{id}', name: 'app_admin_edit_user', methods: ['GET', 'POST'])]
+public function editUser(int $id, UsersRepository $userRepo, Request $request, EntityManagerInterface $em): Response
+{
+    $user = $userRepo->find($id);
+    
+    if (!$user) {
+        $this->addFlash('error', 'User not found.');
+        return $this->redirectToRoute('app_admin_users');
+    }
+
+    if ($request->isMethod('POST')) {
+        // Update the entity with new values from the form
+        $user->setFirstName($request->request->get('first_name'));
+        $user->setLastName($request->request->get('last_name'));
+        $user->setEmail($request->request->get('email'));
+        
+        // Save changes to MySQL
+        $em->flush();
+
+        $this->addFlash('success', 'User updated successfully.');
+        return $this->redirectToRoute('app_admin_users');
+    }
+
+    return $this->render('admin/edit_user.html.twig', [
+        'user' => $user
+    ]);
+}
 }

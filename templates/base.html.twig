@@ -12,8 +12,7 @@
         <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
         <link rel="stylesheet" href="{{ asset('css/app.css') }}?v=20260404-2">
-        {% block stylesheets %}
-        {% endblock %}
+        {% block stylesheets %}{% endblock %}
 
         {% block javascripts %}
             {% block importmap %}{{ importmap('app') }}{% endblock %}
@@ -27,12 +26,13 @@
         {% endif %}
     </head>
     <body class="tb-body">
-        {% set queryRole = app.request.query.get('role') %}
-        {% set currentRole = queryRole in ['candidate', 'recruiter'] ? queryRole : 'candidate' %}
+        {# Identify if we are in an Admin/Backoffice route #}
         {% set routeName = app.request.attributes.get('_route') %}
         {% set isAdminPage = routeName starts with 'management_' or routeName == 'back_dashboard' or routeName starts with 'app_admin' %}
-        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status'] %}
-        {% set roleSwitchRoute = routeName in unsafeRoleRoutes ? 'front_interviews' : routeName %}
+        
+        {# Get session data for roles #}
+        {% set userRoles = app.session.get('user_roles')|default([]) %}
+        
         <div class="page tb-page-shell">
             {% if not isAdminPage %}
             <header class="navbar navbar-expand-md navbar-light d-print-none tb-topbar">
@@ -44,47 +44,58 @@
                         <img src="{{ asset('assets/team_uploads/logo.png') }}" alt="Talent Bridge logo" class="tb-logo me-2">
                         <span class="tb-brand-text">Talent Bridge</span>
                     </h1>
+                    
                     <div class="collapse navbar-collapse" id="tbMainNav">
                         <ul class="navbar-nav tb-main-nav me-auto">
-                            {% if isAdminPage %}
-                                <li class="nav-item"><a class="nav-link" href="{{ path('management_users') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('back_dashboard') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span><span class="nav-link-title">Admin Dashboard</span></a></li>
-                            {% else %}
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_home', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-home"></i></span><span class="nav-link-title">Home</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-check"></i></span><span class="nav-link-title">Applications</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_events', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-message-2"></i></span><span class="nav-link-title">Interviews</span></a></li>
-                            {% endif %}
+                            <li class="nav-item"><a class="nav-link" href="{{ path('front_home') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-home"></i></span><span class="nav-link-title">Home</span></a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ path('front_events') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
                         </ul>
                     </div>
+
                     <div class="navbar-nav flex-row order-md-last">
-                        <div class="btn-list me-2">
-                            <a class="btn btn-sm {{ currentRole == 'candidate' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(roleSwitchRoute, app.request.query.all|merge({role: 'candidate'})) }}">Candidate</a>
-                            <a class="btn btn-sm {{ currentRole == 'recruiter' ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ path(roleSwitchRoute, app.request.query.all|merge({role: 'recruiter'})) }}">Recruiter</a>
-                        </div>
-                        <div class="nav-item d-none d-md-flex me-2">
-                            {% if isAdminPage %}
-                                <a class="btn btn-sm btn-dark" href="{{ path('front_home', {role: currentRole}) }}">Front Portal</a>
-                            {% else %}
-                                <a class="btn btn-sm btn-dark" href="{{ path('back_dashboard') }}">Admin Panel</a>
-                            {% endif %}
-                        </div>
-                        <div class="nav-item d-none d-md-flex me-2">
-                            <a class="btn btn-sm btn-outline-primary" href="{{ path('app_login') }}"><i class="ti ti-user-circle me-1"></i>User Login</a>
-                        </div>
-                        <div class="nav-item d-none d-md-flex me-2">
-                            <a class="btn btn-sm btn-primary" href="{{ path('app_register') }}">Register</a>
-                        </div>
-                        <div class="nav-item d-none d-md-flex">
-                            <form method="post" action="{{ path('app_logout') }}">
-                                <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="ti ti-logout me-1"></i>Logout</button>
-                            </form>
-                        </div>
+                        {% if app.session.get('user_id') %}
+                            {# --- USER IS LOGGED IN --- #}
+                            
+                            <div class="nav-item d-none d-md-flex me-3">
+                                <span class="navbar-text">Welcome, <strong>{{ app.session.get('user_name') }}</strong></span>
+                            </div>
+
+                            <div class="nav-item d-none d-md-flex me-2">
+                                {# Show Admin Panel button ONLY for Admins #}
+                                {% if 'ROLE_ADMIN' in userRoles %}
+                                    <a class="btn btn-sm btn-dark" href="{{ path('back_dashboard') }}">Admin Panel</a>
+                                {# Show Recruiter link ONLY for Recruiters #}
+                                {% elseif 'ROLE_RECRUITER' in userRoles %}
+                                    <a class="btn btn-sm btn-outline-primary" href="{{ path('front_home') }}">Recruiter Space</a>
+                                {# Everyone else (Candidates) sees Applications #}
+                                {% else %}
+                                    <a class="btn btn-sm btn-primary" href="{{ path('front_job_applications') }}">My Applications</a>
+                                {% endif %}
+                            </div>
+
+                            <div class="nav-item d-none d-md-flex">
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ path('app_logout') }}">
+                                    <i class="ti ti-logout me-1"></i>Logout
+                                </a>
+                            </div>
+
+                        {% else %}
+                            {# --- USER IS LOGGED OUT --- #}
+                            <div class="nav-item d-none d-md-flex me-2">
+                                <a class="btn btn-sm btn-outline-primary" href="{{ path('app_login') }}">
+                                    <i class="ti ti-user-circle me-1"></i>User Login
+                                </a>
+                            </div>
+                            <div class="nav-item d-none d-md-flex">
+                                <a class="btn btn-sm btn-primary" href="{{ path('app_register') }}">Register</a>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </header>
             {% endif %}
+
             <div class="container-xl mt-2">
                 {% for label in ['success', 'warning', 'error'] %}
                     {% for message in app.flashes(label) %}
@@ -92,265 +103,11 @@
                     {% endfor %}
                 {% endfor %}
             </div>
+
             {% block body %}{% endblock %}
         </div>
+
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
         <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
-        <script>
-            document.querySelectorAll('.tb-filter-form').forEach(function (filterForm) {
-                const targetSelector = filterForm.getAttribute('data-target');
-                if (!targetSelector) {
-                    return;
-                }
-
-                const grid = document.querySelector(targetSelector);
-                if (!grid) {
-                    return;
-                }
-
-                const searchInput = filterForm.querySelector('[data-filter-search]');
-                const criteriaSelect = filterForm.querySelector('[data-filter-criteria]');
-                const sortSelect = filterForm.querySelector('[data-filter-sort]');
-                const resultLabel = filterForm.querySelector('[data-filter-results]');
-                const items = Array.from(grid.querySelectorAll('.tb-filter-item'));
-
-                items.forEach(function (item, index) {
-                    item.dataset.originalIndex = String(index);
-                });
-
-                const runFilters = function () {
-                    const query = ((searchInput && searchInput.value) || '').trim().toLowerCase();
-                    const criteria = (criteriaSelect && criteriaSelect.value) || 'all';
-                    const sortMode = (sortSelect && sortSelect.value) || 'default';
-
-                    let visibleCount = 0;
-                    items.forEach(function (item) {
-                        let haystack = (item.dataset.filterText || '').toLowerCase();
-                        if (criteria === 'title') {
-                            haystack = (item.dataset.filterTitle || '').toLowerCase();
-                        } else if (criteria === 'meta') {
-                            haystack = (item.dataset.filterMeta || '').toLowerCase();
-                        } else if (criteria === 'description') {
-                            haystack = (item.dataset.filterDescription || '').toLowerCase();
-                        } else if (criteria === 'status') {
-                            haystack = (item.dataset.filterStatus || '').toLowerCase();
-                        }
-
-                        const isMatch = query === '' || haystack.includes(query);
-                        item.classList.toggle('d-none', !isMatch);
-                        if (isMatch) {
-                            visibleCount += 1;
-                        }
-                    });
-
-                    const sorted = items.slice().sort(function (a, b) {
-                        if (sortMode === 'title_asc') {
-                            return (a.dataset.sortTitle || '').localeCompare((b.dataset.sortTitle || ''));
-                        }
-                        if (sortMode === 'title_desc') {
-                            return (b.dataset.sortTitle || '').localeCompare((a.dataset.sortTitle || ''));
-                        }
-                        if (sortMode === 'meta_asc') {
-                            return (a.dataset.sortMeta || '').localeCompare((b.dataset.sortMeta || ''));
-                        }
-                        if (sortMode === 'meta_desc') {
-                            return (b.dataset.sortMeta || '').localeCompare((a.dataset.sortMeta || ''));
-                        }
-                        if (sortMode === 'date_asc') {
-                            return Number(a.dataset.sortDate || 0) - Number(b.dataset.sortDate || 0);
-                        }
-                        if (sortMode === 'date_desc') {
-                            return Number(b.dataset.sortDate || 0) - Number(a.dataset.sortDate || 0);
-                        }
-                        if (sortMode === 'status_asc') {
-                            return (a.dataset.sortStatus || '').localeCompare((b.dataset.sortStatus || ''));
-                        }
-                        if (sortMode === 'status_desc') {
-                            return (b.dataset.sortStatus || '').localeCompare((a.dataset.sortStatus || ''));
-                        }
-
-                        return Number(a.dataset.originalIndex || 0) - Number(b.dataset.originalIndex || 0);
-                    });
-
-                    sorted.forEach(function (item) {
-                        grid.appendChild(item);
-                    });
-
-                    if (resultLabel) {
-                        resultLabel.textContent = visibleCount + ' result(s)';
-                    }
-                };
-
-                if (searchInput) {
-                    searchInput.addEventListener('input', runFilters);
-                }
-                if (sortSelect) {
-                    sortSelect.addEventListener('change', runFilters);
-                }
-                if (criteriaSelect) {
-                    criteriaSelect.addEventListener('change', runFilters);
-                }
-
-                runFilters();
-            });
-
-            document.querySelectorAll('.tb-detail-close').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    const panel = btn.closest('.tb-detail-panel');
-                    if (!panel) return;
-                    panel.classList.add('d-none');
-                    panel.classList.remove('is-open');
-                    document.querySelectorAll('.tb-module-card.is-selected').forEach(function (selectedCard) {
-                        selectedCard.classList.remove('is-selected');
-                    });
-                });
-            });
-
-            document.querySelectorAll('.tb-module-card').forEach(function (card) {
-                card.addEventListener('click', function (event) {
-                    if (event.target.closest('a,button,input,select,textarea,form')) {
-                        return;
-                    }
-
-                    document.querySelectorAll('.tb-module-card.is-selected').forEach(function (selectedCard) {
-                        selectedCard.classList.remove('is-selected');
-                    });
-                    card.classList.add('is-selected');
-
-                    const detailTarget = card.getAttribute('data-detail-target');
-                    if (detailTarget) {
-                        document.querySelectorAll('.tb-detail-panel').forEach(function (p) {
-                            p.classList.add('d-none');
-                            p.classList.remove('is-open');
-                        });
-
-                        const panel = document.querySelector(detailTarget);
-                        if (panel) {
-                            const meta = panel.querySelector('.tb-detail-meta');
-                            const title = panel.querySelector('.tb-detail-title');
-                            const text = panel.querySelector('.tb-detail-text');
-                            const extra = panel.querySelector('.tb-detail-extra');
-                            const primary = panel.querySelector('.tb-detail-primary');
-                            const secondary = panel.querySelector('.tb-detail-secondary');
-                            const tertiary = panel.querySelector('.tb-detail-tertiary');
-
-                            if (meta) meta.textContent = card.getAttribute('data-detail-meta') || '';
-                            if (title) title.textContent = card.getAttribute('data-detail-title') || 'Details';
-                            if (text) text.textContent = card.getAttribute('data-detail-text') || '';
-
-                            if (extra) {
-                                const rawExtra = card.getAttribute('data-detail-extra') || '';
-                                extra.innerHTML = '';
-                                rawExtra.split('||').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (line) {
-                                    const item = document.createElement('div');
-                                    item.className = 'tb-detail-row';
-                                    const splitIndex = line.indexOf(':');
-                                    if (splitIndex > -1) {
-                                        const key = document.createElement('strong');
-                                        key.textContent = line.slice(0, splitIndex + 1) + ' ';
-                                        const value = document.createElement('span');
-                                        value.textContent = line.slice(splitIndex + 1).trim();
-                                        item.appendChild(key);
-                                        item.appendChild(value);
-                                    } else {
-                                        item.textContent = line;
-                                    }
-                                    extra.appendChild(item);
-                                });
-                            }
-
-                            if (primary) {
-                                primary.textContent = card.getAttribute('data-action-primary') || 'Primary Action';
-                                const href = card.getAttribute('data-action-primary-href') || '#';
-                                if (primary.tagName === 'A') {
-                                    primary.setAttribute('href', href);
-                                }
-                                const disabled = card.getAttribute('data-action-primary-disabled') === '1';
-                                primary.classList.toggle('disabled', disabled);
-                                primary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-                            }
-                            if (secondary) {
-                                secondary.textContent = card.getAttribute('data-action-secondary') || 'Secondary Action';
-                                const href = card.getAttribute('data-action-secondary-href') || '#';
-                                const secondaryForm = secondary.closest('form');
-                                if (secondaryForm) {
-                                    secondaryForm.setAttribute('action', href);
-                                } else if (secondary.tagName === 'A') {
-                                    secondary.setAttribute('href', href);
-                                }
-                                const disabled = card.getAttribute('data-action-secondary-disabled') === '1';
-                                secondary.classList.toggle('disabled', disabled);
-                                secondary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-                                if (secondary.tagName === 'BUTTON') {
-                                    secondary.toggleAttribute('disabled', disabled);
-                                }
-                            }
-                            if (tertiary) {
-                                const tertiaryLabel = card.getAttribute('data-action-tertiary');
-                                if (tertiaryLabel) {
-                                    tertiary.textContent = tertiaryLabel;
-                                    const href = card.getAttribute('data-action-tertiary-href') || '#';
-                                    if (tertiary.tagName === 'A') {
-                                        tertiary.setAttribute('href', href);
-                                    }
-                                    const disabled = card.getAttribute('data-action-tertiary-disabled') === '1';
-                                    tertiary.classList.toggle('disabled', disabled);
-                                    tertiary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-                                    tertiary.classList.remove('d-none');
-                                } else {
-                                    tertiary.classList.add('d-none');
-                                }
-                            }
-
-                            const pageWrapper = card.closest('.page-wrapper') || document;
-                            const actionDock = pageWrapper.querySelector('.tb-generic-action-dock');
-                            if (actionDock) {
-                                const dockPrimary = actionDock.querySelector('.tb-dock-primary');
-                                const dockSecondary = actionDock.querySelector('.tb-dock-secondary');
-                                const dockTertiary = actionDock.querySelector('.tb-dock-tertiary');
-                                const dockSecondaryForm = actionDock.querySelector('.tb-dock-secondary-form');
-
-                                if (dockPrimary) {
-                                    dockPrimary.textContent = card.getAttribute('data-action-primary') || 'Primary Action';
-                                    dockPrimary.setAttribute('href', card.getAttribute('data-action-primary-href') || '#');
-                                    const disabled = card.getAttribute('data-action-primary-disabled') === '1';
-                                    dockPrimary.classList.toggle('disabled', disabled);
-                                }
-
-                                if (dockSecondary) {
-                                    dockSecondary.textContent = card.getAttribute('data-action-secondary') || 'Secondary Action';
-                                    const secondaryHref = card.getAttribute('data-action-secondary-href') || '#';
-                                    if (dockSecondaryForm) {
-                                        dockSecondaryForm.setAttribute('action', secondaryHref);
-                                    }
-                                    const disabled = card.getAttribute('data-action-secondary-disabled') === '1';
-                                    dockSecondary.classList.toggle('disabled', disabled);
-                                    dockSecondary.toggleAttribute('disabled', disabled);
-                                }
-
-                                if (dockTertiary) {
-                                    const label = card.getAttribute('data-action-tertiary') || 'Tertiary Action';
-                                    dockTertiary.textContent = label;
-                                    dockTertiary.setAttribute('href', card.getAttribute('data-action-tertiary-href') || '#');
-                                    const disabled = card.getAttribute('data-action-tertiary-disabled') === '1';
-                                    dockTertiary.classList.toggle('disabled', disabled);
-                                }
-
-                                actionDock.classList.remove('d-none');
-                            }
-
-                            panel.classList.remove('d-none');
-                            panel.classList.add('is-open');
-                            return;
-                        }
-                    }
-
-                    const href = card.getAttribute('data-href');
-                    if (href && href !== '#') {
-                        window.location.href = href;
-                    }
-                });
-            });
-        </script>
     </body>
 </html>
