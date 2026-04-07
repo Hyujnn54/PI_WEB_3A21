@@ -188,5 +188,91 @@ class CandidateApplicationController extends AbstractController
             'candidate' => $candidate,
         ]);
     }
+
+    #[Route('/applicationmanagement/candidate/applications/{applicationId}/edit', name: 'app_candidate_application_edit')]
+    public function edit(
+        int $applicationId,
+        Request $request,
+        EntityManagerInterface $em,
+        SluggerInterface $slugger
+    ): Response {
+        $candidateId = 3;
+
+        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        if (!$candidate) {
+            $this->addFlash('error', 'Candidate not found.');
+
+            return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
+        }
+
+        $application = $em->getRepository(Job_application::class)->find($applicationId);
+        if (!$application || $application->getCandidate_id() !== $candidate) {
+            $this->addFlash('error', 'Application not found.');
+
+            return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
+        }
+
+        $status = strtoupper(trim((string) $application->getCurrent_status()));
+        if ($status !== 'SUBMITTED') {
+            $this->addFlash('warning', 'Only applications with SUBMITTED status can be edited.');
+
+            return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
+        }
+
+        $form = $this->createForm(JobApplicationType::class, $application);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $useProfileCv = $form->get('use_profile_cv')->getData();
+            $cvFile = $form->get('cv_file')->getData();
+
+            if ($useProfileCv) {
+                $profileCvPath = method_exists($candidate, 'getCv_path') ? $candidate->getCv_path() : null;
+                if (empty($profileCvPath)) {
+                    $this->addFlash('warning', 'No CV found in your profile. Please upload a CV.');
+
+                    return $this->render('management/job_application/edit.html.twig', [
+                        'form' => $form->createView(),
+                        'application' => $application,
+                        'offer' => $application->getOffer_id(),
+                    ]);
+                }
+
+                $application->setCv_path($profileCvPath);
+            } elseif ($cvFile) {
+                $originalFilename = pathinfo($cvFile->getClientOriginalName(), PATHINFO_FILENAME);
+                $safeFilename = $slugger->slug($originalFilename);
+                $newFilename = $safeFilename.'-'.uniqid().'.'.$cvFile->guessExtension();
+
+                try {
+                    $uploadPath = $this->getParameter('kernel.project_dir') . '/public/uploads/applications';
+                    if (!is_dir($uploadPath)) {
+                        mkdir($uploadPath, 0777, true);
+                    }
+                    $cvFile->move($uploadPath, $newFilename);
+                    $application->setCv_path($newFilename);
+                } catch (FileException $e) {
+                    $this->addFlash('error', 'CV upload failed. Please try again.');
+
+                    return $this->render('management/job_application/edit.html.twig', [
+                        'form' => $form->createView(),
+                        'application' => $application,
+                        'offer' => $application->getOffer_id(),
+                    ]);
+                }
+            }
+
+            $em->flush();
+            $this->addFlash('success', 'Application updated successfully.');
+
+            return $this->redirectToRoute('app_candidate_application_details', ['applicationId' => $application->getId()]);
+        }
+
+        return $this->render('management/job_application/edit.html.twig', [
+            'form' => $form->createView(),
+            'application' => $application,
+            'offer' => $application->getOffer_id(),
+        ]);
+    }
 }
 

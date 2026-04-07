@@ -74,6 +74,7 @@ class FrontPortalController extends AbstractController
                 $status = $application->getCurrent_status();
                 $appliedAt = $application->getApplied_at();
                 $canWithdraw = strtoupper(trim((string) $status)) === 'SUBMITTED';
+                $canEdit = strtoupper(trim((string) $status)) === 'SUBMITTED';
 
                 $cards[] = [
                     'id' => $application->getId(),
@@ -81,6 +82,10 @@ class FrontPortalController extends AbstractController
                     'title' => 'Offer: ' . $offerTitle,
                     'text' => 'Applied on ' . $appliedAt->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
                     'details_url' => $this->generateUrl('app_candidate_application_details', ['applicationId' => $application->getId()]),
+                    'can_edit' => $canEdit,
+                    'edit_url' => $canEdit
+                        ? $this->generateUrl('app_candidate_application_edit', ['applicationId' => $application->getId()])
+                        : '#',
                     'can_withdraw' => $canWithdraw,
                     'withdraw_url' => $canWithdraw
                         ? $this->generateUrl('app_candidate_application_withdraw', ['applicationId' => $application->getId()])

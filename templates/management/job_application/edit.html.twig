@@ -1,0 +1,90 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Edit Application{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="page-title"><i class="ti ti-edit me-1"></i>Edit Application</h2>
+                <p class="text-secondary mb-0">Update your phone number, cover letter, and CV choice.</p>
+            </div>
+            <a href="{{ path('app_candidate_application_details', {'applicationId': application.id}) }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="row row-cards justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title mb-0">{{ offer ? offer.title : 'Unknown Offer' }}</h3>
+                        </div>
+                        <div class="card-body">
+                            {{ form_start(form) }}
+
+                            <div class="mb-3">
+                                {{ form_label(form.phone) }}
+                                {{ form_widget(form.phone, {'attr': {'class': 'form-control'}}) }}
+                            </div>
+
+                            <div class="mb-3">
+                                {{ form_label(form.cover_letter) }}
+                                {{ form_widget(form.cover_letter, {'attr': {'class': 'form-control', 'rows': '5'}}) }}
+                            </div>
+
+                            <div class="hr-text">Your Curriculum Vitae (CV)</div>
+
+                            <div class="mb-3">
+                                <label class="form-check">
+                                    {{ form_widget(form.use_profile_cv) }}
+                                    <span class="form-check-label">{{ form_label(form.use_profile_cv) }}</span>
+                                </label>
+                                <small class="form-hint text-secondary">If selected, we will use the CV currently stored in your profile.</small>
+                            </div>
+
+                            <div id="cv-upload-wrapper" class="mb-3">
+                                {{ form_label(form.cv_file) }}
+                                {{ form_widget(form.cv_file, {'attr': {'class': 'form-control'}}) }}
+                            </div>
+
+                            <div class="mt-4 d-flex gap-2">
+                                <a href="{{ path('app_candidate_application_details', {'applicationId': application.id}) }}" class="btn btn-outline-secondary w-50">Cancel</a>
+                                <button type="submit" class="btn btn-primary w-50">Save Changes</button>
+                            </div>
+
+                            {{ form_end(form) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const useProfileCvCheckbox = document.getElementById('{{ form.use_profile_cv.vars.id }}');
+        const cvUploadWrapper = document.getElementById('cv-upload-wrapper');
+        const cvFileInput = document.getElementById('{{ form.cv_file.vars.id }}');
+
+        if (!useProfileCvCheckbox || !cvUploadWrapper) {
+            return;
+        }
+
+        const updateCvUploadVisibility = function () {
+            const useProfileCv = useProfileCvCheckbox.checked;
+            cvUploadWrapper.classList.toggle('d-none', useProfileCv);
+
+            if (cvFileInput) {
+                cvFileInput.disabled = useProfileCv;
+            }
+        };
+
+        updateCvUploadVisibility();
+        useProfileCvCheckbox.addEventListener('change', updateCvUploadVisibility);
+    })();
+</script>
+{% endblock %}

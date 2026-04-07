@@ -49,7 +49,7 @@
             <div id="applicationCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Application Details' }}" data-action-primary-href="{{ role == 'recruiter' ? '#' : card.details_url }}" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : (card.can_withdraw ? 'Withdraw Application' : 'Cannot Withdraw') }}" data-action-secondary-href="{{ role == 'recruiter' ? '#' : (card.can_withdraw ? card.withdraw_url : '#') }}" data-action-secondary-disabled="{{ role == 'recruiter' ? '0' : (card.can_withdraw ? '0' : '1') }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : 'View Status Timeline' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Status: {{ card.meta }}||{{ card.title }}">
+                        <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Application Details' }}" data-action-primary-href="{{ role == 'recruiter' ? '#' : card.details_url }}" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : (card.can_withdraw ? 'Withdraw Application' : 'Cannot Withdraw') }}" data-action-secondary-href="{{ role == 'recruiter' ? '#' : (card.can_withdraw ? card.withdraw_url : '#') }}" data-action-secondary-disabled="{{ role == 'recruiter' ? '0' : (card.can_withdraw ? '0' : '1') }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : (card.can_edit ? 'Edit Application' : 'Cannot Edit') }}" data-action-tertiary-href="{{ role == 'recruiter' ? '#' : (card.can_edit ? card.edit_url : '#') }}" data-action-tertiary-disabled="{{ role == 'recruiter' ? '0' : (card.can_edit ? '0' : '1') }}" data-detail-extra="Status: {{ card.meta }}||{{ card.title }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
@@ -97,11 +97,18 @@
                     <div class="tb-interview-action-dock-inner">
                         <div class="small text-secondary">Selected application actions</div>
                         <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
-                            <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-edit me-1"></i>Primary Action</a>
-                            <form method="post" action="#" class="d-inline tb-dock-secondary-form">
-                                <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
-                            </form>
-                            <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
+                            <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-eye me-1"></i>Primary Action</a>
+                            {% if role == 'candidate' %}
+                                <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-edit me-1"></i>Tertiary Action</a>
+                                <form method="post" action="#" class="d-inline tb-dock-secondary-form">
+                                    <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
+                                </form>
+                            {% else %}
+                                <form method="post" action="#" class="d-inline tb-dock-secondary-form">
+                                    <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
+                                </form>
+                                <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
