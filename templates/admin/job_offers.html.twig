@@ -15,6 +15,106 @@
         </div>
     </div>
 
+    {% if offerStats is not null %}
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="card border">
+                    <div class="card-body">
+                        <div class="small text-secondary">Offres publiées</div>
+                        <div class="h3 mb-0">{{ offerStats.total_published }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border border-success">
+                    <div class="card-body">
+                        <div class="small text-secondary">Offres ouvertes</div>
+                        <div class="h3 mb-0">{{ offerStats.total_open }} <span class="small text-success">({{ offerStats.open_percentage }}%)</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border border-danger">
+                    <div class="card-body">
+                        <div class="small text-secondary">Offres fermées</div>
+                        <div class="h3 mb-0">{{ offerStats.total_closed }} <span class="small text-danger">({{ offerStats.closed_percentage }}%)</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-xl-7">
+                <div class="card border">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Répartition par ville (Ouvertes vs Fermées)</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm card-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Ville</th>
+                                    <th>Total</th>
+                                    <th>Ouvertes</th>
+                                    <th>Fermées</th>
+                                    <th>Taux ouvertes</th>
+                                    <th>Taux fermées</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for city in offerStats.city_stats %}
+                                    <tr>
+                                        <td>{{ city.city }}</td>
+                                        <td>{{ city.total }}</td>
+                                        <td>{{ city.open }}</td>
+                                        <td>{{ city.closed }}</td>
+                                        <td>{{ city.open_rate }}%</td>
+                                        <td>{{ city.closed_rate }}%</td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-secondary">Aucune donnée.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-xl-5">
+                <div class="card border">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Statistiques par type de contrat</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm card-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Total</th>
+                                    <th>Part</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contract in offerStats.contract_stats %}
+                                    <tr>
+                                        <td>{{ contract.contract_type }}</td>
+                                        <td>{{ contract.total }}</td>
+                                        <td>{{ contract.percentage }}%</td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="3" class="text-secondary">Aucune donnée.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
     <div class="card border mb-3">
         <div class="card-body d-flex flex-wrap gap-2 align-items-center" id="adminOfferMultiFilter">
             <input type="text" class="form-control" style="max-width: 180px;" placeholder="Location" id="adminFilterLocation">

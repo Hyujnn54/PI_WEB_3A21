@@ -41,6 +41,7 @@ class BackOfficeController extends AbstractController
         $offers = [];
         $expiredOffers = [];
         $now = new \DateTimeImmutable();
+        $offerStats = null;
 
         try {
             $connection->executeStatement(
@@ -80,6 +81,8 @@ class BackOfficeController extends AbstractController
                     // Ignore invalid dates in legacy rows.
                 }
             }
+
+            $offerStats = $this->buildOfferStats($offers);
         } catch (\Throwable $exception) {
             // Keep admin page available even if table/query is unavailable.
         }
@@ -88,6 +91,7 @@ class BackOfficeController extends AbstractController
             'authUser' => ['role' => 'admin'],
             'offers' => $offers,
             'expiredOffers' => $expiredOffers,
+            'offerStats' => $offerStats,
         ]);
     }
 
@@ -187,5 +191,86 @@ class BackOfficeController extends AbstractController
         }
 
         return $this->redirectToRoute('app_admin_job_offers');
+    }
+
+    private function buildOfferStats(array $offers): array
+    {
+        $totalPublished = count($offers);
+        $totalClosed = 0;
+        $totalOpen = 0;
+        $cityStats = [];
+        $contractStats = [];
+
+        foreach ($offers as $offer) {
+            $city = trim((string) ($offer['location'] ?? 'Unknown'));
+            if ($city === '') {
+                $city = 'Unknown';
+            }
+
+            $contractType = trim((string) ($offer['contract_type'] ?? 'Unknown'));
+            if ($contractType === '') {
+                $contractType = 'Unknown';
+            }
+
+            $status = strtolower(trim((string) ($offer['status'] ?? 'open')));
+            $isClosed = $status === 'closed';
+            $isOpen = $status === 'open';
+
+            if ($isClosed) {
+                $totalClosed += 1;
+            }
+            if ($isOpen) {
+                $totalOpen += 1;
+            }
+
+            if (!isset($cityStats[$city])) {
+                $cityStats[$city] = ['city' => $city, 'total' => 0, 'open' => 0, 'closed' => 0];
+            }
+            $cityStats[$city]['total'] += 1;
+            if ($isOpen) {
+                $cityStats[$city]['open'] += 1;
+            }
+            if ($isClosed) {
+                $cityStats[$city]['closed'] += 1;
+            }
+
+            if (!isset($contractStats[$contractType])) {
+                $contractStats[$contractType] = ['contract_type' => $contractType, 'total' => 0, 'open' => 0, 'closed' => 0];
+            }
+            $contractStats[$contractType]['total'] += 1;
+            if ($isOpen) {
+                $contractStats[$contractType]['open'] += 1;
+            }
+            if ($isClosed) {
+                $contractStats[$contractType]['closed'] += 1;
+            }
+        }
+
+        $closedPercentage = $totalPublished > 0 ? round(($totalClosed / $totalPublished) * 100, 2) : 0.0;
+        $openPercentage = $totalPublished > 0 ? round(($totalOpen / $totalPublished) * 100, 2) : 0.0;
+
+        $cityStatsList = array_values($cityStats);
+        foreach ($cityStatsList as &$row) {
+            $row['open_rate'] = $row['total'] > 0 ? round(($row['open'] / $row['total']) * 100, 2) : 0.0;
+            $row['closed_rate'] = $row['total'] > 0 ? round(($row['closed'] / $row['total']) * 100, 2) : 0.0;
+        }
+
+        $contractStatsList = array_values($contractStats);
+        foreach ($contractStatsList as &$row) {
+            $row['percentage'] = $totalPublished > 0 ? round(($row['total'] / $totalPublished) * 100, 2) : 0.0;
+        }
+
+        usort($cityStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+        usort($contractStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+
+        return [
+            'total_published' => $totalPublished,
+            'total_closed' => $totalClosed,
+            'total_open' => $totalOpen,
+            'closed_percentage' => $closedPercentage,
+            'open_percentage' => $openPercentage,
+            'city_stats' => $cityStatsList,
+            'contract_stats' => $contractStatsList,
+        ];
     }
 }

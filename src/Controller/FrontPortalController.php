@@ -23,6 +23,7 @@ class FrontPortalController extends AbstractController
         $warningStatuses = [];
         $expiredOffers = [];
         $now = new \DateTimeImmutable();
+        $offerStats = null;
 
         $cards = [
             ['id' => 1, 'meta' => 'Tunis | CDI | Open', 'title' => 'Frontend Engineer', 'text' => 'Build and iterate candidate-facing experiences with reusable UI modules.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Tunis', 'Status: Open', 'Deadline: 2026-05-20'], 'warning_status' => null, 'location' => 'Tunis', 'contract_type' => 'CDI', 'status' => 'open', 'deadline' => '2026-05-20'],
@@ -30,20 +31,31 @@ class FrontPortalController extends AbstractController
             ['id' => 3, 'meta' => 'Remote | Contract | Paused', 'title' => 'Recruitment Data Analyst', 'text' => 'Track funnel metrics and transform hiring data into useful insights.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: Contract', 'Location: Remote', 'Status: Paused', 'Deadline: 2026-05-25'], 'warning_status' => null, 'location' => 'Remote', 'contract_type' => 'Contract', 'status' => 'paused', 'deadline' => '2026-05-25'],
         ];
 
+        if ($role === 'recruiter') {
+            $cards = [];
+        }
+
         try {
             if ($role === 'recruiter') {
                 $connection->executeStatement(
-                    'UPDATE job_offer SET status = :closed_status WHERE deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
+                    'UPDATE job_offer SET status = :closed_status WHERE recruiter_id = :recruiter_id AND deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
                     [
+                        'recruiter_id' => self::STATIC_RECRUITER_ID,
                         'closed_status' => 'closed',
                         'now' => $now->format('Y-m-d H:i:s'),
                     ]
                 );
             }
 
-            $rows = $connection->fetchAllAssociative(
-                'SELECT id, recruiter_id, title, description, location, contract_type, status, deadline FROM job_offer ORDER BY created_at DESC LIMIT 25'
-            );
+            $rowsSql = 'SELECT id, recruiter_id, title, description, location, contract_type, status, deadline FROM job_offer';
+            $rowsParams = [];
+            if ($role === 'recruiter') {
+                $rowsSql .= ' WHERE recruiter_id = :recruiter_id';
+                $rowsParams['recruiter_id'] = self::STATIC_RECRUITER_ID;
+            }
+            $rowsSql .= ' ORDER BY created_at DESC LIMIT 25';
+
+            $rows = $connection->fetchAllAssociative($rowsSql, $rowsParams);
 
             $dbCards = array_map(function (array $row) use ($connection, $now): array {
                 $formattedDeadline = '';
@@ -147,11 +159,16 @@ class FrontPortalController extends AbstractController
             $card['warning_status'] = $warningStatuses[$card['id']] ?? null;
         }
 
+        if ($role === 'recruiter') {
+            $offerStats = $this->buildOfferStats($cards);
+        }
+
         return $this->render('front/modules/job_offers.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
             'warnings' => $warnings,
             'expiredOffers' => $expiredOffers,
+            'offerStats' => $offerStats,
         ]);
     }
 
@@ -451,5 +468,86 @@ class FrontPortalController extends AbstractController
         }
 
         return $skills;
+    }
+
+    private function buildOfferStats(array $offers): array
+    {
+        $totalPublished = count($offers);
+        $totalClosed = 0;
+        $totalOpen = 0;
+        $cityStats = [];
+        $contractStats = [];
+
+        foreach ($offers as $offer) {
+            $city = trim((string) ($offer['location'] ?? 'Unknown'));
+            if ($city === '') {
+                $city = 'Unknown';
+            }
+
+            $contractType = trim((string) ($offer['contract_type'] ?? 'Unknown'));
+            if ($contractType === '') {
+                $contractType = 'Unknown';
+            }
+
+            $status = strtolower(trim((string) ($offer['status'] ?? 'open')));
+            $isClosed = $status === 'closed';
+            $isOpen = $status === 'open';
+
+            if ($isClosed) {
+                $totalClosed += 1;
+            }
+            if ($isOpen) {
+                $totalOpen += 1;
+            }
+
+            if (!isset($cityStats[$city])) {
+                $cityStats[$city] = ['city' => $city, 'total' => 0, 'open' => 0, 'closed' => 0];
+            }
+            $cityStats[$city]['total'] += 1;
+            if ($isOpen) {
+                $cityStats[$city]['open'] += 1;
+            }
+            if ($isClosed) {
+                $cityStats[$city]['closed'] += 1;
+            }
+
+            if (!isset($contractStats[$contractType])) {
+                $contractStats[$contractType] = ['contract_type' => $contractType, 'total' => 0, 'open' => 0, 'closed' => 0];
+            }
+            $contractStats[$contractType]['total'] += 1;
+            if ($isOpen) {
+                $contractStats[$contractType]['open'] += 1;
+            }
+            if ($isClosed) {
+                $contractStats[$contractType]['closed'] += 1;
+            }
+        }
+
+        $closedPercentage = $totalPublished > 0 ? round(($totalClosed / $totalPublished) * 100, 2) : 0.0;
+        $openPercentage = $totalPublished > 0 ? round(($totalOpen / $totalPublished) * 100, 2) : 0.0;
+
+        $cityStatsList = array_values($cityStats);
+        foreach ($cityStatsList as &$row) {
+            $row['open_rate'] = $row['total'] > 0 ? round(($row['open'] / $row['total']) * 100, 2) : 0.0;
+            $row['closed_rate'] = $row['total'] > 0 ? round(($row['closed'] / $row['total']) * 100, 2) : 0.0;
+        }
+
+        $contractStatsList = array_values($contractStats);
+        foreach ($contractStatsList as &$row) {
+            $row['percentage'] = $totalPublished > 0 ? round(($row['total'] / $totalPublished) * 100, 2) : 0.0;
+        }
+
+        usort($cityStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+        usort($contractStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+
+        return [
+            'total_published' => $totalPublished,
+            'total_closed' => $totalClosed,
+            'total_open' => $totalOpen,
+            'closed_percentage' => $closedPercentage,
+            'open_percentage' => $openPercentage,
+            'city_stats' => $cityStatsList,
+            'contract_stats' => $contractStatsList,
+        ];
     }
 }
