@@ -2,6 +2,7 @@
 
 namespace App\Controller\Management\JobApplication;
 
+use App\Entity\Application_status_history;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use App\Entity\Candidate;
@@ -111,6 +112,10 @@ class CandidateApplicationController extends AbstractController
             $application->setCurrent_status('SUBMITTED');
             $application->setIs_archived(false);
 
+            $candidateName = $this->resolveCandidateDisplayName($candidate);
+            $applyNote = $candidateName . ' submitted a new application.';
+            $this->logStatusHistory($em, $application, $candidate, $applyNote);
+
             $em->persist($application);
             $em->flush();
 
@@ -182,10 +187,16 @@ class CandidateApplicationController extends AbstractController
             return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
         }
 
+        $historyEntries = $em->getRepository(Application_status_history::class)->findBy(
+            ['application_id' => $application],
+            ['changed_at' => 'DESC']
+        );
+
         return $this->render('management/job_application/details.html.twig', [
             'application' => $application,
             'offer' => $application->getOffer_id(),
             'candidate' => $candidate,
+            'historyEntries' => $historyEntries,
         ]);
     }
 
@@ -220,6 +231,9 @@ class CandidateApplicationController extends AbstractController
         }
 
         $form = $this->createForm(JobApplicationType::class, $application);
+        $originalPhone = (string) $application->getPhone();
+        $originalCoverLetter = (string) $application->getCover_letter();
+        $originalCvPath = (string) $application->getCv_path();
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -262,6 +276,26 @@ class CandidateApplicationController extends AbstractController
                 }
             }
 
+            $changes = [];
+            if ($originalPhone !== (string) $application->getPhone()) {
+                $changes[] = 'phone number';
+            }
+
+            if ($originalCoverLetter !== (string) $application->getCover_letter()) {
+                $changes[] = 'cover letter';
+            }
+
+            if ($originalCvPath !== (string) $application->getCv_path()) {
+                $changes[] = 'CV';
+            }
+
+            $candidateName = $this->resolveCandidateDisplayName($candidate);
+            $note = empty($changes)
+                ? $candidateName . ' updated the application.'
+                : $candidateName . ' updated the application: changed ' . implode(', ', $changes) . '.';
+
+            $this->logStatusHistory($em, $application, $candidate, $note);
+
             $em->flush();
             $this->addFlash('success', 'Application updated successfully.');
 
@@ -273,6 +307,39 @@ class CandidateApplicationController extends AbstractController
             'application' => $application,
             'offer' => $application->getOffer_id(),
         ]);
+    }
+
+    private function logStatusHistory(
+        EntityManagerInterface $em,
+        Job_application $application,
+        Candidate $candidate,
+        string $note
+    ): void {
+        $history = new Application_status_history();
+        $history->setApplication_id($application);
+        $history->setStatus((string) $application->getCurrent_status());
+        $history->setChanged_at(new \DateTime());
+
+        if (method_exists($candidate, 'getId') && $candidate->getId()) {
+            $history->setChanged_by($candidate->getId());
+        }
+
+        $history->setNote($note);
+        $em->persist($history);
+    }
+
+    private function resolveCandidateDisplayName(Candidate $candidate): string
+    {
+        if (!method_exists($candidate, 'getId') || !$candidate->getId()) {
+            return 'Candidate';
+        }
+
+        $user = $candidate->getId();
+        $firstName = method_exists($user, 'getFirst_name') ? (string) $user->getFirst_name() : '';
+        $lastName = method_exists($user, 'getLast_name') ? (string) $user->getLast_name() : '';
+        $fullName = trim($firstName . ' ' . $lastName);
+
+        return $fullName !== '' ? $fullName : 'Candidate';
     }
 }
 

@@ -11,6 +11,7 @@ class Application_status_history
 {
 
     #[ORM\Id]
+    #[ORM\GeneratedValue(strategy: "IDENTITY")]
     #[ORM\Column(type: "bigint")]
     private string $id;
 
