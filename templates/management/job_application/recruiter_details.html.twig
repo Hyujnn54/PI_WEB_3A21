@@ -112,11 +112,12 @@
                                                     <div class="fw-semibold">{{ entry.status }}</div>
                                                     <div class="text-secondary">{{ entry.note }}</div>
                                                     {% if editableHistoryIds[entry.id]|default(false) %}
-                                                        <form method="post" action="{{ path('app_recruiter_history_note_update', {'applicationId': application.id, 'historyId': entry.id}) }}" class="mt-2">
+                                                        <form method="post" action="{{ path('app_recruiter_history_note_update', {'applicationId': application.id, 'historyId': entry.id}) }}" class="mt-2 js-note-edit-form" novalidate>
                                                             <div class="input-group input-group-sm">
-                                                                <input type="text" name="note" class="form-control" value="{{ entry.note }}" maxlength="255" required>
+                                                                <input type="text" name="note" class="form-control js-note-input" value="{{ entry.note }}" maxlength="255">
                                                                 <button type="submit" class="btn btn-outline-primary">Update Note</button>
                                                             </div>
+                                                            <div class="invalid-feedback d-block js-note-error" style="display:none;"></div>
                                                         </form>
                                                     {% else %}
                                                         <div class="small text-muted mt-1">Not editable (auto-generated or created by another user)</div>
@@ -137,4 +138,45 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        const forms = document.querySelectorAll('.js-note-edit-form');
+        if (!forms.length) {
+            return;
+        }
+
+        forms.forEach(function (form) {
+            const input = form.querySelector('.js-note-input');
+            const error = form.querySelector('.js-note-error');
+            if (!input || !error) {
+                return;
+            }
+
+            const validate = function () {
+                const value = (input.value || '').trim();
+                if (value === '') {
+                    input.classList.add('is-invalid');
+                    error.textContent = 'Note cannot be empty.';
+                    error.style.display = 'block';
+                    return false;
+                }
+
+                input.classList.remove('is-invalid');
+                error.textContent = '';
+                error.style.display = 'none';
+                return true;
+            };
+
+            input.addEventListener('input', validate);
+            input.addEventListener('blur', validate);
+
+            form.addEventListener('submit', function (event) {
+                if (!validate()) {
+                    event.preventDefault();
+                }
+            });
+        });
+    })();
+</script>
 {% endblock %}
