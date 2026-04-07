@@ -49,17 +49,21 @@
             <div id="applicationCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Advance Stage' : 'Application Details' }}" data-action-primary-href="{{ role == 'recruiter' ? '#' : card.details_url }}" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : (card.can_withdraw ? 'Withdraw Application' : 'Cannot Withdraw') }}" data-action-secondary-href="{{ role == 'recruiter' ? '#' : (card.can_withdraw ? card.withdraw_url : '#') }}" data-action-secondary-disabled="{{ role == 'recruiter' ? '0' : (card.can_withdraw ? '0' : '1') }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : (card.can_edit ? 'Edit Application' : 'Cannot Edit') }}" data-action-tertiary-href="{{ role == 'recruiter' ? '#' : (card.can_edit ? card.edit_url : '#') }}" data-action-tertiary-disabled="{{ role == 'recruiter' ? '0' : (card.can_edit ? '0' : '1') }}" data-detail-extra="Status: {{ card.meta }}||{{ card.title }}">
+                        <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Review Application' : 'Application Details' }}" data-action-primary-href="{{ role == 'recruiter' ? card.details_url : card.details_url }}" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : (card.can_withdraw ? 'Withdraw Application' : 'Cannot Withdraw') }}" data-action-secondary-href="{{ role == 'recruiter' ? '#' : (card.can_withdraw ? card.withdraw_url : '#') }}" data-action-secondary-disabled="{{ role == 'recruiter' ? '0' : (card.can_withdraw ? '0' : '1') }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : (card.can_edit ? 'Edit Application' : 'Cannot Edit') }}" data-action-tertiary-href="{{ role == 'recruiter' ? '#' : (card.can_edit ? card.edit_url : '#') }}" data-action-tertiary-disabled="{{ role == 'recruiter' ? '0' : (card.can_edit ? '0' : '1') }}" data-detail-extra="Status: {{ card.meta }}||{{ card.title }}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
                             {% if role == 'recruiter' %}
                                 <div class="d-flex flex-wrap gap-2 mt-3">
-                                    <form method="post" action="{{ card.accept_url|default('#') }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-success">Accept</button>
+                                    <form method="post" action="{{ card.shortlist_url|default('#') }}">
+                                        <input type="hidden" name="status" value="SHORTLISTED">
+                                        <input type="hidden" name="return_to" value="list">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Shortlist</button>
                                     </form>
-                                    <form method="post" action="{{ card.decline_url|default('#') }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Decline</button>
+                                    <form method="post" action="{{ card.reject_url|default('#') }}">
+                                        <input type="hidden" name="status" value="REJECTED">
+                                        <input type="hidden" name="return_to" value="list">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Reject</button>
                                     </form>
                                     <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal" data-application-id="{{ card.id|default(0) }}" data-create-url="{{ card.create_interview_url|default('#') }}">Create Interview</button>
                                 </div>

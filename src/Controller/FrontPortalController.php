@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Candidate;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
+use App\Entity\Recruiter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -58,39 +59,80 @@ class FrontPortalController extends AbstractController
     public function jobApplications(Request $request, EntityManagerInterface $em): Response
     {
         $role = (string) $request->query->get('role', 'candidate');
-        $candidateId = 3;
         $cards = [];
 
-        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
-        if ($candidate) {
-            $applications = $em->getRepository(Job_application::class)->findBy(
-                ['candidate_id' => $candidate],
-                ['applied_at' => 'DESC']
-            );
+        if ($role === 'recruiter') {
+            $recruiterId = 4;
+            $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
 
-            foreach ($applications as $application) {
-                $offer = $application->getOffer_id();
-                $offerTitle = $offer ? $offer->getTitle() : 'Unknown Offer';
-                $status = $application->getCurrent_status();
-                $appliedAt = $application->getApplied_at();
-                $canWithdraw = strtoupper(trim((string) $status)) === 'SUBMITTED';
-                $canEdit = strtoupper(trim((string) $status)) === 'SUBMITTED';
+            if ($recruiter) {
+                $ownedOffers = $em->getRepository(Job_offer::class)->findBy(['recruiter_id' => $recruiter]);
+                if (!empty($ownedOffers)) {
+                    $applications = $em->getRepository(Job_application::class)->findBy(
+                        ['offer_id' => $ownedOffers],
+                        ['applied_at' => 'DESC']
+                    );
 
-                $cards[] = [
-                    'id' => $application->getId(),
-                    'meta' => $status,
-                    'title' => 'Offer: ' . $offerTitle,
-                    'text' => 'Applied on ' . $appliedAt->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
-                    'details_url' => $this->generateUrl('app_candidate_application_details', ['applicationId' => $application->getId()]),
-                    'can_edit' => $canEdit,
-                    'edit_url' => $canEdit
-                        ? $this->generateUrl('app_candidate_application_edit', ['applicationId' => $application->getId()])
-                        : '#',
-                    'can_withdraw' => $canWithdraw,
-                    'withdraw_url' => $canWithdraw
-                        ? $this->generateUrl('app_candidate_application_withdraw', ['applicationId' => $application->getId()])
-                        : '#',
-                ];
+                    foreach ($applications as $application) {
+                        $offer = $application->getOffer_id();
+                        $candidate = $application->getCandidate_id();
+                        $candidateUser = $candidate ? $candidate->getId() : null;
+                        $candidateName = 'Candidate';
+
+                        if ($candidateUser) {
+                            $firstName = method_exists($candidateUser, 'getFirst_name') ? (string) $candidateUser->getFirst_name() : '';
+                            $lastName = method_exists($candidateUser, 'getLast_name') ? (string) $candidateUser->getLast_name() : '';
+                            $fullName = trim($firstName . ' ' . $lastName);
+                            if ($fullName !== '') {
+                                $candidateName = $fullName;
+                            }
+                        }
+
+                        $cards[] = [
+                            'id' => $application->getId(),
+                            'meta' => (string) $application->getCurrent_status(),
+                            'title' => 'Offer: ' . ($offer ? $offer->getTitle() : 'Unknown Offer'),
+                            'text' => $candidateName . ' | Applied on ' . $application->getApplied_at()->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
+                            'details_url' => $this->generateUrl('app_recruiter_application_details', ['applicationId' => $application->getId()]),
+                            'shortlist_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
+                            'reject_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
+                        ];
+                    }
+                }
+            }
+        } else {
+            $candidateId = 3;
+            $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+            if ($candidate) {
+                $applications = $em->getRepository(Job_application::class)->findBy(
+                    ['candidate_id' => $candidate],
+                    ['applied_at' => 'DESC']
+                );
+
+                foreach ($applications as $application) {
+                    $offer = $application->getOffer_id();
+                    $offerTitle = $offer ? $offer->getTitle() : 'Unknown Offer';
+                    $status = $application->getCurrent_status();
+                    $appliedAt = $application->getApplied_at();
+                    $canWithdraw = strtoupper(trim((string) $status)) === 'SUBMITTED';
+                    $canEdit = strtoupper(trim((string) $status)) === 'SUBMITTED';
+
+                    $cards[] = [
+                        'id' => $application->getId(),
+                        'meta' => $status,
+                        'title' => 'Offer: ' . $offerTitle,
+                        'text' => 'Applied on ' . $appliedAt->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
+                        'details_url' => $this->generateUrl('app_candidate_application_details', ['applicationId' => $application->getId()]),
+                        'can_edit' => $canEdit,
+                        'edit_url' => $canEdit
+                            ? $this->generateUrl('app_candidate_application_edit', ['applicationId' => $application->getId()])
+                            : '#',
+                        'can_withdraw' => $canWithdraw,
+                        'withdraw_url' => $canWithdraw
+                            ? $this->generateUrl('app_candidate_application_withdraw', ['applicationId' => $application->getId()])
+                            : '#',
+                    ];
+                }
             }
         }
 

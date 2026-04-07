@@ -31,7 +31,7 @@
         {% set currentRole = queryRole in ['candidate', 'recruiter'] ? queryRole : 'candidate' %}
         {% set routeName = app.request.attributes.get('_route') %}
         {% set isAdminPage = routeName starts with 'management_' or routeName == 'back_dashboard' or routeName starts with 'app_admin' %}
-        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status', 'app_candidate_apply', 'app_candidate_application_details', 'app_candidate_application_edit'] %}
+        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status', 'app_candidate_apply', 'app_candidate_application_details', 'app_candidate_application_edit', 'app_recruiter_application_details'] %}
         {% set roleSwitchRoute = routeName in unsafeRoleRoutes ? 'front_interviews' : routeName %}
         <div class="page tb-page-shell">
             {% if not isAdminPage %}
