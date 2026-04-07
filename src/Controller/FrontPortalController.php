@@ -55,14 +55,39 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/job-applications', name: 'front_job_applications')]
-    public function jobApplications(Request $request): Response
+    public function jobApplications(Request $request, EntityManagerInterface $em): Response
     {
         $role = (string) $request->query->get('role', 'candidate');
-        $cards = [
-            ['meta' => 'Application #1021 | Under Review', 'title' => 'Offer: Frontend Engineer', 'text' => 'Your profile passed initial screening and is awaiting recruiter feedback.'],
-            ['meta' => 'Application #1022 | Interview Scheduled', 'title' => 'Offer: Symfony Backend Developer', 'text' => 'Technical interview is planned and pending confirmation details.'],
-            ['meta' => 'Application #1023 | Accepted', 'title' => 'Offer: QA Engineer', 'text' => 'Your application has been approved and onboarding steps are prepared.'],
-        ];
+        $candidateId = 3;
+        $cards = [];
+
+        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        if ($candidate) {
+            $applications = $em->getRepository(Job_application::class)->findBy(
+                ['candidate_id' => $candidate],
+                ['applied_at' => 'DESC']
+            );
+
+            foreach ($applications as $application) {
+                $offer = $application->getOffer_id();
+                $offerTitle = $offer ? $offer->getTitle() : 'Unknown Offer';
+                $status = $application->getCurrent_status();
+                $appliedAt = $application->getApplied_at();
+                $canWithdraw = strtoupper(trim((string) $status)) === 'SUBMITTED';
+
+                $cards[] = [
+                    'id' => $application->getId(),
+                    'meta' => $status,
+                    'title' => 'Offer: ' . $offerTitle,
+                    'text' => 'Applied on ' . $appliedAt->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
+                    'details_url' => $this->generateUrl('app_candidate_application_details', ['applicationId' => $application->getId()]),
+                    'can_withdraw' => $canWithdraw,
+                    'withdraw_url' => $canWithdraw
+                        ? $this->generateUrl('app_candidate_application_withdraw', ['applicationId' => $application->getId()])
+                        : '#',
+                ];
+            }
+        }
 
         return $this->render('front/modules/job_applications.html.twig', [
             'authUser' => ['role' => $role],

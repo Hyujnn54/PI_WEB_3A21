@@ -124,5 +124,69 @@ class CandidateApplicationController extends AbstractController
         ]);
 
     }
+
+    #[Route('/applicationmanagement/candidate/applications/{applicationId}/withdraw', name: 'app_candidate_application_withdraw', methods: ['POST'])]
+    public function withdraw(
+        int $applicationId,
+        EntityManagerInterface $em
+    ): Response {
+        $candidateId = 3;
+
+        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        if (!$candidate) {
+            $this->addFlash('error', 'Candidate not found.');
+
+            return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
+        }
+
+        $application = $em->getRepository(Job_application::class)->find($applicationId);
+        if (!$application || $application->getCandidate_id() !== $candidate) {
+            $this->addFlash('error', 'Application not found.');
+
+            return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
+        }
+
+        $status = strtoupper(trim((string) $application->getCurrent_status()));
+        if ($status !== 'SUBMITTED') {
+            $this->addFlash('warning', 'Only applications with SUBMITTED status can be withdrawn.');
+
+            return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
+        }
+
+        $em->remove($application);
+        $em->flush();
+
+        $this->addFlash('success', 'Application withdrawn successfully.');
+
+        return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
+    }
+
+    #[Route('/applicationmanagement/candidate/applications/{applicationId}/details', name: 'app_candidate_application_details')]
+    public function details(
+        int $applicationId,
+        EntityManagerInterface $em
+    ): Response {
+        $candidateId = 3;
+
+        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        if (!$candidate) {
+            $this->addFlash('error', 'Candidate not found.');
+
+            return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
+        }
+
+        $application = $em->getRepository(Job_application::class)->find($applicationId);
+        if (!$application || $application->getCandidate_id() !== $candidate) {
+            $this->addFlash('error', 'Application not found.');
+
+            return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
+        }
+
+        return $this->render('management/job_application/details.html.twig', [
+            'application' => $application,
+            'offer' => $application->getOffer_id(),
+            'candidate' => $candidate,
+        ]);
+    }
 }
 
