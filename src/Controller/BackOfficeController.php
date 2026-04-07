@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -28,6 +29,25 @@ class BackOfficeController extends AbstractController
     {
         return $this->render('admin/add_user.html.twig', [
             'authUser' => ['role' => 'admin'],
+        ]);
+    }
+
+    #[Route('/admin/job-offers', name: 'app_admin_job_offers')]
+    public function jobOffers(Connection $connection): Response
+    {
+        $offers = [];
+
+        try {
+            $offers = $connection->fetchAllAssociative(
+                'SELECT id, recruiter_id, title, location, contract_type, status, created_at, deadline FROM job_offer ORDER BY created_at DESC'
+            );
+        } catch (\Throwable $exception) {
+            // Keep admin page available even if table/query is unavailable.
+        }
+
+        return $this->render('admin/job_offers.html.twig', [
+            'authUser' => ['role' => 'admin'],
+            'offers' => $offers,
         ]);
     }
 }

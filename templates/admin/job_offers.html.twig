@@ -1,0 +1,54 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Talent Bridge | Admin Job Offers{% endblock %}
+
+{% block admin_content %}
+    <div class="row mb-4 align-items-center">
+        <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h1 class="h3 mb-1">All Job Offers</h1>
+                <p class="mb-0 text-muted">Admin view of all published offers.</p>
+            </div>
+            <a href="{{ path('app_admin') }}" class="btn btn-outline-primary">
+                <i class="ti ti-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="card border">
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Recruiter ID</th>
+                        <th>Location</th>
+                        <th>Contract</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Deadline</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for offer in offers %}
+                    <tr>
+                        <td>#{{ offer.id }}</td>
+                        <td>{{ offer.title }}</td>
+                        <td>{{ offer.recruiter_id }}</td>
+                        <td>{{ offer.location }}</td>
+                        <td>{{ offer.contract_type }}</td>
+                        <td>{{ offer.status }}</td>
+                        <td>{{ offer.created_at ? offer.created_at|date('Y-m-d H:i') : '-' }}</td>
+                        <td>{{ offer.deadline ? offer.deadline|date('Y-m-d H:i') : '-' }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="text-secondary">No job offers found.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

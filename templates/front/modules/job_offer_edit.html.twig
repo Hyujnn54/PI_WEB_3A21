@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Talent Bridge | Create Job Offer{% endblock %}
+{% block title %}Talent Bridge | Edit Job Offer{% endblock %}
 
 {% block body %}
 {% set role = authUser.role|default('candidate') %}
@@ -8,8 +8,8 @@
     <div class="page-header d-print-none">
         <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h2 class="page-title"><i class="ti ti-briefcase-2 me-1"></i>Create Job Offer</h2>
-                <p class="text-secondary mb-0">Recruiter ID is fixed in the backend for now.</p>
+                <h2 class="page-title"><i class="ti ti-edit me-1"></i>Edit Job Offer</h2>
+                <p class="text-secondary mb-0">You can update only your own offers.</p>
             </div>
             <a href="{{ path('front_job_offers', {role: role}) }}" class="btn btn-outline-primary">Back to Offers</a>
         </div>
@@ -22,7 +22,7 @@
                     <form method="post" class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Title</label>
-                            <input type="text" name="title" class="form-control" required>
+                            <input type="text" name="title" class="form-control" value="{{ offer.title|default('') }}" required>
                         </div>
 
                         <div class="col-md-6">
@@ -30,7 +30,7 @@
                             <select name="contract_type" class="form-select" required>
                                 <option value="">Choose contract type</option>
                                 {% for contractType in contractTypes %}
-                                    <option value="{{ contractType }}">{{ contractType }}</option>
+                                    <option value="{{ contractType }}" {{ offer.contract_type|default('') == contractType ? 'selected' : '' }}>{{ contractType }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -38,54 +38,77 @@
                         <div class="col-12">
                             <label class="form-label d-block">Required Skills</label>
                             <div id="skillsContainer" class="d-flex flex-column gap-2">
-                                <div class="row g-2 skill-row">
-                                    <div class="col-md-6">
-                                        <input type="text" name="skills[0][name]" class="form-control" placeholder="e.g. Symfony" required>
+                                {% for skill in skills|default([]) %}
+                                    <div class="row g-2 skill-row">
+                                        <div class="col-md-6">
+                                            <input type="text" name="skills[{{ loop.index0 }}][name]" class="form-control" value="{{ skill.skill_name|default('') }}" placeholder="e.g. Symfony" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <select name="skills[{{ loop.index0 }}][level]" class="form-select" required>
+                                                <option value="">Choose skill level</option>
+                                                {% for skillLevel in skillLevels %}
+                                                    <option value="{{ skillLevel }}" {{ skill.level_required|default('') == skillLevel ? 'selected' : '' }}>{{ skillLevel|capitalize }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="button" class="btn btn-outline-danger w-100 remove-skill-btn">Remove</button>
+                                        </div>
                                     </div>
-                                    <div class="col-md-4">
-                                        <select name="skills[0][level]" class="form-select" required>
-                                            <option value="">Choose skill level</option>
-                                            {% for skillLevel in skillLevels %}
-                                                <option value="{{ skillLevel }}">{{ skillLevel|capitalize }}</option>
-                                            {% endfor %}
-                                        </select>
+                                {% else %}
+                                    <div class="row g-2 skill-row">
+                                        <div class="col-md-6">
+                                            <input type="text" name="skills[0][name]" class="form-control" placeholder="e.g. Symfony" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <select name="skills[0][level]" class="form-select" required>
+                                                <option value="">Choose skill level</option>
+                                                {% for skillLevel in skillLevels %}
+                                                    <option value="{{ skillLevel }}">{{ skillLevel|capitalize }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="button" class="btn btn-outline-danger w-100 remove-skill-btn" disabled>Remove</button>
+                                        </div>
                                     </div>
-                                    <div class="col-md-2">
-                                        <button type="button" class="btn btn-outline-danger w-100 remove-skill-btn" disabled>Remove</button>
-                                    </div>
-                                </div>
+                                {% endfor %}
                             </div>
                             <button type="button" id="addSkillBtn" class="btn btn-outline-primary btn-sm mt-2">Add Skill</button>
                         </div>
 
                         <div class="col-12">
                             <label class="form-label">Description</label>
-                            <textarea name="description" class="form-control" rows="4" required></textarea>
+                            <textarea name="description" class="form-control" rows="4" required>{{ offer.description|default('') }}</textarea>
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label">Location</label>
-                            <input type="text" name="location" class="form-control" required>
+                            <input type="text" name="location" class="form-control" value="{{ offer.location|default('') }}" required>
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label">Deadline</label>
-                            <input type="datetime-local" name="deadline" class="form-control" required>
+                            {% set deadlineValue = offer.deadline|default('') %}
+                            {% if deadlineValue and (' ' in deadlineValue) %}
+                                {% set deadlineValue = deadlineValue|replace({' ': 'T'})|slice(0, 16) %}
+                            {% endif %}
+                            <input type="datetime-local" name="deadline" class="form-control" value="{{ deadlineValue }}" required>
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label">Latitude (optional)</label>
-                            <input type="number" step="0.000001" name="latitude" class="form-control" value="0">
+                            <input type="number" step="0.000001" name="latitude" class="form-control" value="{{ offer.latitude|default('0') }}">
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label">Longitude (optional)</label>
-                            <input type="number" step="0.000001" name="longitude" class="form-control" value="0">
+                            <input type="number" step="0.000001" name="longitude" class="form-control" value="{{ offer.longitude|default('0') }}">
                         </div>
 
                         <div class="col-12 d-flex justify-content-end gap-2">
                             <a href="{{ path('front_job_offers', {role: role}) }}" class="btn btn-outline-secondary">Cancel</a>
-                            <button type="submit" class="btn btn-primary">Create Offer</button>
+                            <button type="submit" class="btn btn-primary">Update Offer</button>
                         </div>
                     </form>
                 </div>

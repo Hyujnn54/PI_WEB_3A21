@@ -11,6 +11,8 @@ use Symfony\Component\Routing\Attribute\Route;
 class FrontPortalController extends AbstractController
 {
     private const STATIC_RECRUITER_ID = '1';
+    private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
+    private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
 
     #[Route('/front/job-offers', name: 'front_job_offers')]
     public function jobOffers(Request $request, Connection $connection): Response
@@ -28,13 +30,36 @@ class FrontPortalController extends AbstractController
                 'SELECT id, recruiter_id, title, description, location, contract_type FROM job_offer ORDER BY created_at DESC LIMIT 25'
             );
 
-            $dbCards = array_map(function (array $row): array {
+            $dbCards = array_map(function (array $row) use ($connection): array {
+                $skills = $connection->fetchAllAssociative(
+                    'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
+                    ['offer_id' => (string) $row['id']]
+                );
+
+                $detailExtra = [
+                    'Type: ' . (string) $row['contract_type'],
+                    'Location: ' . (string) $row['location'],
+                ];
+
+                if (count($skills) > 0) {
+                    foreach ($skills as $skill) {
+                        $detailExtra[] = sprintf(
+                            'Skill: %s (%s)',
+                            (string) $skill['skill_name'],
+                            ucfirst((string) $skill['level_required'])
+                        );
+                    }
+                } else {
+                    $detailExtra[] = 'Skills: Not specified';
+                }
+
                 return [
                     'id' => (string) $row['id'],
                     'meta' => sprintf('%s | %s', (string) $row['location'], (string) $row['contract_type']),
                     'title' => (string) $row['title'],
                     'text' => (string) $row['description'],
                     'can_delete' => (string) $row['recruiter_id'] === self::STATIC_RECRUITER_ID,
+                    'detail_extra' => $detailExtra,
                 ];
             }, $rows);
 
@@ -64,9 +89,12 @@ class FrontPortalController extends AbstractController
             $location = trim((string) $request->request->get('location', ''));
             $contractType = trim((string) $request->request->get('contract_type', ''));
             $deadlineInput = trim((string) $request->request->get('deadline', ''));
+            $skills = $this->normalizeSkills((array) $request->request->all('skills'));
 
-            if ($title === '' || $description === '' || $location === '' || $contractType === '' || $deadlineInput === '') {
+            if ($title === '' || $description === '' || $location === '' || $contractType === '' || $deadlineInput === '' || count($skills) === 0) {
                 $this->addFlash('error', 'Please fill in all required fields.');
+            } elseif (!in_array($contractType, self::CONTRACT_TYPES, true)) {
+                $this->addFlash('error', 'Please select a valid contract type.');
             } else {
                 $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $deadlineInput);
                 if (!$deadline) {
@@ -74,8 +102,9 @@ class FrontPortalController extends AbstractController
                 } else {
                     $now = new \DateTimeImmutable();
                     $newId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
-
                     try {
+                        $connection->beginTransaction();
+
                         $connection->insert('job_offer', [
                             'id' => $newId,
                             'recruiter_id' => self::STATIC_RECRUITER_ID,
@@ -94,10 +123,24 @@ class FrontPortalController extends AbstractController
                             'flagged_at' => $now->format('Y-m-d H:i:s'),
                         ]);
 
+                        foreach ($skills as $skill) {
+                            $connection->insert('offer_skill', [
+                                'id' => (string) ((int) round(microtime(true) * 1000) . random_int(100, 999)),
+                                'offer_id' => $newId,
+                                'skill_name' => $skill['name'],
+                                'level_required' => $skill['level'],
+                            ]);
+                        }
+
+                        $connection->commit();
+
                         $this->addFlash('success', 'Job offer created successfully.');
                         return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
                     } catch (\Throwable $exception) {
-                        $this->addFlash('error', 'Failed to create job offer. Check DB constraints for recruiter_id.');
+                        if ($connection->isTransactionActive()) {
+                            $connection->rollBack();
+                        }
+                        $this->addFlash('error', 'Failed to create job offer. Check DB constraints for recruiter_id and offer_skill.');
                     }
                 }
             }
@@ -105,7 +148,111 @@ class FrontPortalController extends AbstractController
 
         return $this->render('front/modules/job_offer_new.html.twig', [
             'authUser' => ['role' => $role],
-            'contractTypes' => ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'],
+            'contractTypes' => self::CONTRACT_TYPES,
+            'skillLevels' => self::SKILL_LEVELS,
+        ]);
+    }
+
+    #[Route('/front/job-offers/{id}/edit', name: 'front_job_offer_edit', requirements: ['id' => '\\d+'], methods: ['GET', 'POST'])]
+    public function editJobOffer(string $id, Request $request, Connection $connection): Response
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ($role !== 'recruiter') {
+            $this->addFlash('error', 'Only recruiters can update job offers.');
+            return $this->redirectToRoute('front_job_offers', ['role' => $role]);
+        }
+
+        $offer = $connection->fetchAssociative(
+            'SELECT id, recruiter_id, title, description, location, latitude, longitude, contract_type, deadline FROM job_offer WHERE id = :id AND recruiter_id = :recruiter_id LIMIT 1',
+            [
+                'id' => $id,
+                'recruiter_id' => self::STATIC_RECRUITER_ID,
+            ]
+        );
+        $skills = $connection->fetchAllAssociative(
+            'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
+            ['offer_id' => $id]
+        );
+
+        if (!$offer) {
+            $this->addFlash('error', 'You can update only job offers created by you.');
+            return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
+        }
+
+        if ($request->isMethod('POST')) {
+            $title = trim((string) $request->request->get('title', ''));
+            $description = trim((string) $request->request->get('description', ''));
+            $location = trim((string) $request->request->get('location', ''));
+            $contractType = trim((string) $request->request->get('contract_type', ''));
+            $deadlineInput = trim((string) $request->request->get('deadline', ''));
+            $skills = $this->normalizeSkills((array) $request->request->all('skills'));
+
+            if ($title === '' || $description === '' || $location === '' || $contractType === '' || $deadlineInput === '' || count($skills) === 0) {
+                $this->addFlash('error', 'Please fill in all required fields.');
+            } elseif (!in_array($contractType, self::CONTRACT_TYPES, true)) {
+                $this->addFlash('error', 'Please select a valid contract type.');
+            } else {
+                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $deadlineInput);
+                if (!$deadline) {
+                    $this->addFlash('error', 'Invalid deadline format.');
+                } else {
+                    try {
+                        $connection->beginTransaction();
+
+                        $connection->update('job_offer', [
+                            'title' => $title,
+                            'description' => $description,
+                            'location' => $location,
+                            'contract_type' => $contractType,
+                            'deadline' => $deadline->format('Y-m-d H:i:s'),
+                            'latitude' => (float) $request->request->get('latitude', 0),
+                            'longitude' => (float) $request->request->get('longitude', 0),
+                        ], [
+                            'id' => $id,
+                            'recruiter_id' => self::STATIC_RECRUITER_ID,
+                        ]);
+
+                        $connection->delete('offer_skill', ['offer_id' => $id]);
+                        foreach ($skills as $skill) {
+                            $connection->insert('offer_skill', [
+                                'id' => (string) ((int) round(microtime(true) * 1000) . random_int(100, 999)),
+                                'offer_id' => $id,
+                                'skill_name' => $skill['name'],
+                                'level_required' => $skill['level'],
+                            ]);
+                        }
+
+                        $connection->commit();
+
+                        $this->addFlash('success', 'Job offer updated successfully.');
+                        return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
+                    } catch (\Throwable $exception) {
+                        if ($connection->isTransactionActive()) {
+                            $connection->rollBack();
+                        }
+                        $this->addFlash('error', 'Unable to update this job offer.');
+                    }
+                }
+            }
+
+            $offer = [
+                'id' => $id,
+                'title' => $title,
+                'description' => $description,
+                'location' => $location,
+                'contract_type' => $contractType,
+                'deadline' => $deadlineInput,
+                'latitude' => (string) $request->request->get('latitude', '0'),
+                'longitude' => (string) $request->request->get('longitude', '0'),
+            ];
+        }
+
+        return $this->render('front/modules/job_offer_edit.html.twig', [
+            'authUser' => ['role' => $role],
+            'offer' => $offer,
+            'skills' => $skills,
+            'contractTypes' => self::CONTRACT_TYPES,
+            'skillLevels' => self::SKILL_LEVELS,
         ]);
     }
 
@@ -182,5 +329,26 @@ class FrontPortalController extends AbstractController
             'authUser' => ['role' => $role],
             'cards' => $cards,
         ]);
+    }
+
+    private function normalizeSkills(array $rawSkills): array
+    {
+        $skills = [];
+
+        foreach ($rawSkills as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $name = trim((string) ($entry['name'] ?? ''));
+            $level = trim((string) ($entry['level'] ?? ''));
+            if ($name === '' || !in_array($level, self::SKILL_LEVELS, true)) {
+                continue;
+            }
+
+            $skills[] = ['name' => $name, 'level' => $level];
+        }
+
+        return $skills;
     }
 }
