@@ -8,6 +8,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[Route('/offermanagement')]
 class BackOfficeController extends AbstractController
 {
     private const STATIC_ADMIN_ID = '1';
@@ -44,43 +45,9 @@ class BackOfficeController extends AbstractController
         $offerStats = null;
 
         try {
-            $connection->executeStatement(
-                'UPDATE job_offer SET status = :closed_status WHERE deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
-                [
-                    'closed_status' => 'closed',
-                    'now' => $now->format('Y-m-d H:i:s'),
-                ]
-            );
-
-            $offers = $connection->fetchAllAssociative(
-                'SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
-                        COALESCE(jw.status, NULL) AS warning_status,
-                        jw.reason AS warning_reason,
-                        jw.edited_at AS warning_edited_at
-                 FROM job_offer jo
-                 LEFT JOIN (
-                     SELECT w1.job_offer_id, w1.status, w1.reason, w1.edited_at, w1.created_at
-                     FROM job_offer_warning w1
-                     WHERE w1.status IN ("SENT", "RESOLVED")
-                     ORDER BY w1.created_at DESC
-                 ) jw ON jw.job_offer_id = jo.id
-                 ORDER BY jo.created_at DESC'
-            );
-
-            foreach ($offers as $offer) {
-                if (empty($offer['deadline'])) {
-                    continue;
-                }
-
-                try {
-                    $deadlineAt = new \DateTimeImmutable((string) $offer['deadline']);
-                    if ($deadlineAt < $now) {
-                        $expiredOffers[] = $offer;
-                    }
-                } catch (\Throwable $exception) {
-                    // Ignore invalid dates in legacy rows.
-                }
-            }
+            $this->closeExpiredOffers($connection, $now);
+            $offers = $this->fetchAdminOffers($connection);
+            $expiredOffers = $this->extractExpiredOffers($offers, $now);
 
             $offerStats = $this->buildOfferStats($offers);
         } catch (\Throwable $exception) {
@@ -191,6 +158,64 @@ class BackOfficeController extends AbstractController
         }
 
         return $this->redirectToRoute('app_admin_job_offers');
+    }
+
+    private function closeExpiredOffers(Connection $connection, \DateTimeImmutable $now): void
+    {
+        $connection->executeStatement(
+            'UPDATE job_offer SET status = :closed_status WHERE deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
+            [
+                'closed_status' => 'closed',
+                'now' => $now->format('Y-m-d H:i:s'),
+            ]
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchAdminOffers(Connection $connection): array
+    {
+        return $connection->fetchAllAssociative(
+            'SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
+                    COALESCE(jw.status, NULL) AS warning_status,
+                    jw.reason AS warning_reason,
+                    jw.edited_at AS warning_edited_at
+             FROM job_offer jo
+             LEFT JOIN (
+                 SELECT w1.job_offer_id, w1.status, w1.reason, w1.edited_at, w1.created_at
+                 FROM job_offer_warning w1
+                 WHERE w1.status IN ("SENT", "RESOLVED")
+                 ORDER BY w1.created_at DESC
+             ) jw ON jw.job_offer_id = jo.id
+             ORDER BY jo.created_at DESC'
+        );
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $offers
+     * @return array<int, array<string, mixed>>
+     */
+    private function extractExpiredOffers(array $offers, \DateTimeImmutable $now): array
+    {
+        $expiredOffers = [];
+
+        foreach ($offers as $offer) {
+            if (empty($offer['deadline'])) {
+                continue;
+            }
+
+            try {
+                $deadlineAt = new \DateTimeImmutable((string) $offer['deadline']);
+                if ($deadlineAt < $now) {
+                    $expiredOffers[] = $offer;
+                }
+            } catch (\Throwable $exception) {
+                // Ignore invalid dates in legacy rows.
+            }
+        }
+
+        return $expiredOffers;
     }
 
     private function buildOfferStats(array $offers): array

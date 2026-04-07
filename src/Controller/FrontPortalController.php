@@ -8,6 +8,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[Route('/offermanagement')]
 class FrontPortalController extends AbstractController
 {
     private const STATIC_RECRUITER_ID = '1';
@@ -166,6 +167,7 @@ class FrontPortalController extends AbstractController
         return $this->render('front/modules/job_offers.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
+            'contractTypes' => self::CONTRACT_TYPES,
             'warnings' => $warnings,
             'expiredOffers' => $expiredOffers,
             'offerStats' => $offerStats,

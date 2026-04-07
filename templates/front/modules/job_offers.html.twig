@@ -216,7 +216,12 @@
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap align-items-center gap-2" id="offerMultiFilter">
                         <input type="text" class="form-control" style="max-width: 190px;" placeholder="Location" id="filterLocation">
-                        <input type="text" class="form-control" style="max-width: 190px;" placeholder="Contract type" id="filterContractType">
+                        <select class="form-select" style="max-width: 190px;" id="filterContractType">
+                            <option value="">All contract types</option>
+                            {% for contractType in contractTypes|default([]) %}
+                                <option value="{{ contractType }}">{{ contractType }}</option>
+                            {% endfor %}
+                        </select>
                         <select class="form-select" style="max-width: 170px;" id="filterStatus">
                             <option value="">All status</option>
                             <option value="open">Open</option>
