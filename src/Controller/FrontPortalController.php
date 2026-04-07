@@ -6,6 +6,8 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Doctrine\ORM\EntityManagerInterface;
+use App\Entity\Recruitment_event;
 
 class FrontPortalController extends AbstractController
 {
@@ -42,14 +44,22 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/events', name: 'front_events')]
-    public function events(Request $request): Response
+    public function events(Request $request, EntityManagerInterface $entityManager): Response
     {
         $role = (string) $request->query->get('role', 'candidate');
-        $cards = [
-            ['meta' => '12 Apr 2026 | Tunis', 'title' => 'Tech Hiring Day', 'text' => 'Meet recruiters and discover active engineering opportunities.'],
-            ['meta' => '20 Apr 2026 | Sousse', 'title' => 'Career Talk', 'text' => 'Panel discussion with hiring managers and senior developers.'],
-            ['meta' => '28 Apr 2026 | Remote', 'title' => 'Virtual Assessment Workshop', 'text' => 'Online guidance session for interview and coding assessments.'],
-        ];
+        
+        // Fetch events from database
+        $events = $entityManager->getRepository(Recruitment_event::class)->findAll();
+        
+        $cards = [];
+        foreach ($events as $event) {
+            $cards[] = [
+                'id' => $event->getId(),
+                'meta' => $event->getEvent_date()->format('d M Y') . ' | ' . $event->getLocation(),
+                'title' => $event->getTitle(),
+                'text' => $event->getDescription(),
+            ];
+        }
 
         return $this->render('front/modules/events.html.twig', [
             'authUser' => ['role' => $role],

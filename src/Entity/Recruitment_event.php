@@ -13,8 +13,9 @@ class Recruitment_event
 {
 
     #[ORM\Id]
+    #[ORM\GeneratedValue(strategy: "AUTO")]
     #[ORM\Column(type: "bigint")]
-    private string $id;
+    private ?int $id = null;
 
         #[ORM\ManyToOne(targetEntity: Recruiter::class, inversedBy: "recruitment_events")]
     #[ORM\JoinColumn(name: 'recruiter_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
@@ -44,7 +45,7 @@ class Recruitment_event
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $created_at;
 
-    public function getId()
+    public function getId(): ?int
     {
         return $this->id;
     }
