@@ -3,51 +3,158 @@
 {% block title %}Edit Application{% endblock %}
 
 {% block body %}
+<style>
+    .tb-apply-hero {
+        background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
+        border: 1px solid #e6edf9;
+        border-radius: 14px;
+        padding: 18px 20px;
+    }
+
+    .tb-apply-layout {
+        display: grid;
+        grid-template-columns: 1.75fr 1fr;
+        gap: 1rem;
+    }
+
+    .tb-apply-card {
+        border: 1px solid #e8edf5;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 10px 24px rgba(25, 46, 89, 0.05);
+    }
+
+    .tb-apply-card .card-header {
+        border-bottom: 1px solid #edf2f9;
+        background: #fbfdff;
+        border-top-left-radius: 14px;
+        border-top-right-radius: 14px;
+    }
+
+    .tb-apply-section-title {
+        font-size: 0.83rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: #5f7492;
+        font-weight: 700;
+        margin-bottom: 0.7rem;
+    }
+
+    .tb-apply-field .form-label {
+        font-weight: 600;
+        color: #24364e;
+        margin-bottom: 0.45rem;
+    }
+
+    .tb-apply-field .form-control {
+        border: 1px solid #d6dfeb;
+        border-radius: 10px;
+        padding: 0.64rem 0.75rem;
+    }
+
+    .tb-apply-field .form-control:focus {
+        border-color: #96b7ef;
+        box-shadow: 0 0 0 0.2rem rgba(68, 126, 217, 0.13);
+    }
+
+    .tb-apply-sidebar-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0.7rem;
+    }
+
+    .tb-apply-sidebar-item {
+        display: flex;
+        align-items: start;
+        gap: 0.55rem;
+        color: #4d617d;
+        font-size: 0.92rem;
+    }
+
+    .tb-apply-sidebar-item i {
+        color: #3f6db4;
+        margin-top: 0.1rem;
+    }
+
+    .tb-cv-box {
+        border: 1px dashed #c8d6ec;
+        border-radius: 11px;
+        padding: 0.9rem;
+        background: #f8fbff;
+    }
+
+    @media (max-width: 991.98px) {
+        .tb-apply-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 <div class="page-wrapper">
     <div class="page-header d-print-none">
-        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-                <h2 class="page-title"><i class="ti ti-edit me-1"></i>Edit Application</h2>
-                <p class="text-secondary mb-0">Update your phone number, cover letter, and CV choice.</p>
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <div class="tb-apply-hero">
+                        <h2 class="page-title mb-1">Edit Application for {{ offer ? offer.title : 'Unknown Offer' }}</h2>
+                        <div class="text-secondary">
+                            {{ offer and offer.location is defined ? offer.location : 'Location unavailable' }}
+                            {% if offer and offer.contract_type is defined %}
+                                &bull; {{ offer.contract_type }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
-            <a href="{{ path('app_candidate_application_details', {'applicationId': application.id}) }}" class="btn btn-outline-secondary">Cancel</a>
         </div>
     </div>
 
     <div class="page-body">
         <div class="container-xl">
-            <div class="row row-cards justify-content-center">
-                <div class="col-lg-8">
-                    <div class="card">
+            <div class="tb-apply-layout">
+                <div class="tb-apply-card card">
                         <div class="card-header">
-                            <h3 class="card-title mb-0">{{ offer ? offer.title : 'Unknown Offer' }}</h3>
+                            <h3 class="card-title mb-0">Update Job Application</h3>
                         </div>
                         <div class="card-body">
-                            {{ form_start(form) }}
+                            {{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
 
-                            <div class="mb-3">
+                            {{ form_errors(form) }}
+
+                            <div class="tb-apply-section-title">Contact Information</div>
+                            <div class="mb-3 tb-apply-field">
                                 {{ form_label(form.phone) }}
-                                {{ form_widget(form.phone, {'attr': {'class': 'form-control'}}) }}
+                                {{ form_widget(form.phone, {'attr': {'class': 'form-control', 'placeholder': 'e.g. +216 12 345 678'}}) }}
+                                {{ form_errors(form.phone) }}
+                                <div id="phone-js-error" class="invalid-feedback d-block" style="display:none;"></div>
                             </div>
 
-                            <div class="mb-3">
+                            <div class="tb-apply-section-title">Application Details</div>
+                            <div class="mb-3 tb-apply-field">
                                 {{ form_label(form.cover_letter) }}
-                                {{ form_widget(form.cover_letter, {'attr': {'class': 'form-control', 'rows': '5'}}) }}
+                                {{ form_widget(form.cover_letter, {'attr': {'class': 'form-control', 'rows': '6', 'placeholder': 'Briefly describe why your profile matches this role...'}}) }}
+                                {{ form_errors(form.cover_letter) }}
+                                <div id="cover-letter-js-error" class="invalid-feedback d-block" style="display:none;"></div>
                             </div>
 
-                            <div class="hr-text">Your Curriculum Vitae (CV)</div>
+                            <div class="tb-apply-section-title">Curriculum Vitae</div>
+                            <div class="tb-cv-box mb-3">
+                                <div class="mb-3">
+                                    <label class="form-check mb-1">
+                                        {{ form_widget(form.use_profile_cv) }}
+                                        <span class="form-check-label fw-semibold text-dark">{{ form_label(form.use_profile_cv) }}</span>
+                                    </label>
+                                    <small class="form-hint text-secondary">If selected, we will use the CV currently stored in your profile.</small>
+                                    {{ form_errors(form.use_profile_cv) }}
+                                </div>
 
-                            <div class="mb-3">
-                                <label class="form-check">
-                                    {{ form_widget(form.use_profile_cv) }}
-                                    <span class="form-check-label">{{ form_label(form.use_profile_cv) }}</span>
-                                </label>
-                                <small class="form-hint text-secondary">If selected, we will use the CV currently stored in your profile.</small>
-                            </div>
-
-                            <div id="cv-upload-wrapper" class="mb-3">
-                                {{ form_label(form.cv_file) }}
-                                {{ form_widget(form.cv_file, {'attr': {'class': 'form-control'}}) }}
+                                <div id="cv-upload-wrapper" class="tb-apply-field mb-0">
+                                    {{ form_label(form.cv_file) }}
+                                    {{ form_widget(form.cv_file, {'attr': {'class': 'form-control'}}) }}
+                                    {{ form_errors(form.cv_file) }}
+                                    <div id="cv-js-error" class="invalid-feedback d-block" style="display:none;"></div>
+                                </div>
                             </div>
 
                             <div class="mt-4 d-flex gap-2">
@@ -57,6 +164,25 @@
 
                             {{ form_end(form) }}
                         </div>
+                </div>
+
+                <div class="tb-apply-card card">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Application Summary</h3>
+                    </div>
+                    <div class="card-body">
+                        <ul class="tb-apply-sidebar-list">
+                            <li class="tb-apply-sidebar-item"><i class="ti ti-briefcase"></i><span><strong>Position:</strong> {{ offer ? offer.title : 'Unknown Offer' }}</span></li>
+                            <li class="tb-apply-sidebar-item"><i class="ti ti-map-pin"></i><span><strong>Location:</strong> {{ offer and offer.location is defined ? offer.location : 'Location unavailable' }}</span></li>
+                            <li class="tb-apply-sidebar-item"><i class="ti ti-file-description"></i><span><strong>Contract:</strong> {{ offer and offer.contract_type is defined ? offer.contract_type : 'N/A' }}</span></li>
+                            {% if offer and offer.deadline is defined and offer.deadline %}
+                                <li class="tb-apply-sidebar-item"><i class="ti ti-calendar-event"></i><span><strong>Deadline:</strong> {{ offer.deadline|date('d M Y') }}</span></li>
+                            {% endif %}
+                        </ul>
+                        <hr>
+                        <p class="text-secondary small mb-0">
+                            Keep your contact details and cover letter clear and up to date so recruiters can review your application quickly.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -66,13 +192,122 @@
 
 <script>
     (function () {
+        const form = document.querySelector('form[name="{{ form.vars.name }}"]');
+        if (!form) {
+            return;
+        }
+
+        const phoneInput = document.getElementById('{{ form.phone.vars.id }}');
+        const coverLetterInput = document.getElementById('{{ form.cover_letter.vars.id }}');
         const useProfileCvCheckbox = document.getElementById('{{ form.use_profile_cv.vars.id }}');
         const cvUploadWrapper = document.getElementById('cv-upload-wrapper');
         const cvFileInput = document.getElementById('{{ form.cv_file.vars.id }}');
+        const phoneError = document.getElementById('phone-js-error');
+        const coverLetterError = document.getElementById('cover-letter-js-error');
+        const cvError = document.getElementById('cv-js-error');
 
         if (!useProfileCvCheckbox || !cvUploadWrapper) {
             return;
         }
+
+        const showError = function (input, errorElement, message) {
+            if (input) {
+                input.classList.add('is-invalid');
+            }
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+        };
+
+        const clearError = function (input, errorElement) {
+            if (input) {
+                input.classList.remove('is-invalid');
+            }
+            if (errorElement) {
+                errorElement.textContent = '';
+                errorElement.style.display = 'none';
+            }
+        };
+
+        const getTunisianLocalNumber = function (value) {
+            const cleaned = (value || '').replace(/[^0-9+]/g, '');
+            if (cleaned.startsWith('+216') && cleaned.length === 12) {
+                return cleaned.substring(4);
+            }
+            if (cleaned.startsWith('216') && cleaned.length === 11) {
+                return cleaned.substring(3);
+            }
+            if (cleaned.startsWith('0') && cleaned.length === 9) {
+                return cleaned.substring(1);
+            }
+            if (/^[0-9]{8}$/.test(cleaned)) {
+                return cleaned;
+            }
+            return '';
+        };
+
+        const validatePhone = function () {
+            if (!phoneInput) {
+                return true;
+            }
+
+            const raw = phoneInput.value || '';
+            if (raw.trim() === '') {
+                showError(phoneInput, phoneError, 'Phone number cannot be empty.');
+                return false;
+            }
+
+            const local = getTunisianLocalNumber(raw);
+            if (!/^[259][0-9]{7}$/.test(local)) {
+                showError(phoneInput, phoneError, 'Please enter a valid Tunisian phone number (+216XXXXXXXX, 216XXXXXXXX, 0XXXXXXXX or XXXXXXXX).');
+                return false;
+            }
+
+            clearError(phoneInput, phoneError);
+            return true;
+        };
+
+        const validateCoverLetter = function () {
+            if (!coverLetterInput) {
+                return true;
+            }
+
+            const value = coverLetterInput.value || '';
+            const trimmed = value.trim();
+            const length = trimmed.length;
+
+            if (length === 0) {
+                showError(coverLetterInput, coverLetterError, 'Cover letter cannot be empty.');
+                return false;
+            }
+            if (length < 50) {
+                showError(coverLetterInput, coverLetterError, 'Cover letter must be at least 50 characters (current: ' + length + ').');
+                return false;
+            }
+            if (length > 2000) {
+                showError(coverLetterInput, coverLetterError, 'Cover letter must not exceed 2000 characters (current: ' + length + ').');
+                return false;
+            }
+
+            clearError(coverLetterInput, coverLetterError);
+            return true;
+        };
+
+        const validateCvSource = function () {
+            if (useProfileCvCheckbox.checked) {
+                clearError(cvFileInput, cvError);
+                return true;
+            }
+
+            if (!cvFileInput || !cvFileInput.files || cvFileInput.files.length === 0) {
+                clearError(cvFileInput, cvError);
+                return true;
+            }
+
+            clearError(cvFileInput, cvError);
+            return true;
+        };
 
         const updateCvUploadVisibility = function () {
             const useProfileCv = useProfileCvCheckbox.checked;
@@ -81,10 +316,36 @@
             if (cvFileInput) {
                 cvFileInput.disabled = useProfileCv;
             }
+
+            validateCvSource();
         };
 
         updateCvUploadVisibility();
         useProfileCvCheckbox.addEventListener('change', updateCvUploadVisibility);
+
+        if (phoneInput) {
+            phoneInput.addEventListener('input', validatePhone);
+            phoneInput.addEventListener('blur', validatePhone);
+        }
+
+        if (coverLetterInput) {
+            coverLetterInput.addEventListener('input', validateCoverLetter);
+            coverLetterInput.addEventListener('blur', validateCoverLetter);
+        }
+
+        if (cvFileInput) {
+            cvFileInput.addEventListener('change', validateCvSource);
+        }
+
+        form.addEventListener('submit', function (event) {
+            const phoneValid = validatePhone();
+            const coverLetterValid = validateCoverLetter();
+            const cvValid = validateCvSource();
+            const valid = phoneValid && coverLetterValid && cvValid;
+            if (!valid) {
+                event.preventDefault();
+            }
+        });
     })();
 </script>
 {% endblock %}

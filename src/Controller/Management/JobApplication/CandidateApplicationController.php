@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Symfony\Component\HttpFoundation\File\Exception\FileException;
+use Symfony\Component\Form\FormError;
 
 class CandidateApplicationController extends AbstractController
 {
@@ -57,6 +58,9 @@ class CandidateApplicationController extends AbstractController
         }
 
         $form = $this->createForm(JobApplicationType::class, $application);
+        if (!$request->isMethod('POST')) {
+            $form->get('use_profile_cv')->setData(true);
+        }
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -66,7 +70,7 @@ class CandidateApplicationController extends AbstractController
             if ($useProfileCv) {
                 $profileCvPath = method_exists($candidate, 'getCv_path') ? $candidate->getCv_path() : null;
                 if (empty($profileCvPath)) {
-                    $this->addFlash('warning', 'No CV found in your profile. Please upload a CV.');
+                    $form->get('use_profile_cv')->addError(new FormError('No CV found in your profile. Uncheck this option and upload a CV.'));
 
                     return $this->render('management/job_application/apply.html.twig', [
                         'form' => $form->createView(),
@@ -98,7 +102,7 @@ class CandidateApplicationController extends AbstractController
                     ]);
                 }
             } else {
-                $this->addFlash('warning', 'Please choose a CV source: profile CV or upload a new one.');
+                $form->get('cv_file')->addError(new FormError('Please upload a CV file or choose the profile CV option.'));
 
                 return $this->render('management/job_application/apply.html.twig', [
                     'form' => $form->createView(),
@@ -243,7 +247,7 @@ class CandidateApplicationController extends AbstractController
             if ($useProfileCv) {
                 $profileCvPath = method_exists($candidate, 'getCv_path') ? $candidate->getCv_path() : null;
                 if (empty($profileCvPath)) {
-                    $this->addFlash('warning', 'No CV found in your profile. Please upload a CV.');
+                    $form->get('use_profile_cv')->addError(new FormError('No CV found in your profile. Uncheck this option and upload a CV.'));
 
                     return $this->render('management/job_application/edit.html.twig', [
                         'form' => $form->createView(),
