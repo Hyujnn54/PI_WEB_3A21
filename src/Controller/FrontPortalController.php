@@ -23,17 +23,24 @@ class FrontPortalController extends AbstractController
         $warningStatuses = [];
 
         $cards = [
-            ['id' => 1, 'meta' => 'Tunis | CDI | Open', 'title' => 'Frontend Engineer', 'text' => 'Build and iterate candidate-facing experiences with reusable UI modules.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Tunis', 'Status: Open'], 'warning_status' => null, 'location' => 'Tunis', 'contract_type' => 'CDI', 'status' => 'open'],
-            ['id' => 2, 'meta' => 'Sfax | CDI | Open', 'title' => 'Symfony Backend Developer', 'text' => 'Maintain recruitment workflows and implement stable API endpoints.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Sfax', 'Status: Open'], 'warning_status' => null, 'location' => 'Sfax', 'contract_type' => 'CDI', 'status' => 'open'],
-            ['id' => 3, 'meta' => 'Remote | Contract | Paused', 'title' => 'Recruitment Data Analyst', 'text' => 'Track funnel metrics and transform hiring data into useful insights.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: Contract', 'Location: Remote', 'Status: Paused'], 'warning_status' => null, 'location' => 'Remote', 'contract_type' => 'Contract', 'status' => 'paused'],
+            ['id' => 1, 'meta' => 'Tunis | CDI | Open', 'title' => 'Frontend Engineer', 'text' => 'Build and iterate candidate-facing experiences with reusable UI modules.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Tunis', 'Status: Open', 'Deadline: 2026-05-20'], 'warning_status' => null, 'location' => 'Tunis', 'contract_type' => 'CDI', 'status' => 'open', 'deadline' => '2026-05-20'],
+            ['id' => 2, 'meta' => 'Sfax | CDI | Open', 'title' => 'Symfony Backend Developer', 'text' => 'Maintain recruitment workflows and implement stable API endpoints.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: CDI', 'Location: Sfax', 'Status: Open', 'Deadline: 2026-05-22'], 'warning_status' => null, 'location' => 'Sfax', 'contract_type' => 'CDI', 'status' => 'open', 'deadline' => '2026-05-22'],
+            ['id' => 3, 'meta' => 'Remote | Contract | Paused', 'title' => 'Recruitment Data Analyst', 'text' => 'Track funnel metrics and transform hiring data into useful insights.', 'can_delete' => false, 'recruiter_id' => '999', 'detail_extra' => ['Type: Contract', 'Location: Remote', 'Status: Paused', 'Deadline: 2026-05-25'], 'warning_status' => null, 'location' => 'Remote', 'contract_type' => 'Contract', 'status' => 'paused', 'deadline' => '2026-05-25'],
         ];
 
         try {
             $rows = $connection->fetchAllAssociative(
-                'SELECT id, recruiter_id, title, description, location, contract_type, status FROM job_offer ORDER BY created_at DESC LIMIT 25'
+                'SELECT id, recruiter_id, title, description, location, contract_type, status, deadline FROM job_offer ORDER BY created_at DESC LIMIT 25'
             );
 
             $dbCards = array_map(function (array $row) use ($connection): array {
+                $formattedDeadline = '';
+                try {
+                    $formattedDeadline = (new \DateTimeImmutable((string) ($row['deadline'] ?? '')))->format('Y-m-d');
+                } catch (\Throwable $exception) {
+                    $formattedDeadline = '';
+                }
+
                 $skills = $connection->fetchAllAssociative(
                     'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
                     ['offer_id' => (string) $row['id']]
@@ -43,6 +50,7 @@ class FrontPortalController extends AbstractController
                     'Type: ' . (string) $row['contract_type'],
                     'Location: ' . (string) $row['location'],
                     'Status: ' . ucfirst((string) $row['status']),
+                    'Deadline: ' . ($formattedDeadline !== '' ? $formattedDeadline : 'N/A'),
                 ];
 
                 if (count($skills) > 0) {
@@ -68,6 +76,7 @@ class FrontPortalController extends AbstractController
                     'location' => (string) $row['location'],
                     'contract_type' => (string) $row['contract_type'],
                     'status' => (string) $row['status'],
+                    'deadline' => $formattedDeadline,
                 ];
             }, $rows);
 

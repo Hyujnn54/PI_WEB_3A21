@@ -15,6 +15,22 @@
         </div>
     </div>
 
+    <div class="card border mb-3">
+        <div class="card-body d-flex flex-wrap gap-2 align-items-center" id="adminOfferMultiFilter">
+            <input type="text" class="form-control" style="max-width: 180px;" placeholder="Location" id="adminFilterLocation">
+            <input type="text" class="form-control" style="max-width: 190px;" placeholder="Contract type" id="adminFilterContractType">
+            <select class="form-select" style="max-width: 170px;" id="adminFilterStatus">
+                <option value="">All status</option>
+                <option value="open">Open</option>
+                <option value="paused">Paused</option>
+                <option value="closed">Closed</option>
+            </select>
+            <input type="date" class="form-control" style="max-width: 170px;" id="adminFilterDeadline">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="adminClearOfferFilters">Reset</button>
+            <div class="small text-secondary ms-auto" id="adminOfferFilterResults"></div>
+        </div>
+    </div>
+
     <div class="card border">
         <div class="table-responsive">
             <table class="table table-vcenter card-table">
@@ -37,7 +53,11 @@
                     {% set isActive = warningStatus == 'SENT' %}
                     {% set isPendingReview = warningStatus == 'RESOLVED' %}
                     {% set rowClass = isActive ? 'table-warning' : (isPendingReview ? 'table-info' : '') %}
-                    <tr class="{{ rowClass }}">
+                    <tr class="{{ rowClass }} admin-offer-row"
+                        data-filter-location="{{ offer.location|default('')|lower }}"
+                        data-filter-contract-type="{{ offer.contract_type|default('')|lower }}"
+                        data-filter-status="{{ offer.status|default('')|lower }}"
+                        data-filter-deadline="{{ offer.deadline ? offer.deadline|date('Y-m-d') : '' }}">
                         <td>#{{ offer.id }}</td>
                         <td>{{ offer.title }}</td>
                         <td>{{ offer.recruiter_id }}</td>
@@ -91,4 +111,66 @@
             </table>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const table = document.querySelector('.table.table-vcenter.card-table');
+            if (!table) return;
+
+            const rows = Array.from(table.querySelectorAll('tbody .admin-offer-row'));
+            if (rows.length === 0) return;
+
+            const locationInput = document.getElementById('adminFilterLocation');
+            const contractTypeInput = document.getElementById('adminFilterContractType');
+            const statusSelect = document.getElementById('adminFilterStatus');
+            const deadlineInput = document.getElementById('adminFilterDeadline');
+            const resetBtn = document.getElementById('adminClearOfferFilters');
+            const resultLabel = document.getElementById('adminOfferFilterResults');
+
+            const runFilters = function () {
+                const locationQuery = ((locationInput && locationInput.value) || '').trim().toLowerCase();
+                const contractQuery = ((contractTypeInput && contractTypeInput.value) || '').trim().toLowerCase();
+                const statusQuery = ((statusSelect && statusSelect.value) || '').trim().toLowerCase();
+                const deadlineQuery = ((deadlineInput && deadlineInput.value) || '').trim();
+
+                let visibleCount = 0;
+                rows.forEach(function (row) {
+                    const rowLocation = (row.dataset.filterLocation || '').toLowerCase();
+                    const rowContractType = (row.dataset.filterContractType || '').toLowerCase();
+                    const rowStatus = (row.dataset.filterStatus || '').toLowerCase();
+                    const rowDeadline = (row.dataset.filterDeadline || '').trim();
+
+                    const locationMatch = locationQuery === '' || rowLocation.includes(locationQuery);
+                    const contractMatch = contractQuery === '' || rowContractType.includes(contractQuery);
+                    const statusMatch = statusQuery === '' || rowStatus === statusQuery;
+                    const deadlineMatch = deadlineQuery === '' || rowDeadline === deadlineQuery;
+
+                    const isMatch = locationMatch && contractMatch && statusMatch && deadlineMatch;
+                    row.classList.toggle('d-none', !isMatch);
+                    if (isMatch) visibleCount += 1;
+                });
+
+                if (resultLabel) {
+                    resultLabel.textContent = visibleCount + ' result(s)';
+                }
+            };
+
+            if (locationInput) locationInput.addEventListener('input', runFilters);
+            if (contractTypeInput) contractTypeInput.addEventListener('input', runFilters);
+            if (statusSelect) statusSelect.addEventListener('change', runFilters);
+            if (deadlineInput) deadlineInput.addEventListener('change', runFilters);
+
+            if (resetBtn) {
+                resetBtn.addEventListener('click', function () {
+                    if (locationInput) locationInput.value = '';
+                    if (contractTypeInput) contractTypeInput.value = '';
+                    if (statusSelect) statusSelect.value = '';
+                    if (deadlineInput) deadlineInput.value = '';
+                    runFilters();
+                });
+            }
+
+            runFilters();
+        })();
+    </script>
 {% endblock %}
