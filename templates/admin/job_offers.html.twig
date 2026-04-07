@@ -18,26 +18,51 @@
     {% if offerStats is not null %}
         <div class="row g-3 mb-3">
             <div class="col-md-4">
-                <div class="card border">
+                <div class="card border shadow-sm h-100">
                     <div class="card-body">
-                        <div class="small text-secondary">Offres publiées</div>
-                        <div class="h3 mb-0">{{ offerStats.total_published }}</div>
+                        <div class="small text-secondary mb-1">Offres publiées</div>
+                        <div class="h2 mb-0">{{ offerStats.total_published }}</div>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card border border-success">
+                <div class="card border border-success shadow-sm h-100">
                     <div class="card-body">
-                        <div class="small text-secondary">Offres ouvertes</div>
-                        <div class="h3 mb-0">{{ offerStats.total_open }} <span class="small text-success">({{ offerStats.open_percentage }}%)</span></div>
+                        <div class="small text-secondary mb-1">Offres ouvertes</div>
+                        <div class="h2 mb-1">{{ offerStats.total_open }}</div>
+                        <span class="badge bg-success-lt text-success">{{ offerStats.open_percentage }}%</span>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card border border-danger">
+                <div class="card border border-danger shadow-sm h-100">
                     <div class="card-body">
-                        <div class="small text-secondary">Offres fermées</div>
-                        <div class="h3 mb-0">{{ offerStats.total_closed }} <span class="small text-danger">({{ offerStats.closed_percentage }}%)</span></div>
+                        <div class="small text-secondary mb-1">Offres fermées</div>
+                        <div class="h2 mb-1">{{ offerStats.total_closed }}</div>
+                        <span class="badge bg-red-lt text-danger">{{ offerStats.closed_percentage }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-xl-6">
+                <div class="card border shadow-sm">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Pie Chart: Offres ouvertes vs fermées</h3>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="adminStatusPie" height="220"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-xl-6">
+                <div class="card border shadow-sm">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Pie Chart: Types de contrat</h3>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="adminContractPie" height="220"></canvas>
                     </div>
                 </div>
             </div>
@@ -45,7 +70,7 @@
 
         <div class="row g-3 mb-3">
             <div class="col-12 col-xl-7">
-                <div class="card border">
+                <div class="card border shadow-sm">
                     <div class="card-header">
                         <h3 class="card-title mb-0">Répartition par ville (Ouvertes vs Fermées)</h3>
                     </div>
@@ -82,7 +107,7 @@
                 </div>
             </div>
             <div class="col-12 col-xl-5">
-                <div class="card border">
+                <div class="card border shadow-sm">
                     <div class="card-header">
                         <h3 class="card-title mb-0">Statistiques par type de contrat</h3>
                     </div>
@@ -100,7 +125,14 @@
                                     <tr>
                                         <td>{{ contract.contract_type }}</td>
                                         <td>{{ contract.total }}</td>
-                                        <td>{{ contract.percentage }}%</td>
+                                        <td style="min-width: 160px;">
+                                            <div class="d-flex justify-content-between small mb-1">
+                                                <span>{{ contract.percentage }}%</span>
+                                            </div>
+                                            <div class="progress progress-xs">
+                                                <div class="progress-bar bg-primary" style="width: {{ contract.percentage }}%;"></div>
+                                            </div>
+                                        </td>
                                     </tr>
                                 {% else %}
                                     <tr>
@@ -252,6 +284,90 @@
 
     <script>
         (function () {
+            const stats = {{ offerStats is not null ? offerStats|json_encode|raw : 'null' }};
+
+            const initCharts = function () {
+                if (!stats || !window.Chart) return;
+
+                const statusCanvas = document.getElementById('adminStatusPie');
+                const contractCanvas = document.getElementById('adminContractPie');
+
+                if (statusCanvas) {
+                    new Chart(statusCanvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Open', 'Closed'],
+                            datasets: [{
+                                data: [Number(stats.total_open || 0), Number(stats.total_closed || 0)],
+                                backgroundColor: ['#2fb344', '#d63939']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            cutout: '58%',
+                            plugins: {
+                                legend: { position: 'bottom' },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            const value = Number(context.parsed || 0);
+                                            const data = context.dataset.data || [];
+                                            const total = data.reduce(function (sum, item) { return sum + Number(item || 0); }, 0);
+                                            const pct = total > 0 ? ((value / total) * 100).toFixed(2) : '0.00';
+                                            return context.label + ': ' + value + ' (' + pct + '%)';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if (contractCanvas) {
+                    const labels = (stats.contract_stats || []).map(function (item) { return item.contract_type; });
+                    const values = (stats.contract_stats || []).map(function (item) { return Number(item.total || 0); });
+                    new Chart(contractCanvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: values,
+                                backgroundColor: ['#206bc4', '#4299e1', '#17a2b8', '#f59f00', '#2fb344', '#d63939', '#7950f2']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            cutout: '58%',
+                            plugins: {
+                                legend: { position: 'bottom' },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            const value = Number(context.parsed || 0);
+                                            const data = context.dataset.data || [];
+                                            const total = data.reduce(function (sum, item) { return sum + Number(item || 0); }, 0);
+                                            const pct = total > 0 ? ((value / total) * 100).toFixed(2) : '0.00';
+                                            return context.label + ': ' + value + ' (' + pct + '%)';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            };
+
+            if (stats) {
+                if (window.Chart) {
+                    initCharts();
+                } else {
+                    const chartScript = document.createElement('script');
+                    chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+                    chartScript.onload = initCharts;
+                    document.head.appendChild(chartScript);
+                }
+            }
+
             const table = document.querySelector('.table.table-vcenter.card-table');
             if (!table) return;
 
