@@ -20,13 +20,14 @@
         radial-gradient(circle at 50% 120%, rgba(13, 91, 215, 0.09), transparent 42%),
         linear-gradient(180deg, #f4f8ff 0%, #ffffff 75%);
     background-repeat: no-repeat;
-    background-attachment: scroll;
+    background-attachment: fixed;
     background-size: cover;
+    background-position: center top;
     min-height: 100vh;
 }
 
 .tb-admin-body {
-    background-attachment: scroll;
+    background-attachment: fixed;
 }
 
 .tb-page-shell {
@@ -362,6 +363,73 @@
     z-index: 2010 !important;
 }
 
+.tb-modal-shell {
+    border: 1px solid rgba(35, 65, 112, 0.24);
+    border-radius: 20px;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(13, 91, 215, 0.12), transparent 42%),
+        linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    box-shadow: 0 22px 40px rgba(15, 42, 84, 0.24);
+}
+
+.tb-modal-header {
+    border-bottom: 1px solid rgba(27, 70, 126, 0.14);
+    background:
+        radial-gradient(circle at 0% 100%, rgba(19, 182, 255, 0.18), transparent 48%),
+        linear-gradient(120deg, rgba(13, 91, 215, 0.12) 0%, rgba(13, 91, 215, 0.03) 100%);
+    padding: 0.9rem 1.1rem;
+}
+
+.tb-modal-shell .modal-title {
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #16355d;
+}
+
+.tb-modal-shell .modal-body {
+    padding: 1rem 1.1rem;
+}
+
+.tb-modal-shell .modal-footer {
+    border-top: 1px solid rgba(27, 70, 126, 0.12);
+    background: rgba(255, 255, 255, 0.66);
+}
+
+.tb-modal-shell .form-control,
+.tb-modal-shell .form-select,
+.tb-modal-shell textarea {
+    border-radius: 12px;
+    border: 1px solid rgba(54, 93, 144, 0.35);
+    background: #ffffff;
+}
+
+.tb-modal-shell .form-control:focus,
+.tb-modal-shell .form-select:focus,
+.tb-modal-shell textarea:focus {
+    border-color: #2f74d8;
+    box-shadow: 0 0 0 0.2rem rgba(47, 116, 216, 0.14);
+}
+
+.tb-modal-shell .form-hint {
+    color: #4f6b91;
+}
+
+.modal.show .tb-modal-shell {
+    animation: tbModalIn 0.2s ease;
+}
+
+@keyframes tbModalIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 @media (max-width: 1199px) {
     .tb-detail-panel-side {
         position: static;
@@ -532,10 +600,44 @@
     opacity: 0.55 !important;
 }
 
+.tb-calendar-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.7rem;
+}
+
+.tb-calendar-tools .btn-group .btn {
+    border-radius: 999px;
+}
+
 .tb-calendar-title {
-    font-weight: 700;
-    margin-bottom: 0.6rem;
+    font-weight: 800;
+    margin: 0;
     color: #1a437e;
+    letter-spacing: -0.01em;
+}
+
+.tb-calendar-summary {
+    color: #4a678f;
+    margin-bottom: 0.5rem;
+}
+
+.tb-calendar-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.76rem;
+    color: #55719a;
+}
+
+.tb-calendar-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #0d5bd7;
 }
 
 .tb-calendar-grid {
@@ -564,6 +666,11 @@
     color: #2e4f7f;
     transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
     cursor: pointer;
+}
+
+.tb-calendar-cell.tb-is-today {
+    border-color: #d8732f;
+    box-shadow: inset 0 0 0 1px rgba(216, 115, 47, 0.3);
 }
 
 .tb-calendar-cell.tb-empty {
@@ -601,6 +708,22 @@
     right: 6px;
 }
 
+.tb-calendar-cell .tb-count {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    min-width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: #fff;
+    background: #0d5bd7;
+}
+
 .tb-calendar-day-details {
     border: 1px solid #d8e7ff;
     border-radius: 10px;
@@ -614,16 +737,63 @@
     margin-bottom: 0.5rem;
 }
 
+.tb-calendar-day-empty {
+    color: #667fa0;
+    font-size: 0.85rem;
+}
+
 .tb-calendar-event-item {
     border: 1px solid #d5e3f9;
     background: #fff;
     border-radius: 8px;
     padding: 0.45rem 0.6rem;
     margin-bottom: 0.4rem;
+    width: 100%;
+    text-align: left;
+}
+
+.tb-calendar-event-action {
+    cursor: pointer;
+    transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.tb-calendar-event-action:hover,
+.tb-calendar-event-action:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(17, 47, 91, 0.12);
+    border-color: #4f82d5;
+}
+
+.tb-calendar-event-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.tb-calendar-event-title {
+    font-weight: 700;
+    color: #1c3d67;
+}
+
+.tb-calendar-event-status {
+    font-size: 0.68rem;
+    border-radius: 999px;
+    padding: 0.2rem 0.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    background: rgba(13, 91, 215, 0.12);
+    color: #15539f;
 }
 
 .tb-calendar-event-item:last-child {
     margin-bottom: 0;
+}
+
+.tb-module-card.tb-calendar-linked {
+    box-shadow: 0 0 0 3px rgba(13, 91, 215, 0.28), 0 14px 28px rgba(16, 47, 94, 0.2);
 }
 
 .btn-primary {
@@ -675,7 +845,10 @@
         radial-gradient(circle at 8% 0%, rgba(216, 115, 47, 0.18), transparent 26%),
         radial-gradient(circle at 90% 10%, rgba(21, 90, 138, 0.18), transparent 30%),
         linear-gradient(180deg, #f8f2e9 0%, #f6f0e6 42%, #f2ebdf 100%);
-    background-attachment: scroll;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center top;
+    background-attachment: fixed;
 }
 
 .tb-front-body::before {

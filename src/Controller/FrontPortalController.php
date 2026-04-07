@@ -240,10 +240,10 @@ class FrontPortalController extends AbstractController
                 $status = (string) $interview->getStatus();
                 $title = (string) $offer->getTitle();
                 $notes = trim((string) $interview->getNotes());
-                $mode = $this->normalizeInterviewMode((string) $interview->getMode());
-                $duration = (string) $interview->getDuration_minutes();
                 $location = trim((string) $interview->getLocation());
                 $meetingLink = trim((string) $interview->getMeeting_link());
+                $mode = $this->normalizeInterviewMode((string) $interview->getMode(), $location, $meetingLink);
+                $duration = (string) $interview->getDuration_minutes();
                 $normalizedStatus = strtoupper(trim($status));
                 if ($normalizedStatus === '') {
                     $normalizedStatus = 'SCHEDULED';
@@ -306,6 +306,7 @@ class FrontPortalController extends AbstractController
                 ];
 
                 $upcomingInterviews[] = [
+                    'interview_id' => (string) $interview->getId(),
                     'timestamp' => $scheduledAt->getTimestamp(),
                     'date' => $scheduledAt->format('d M Y H:i'),
                     'ymd' => $scheduledAt->format('Y-m-d'),
@@ -321,7 +322,6 @@ class FrontPortalController extends AbstractController
         }
 
         usort($upcomingInterviews, static fn (array $a, array $b): int => $b['timestamp'] <=> $a['timestamp']);
-        $upcomingInterviews = array_slice($upcomingInterviews, 0, 8);
 
         return $this->render('front/modules/interviews.html.twig', [
             'authUser' => ['role' => $role],
@@ -840,10 +840,20 @@ class FrontPortalController extends AbstractController
         return $latest instanceof Interview_feedback ? $latest : null;
     }
 
-    private function normalizeInterviewMode(?string $mode): string
+    private function normalizeInterviewMode(?string $mode, ?string $location = null, ?string $meetingLink = null): string
     {
         $value = strtolower(trim((string) $mode));
-        if ($value === 'onsite' || $value === 'on_site') {
+        if (in_array($value, ['onsite', 'on_site', 'on-site', 'on site', 'in_person', 'in-person', 'in person'], true)) {
+            return 'onsite';
+        }
+
+        if (in_array($value, ['online', 'on_line', 'on-line', 'on line'], true)) {
+            return 'online';
+        }
+
+        $normalizedLocation = trim((string) $location);
+        $normalizedMeetingLink = trim((string) $meetingLink);
+        if ($normalizedLocation !== '' && $normalizedMeetingLink === '') {
             return 'onsite';
         }
 

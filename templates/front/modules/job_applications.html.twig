@@ -166,8 +166,8 @@
 
             <div class="modal fade" id="createInterviewModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-centered">
-                    <div class="modal-content tb-admin-card">
-                        <div class="modal-header">
+                    <div class="modal-content tb-admin-card tb-modal-shell">
+                        <div class="modal-header tb-modal-header">
                             <h5 class="modal-title"><i class="ti ti-calendar-plus me-1"></i>Create Interview</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
@@ -371,17 +371,33 @@
         });
 
         document.querySelectorAll('.tb-open-interview-modal').forEach(function (btn) {
-            btn.addEventListener('click', async function (event) {
+            btn.addEventListener('click', function (event) {
                 event.preventDefault();
                 event.stopPropagation();
 
                 const card = btn.closest('.tb-module-card');
                 if (!card) return;
 
-                const canCreate = await refreshCreateAvailability(card);
-                if (!canCreate) return;
+                const createDisabled = card.getAttribute('data-create-disabled') === '1';
+                if (createDisabled) {
+                    syncInlineCreateButton(card);
+                    return;
+                }
 
-                openCreateModal(card.getAttribute('data-create-url') || '#');
+                const initialUrl = card.getAttribute('data-create-url') || '#';
+                openCreateModal(initialUrl);
+
+                refreshCreateAvailability(card).then(function (canCreate) {
+                    if (!canCreate) {
+                        if (modal) {
+                            modal.hide();
+                        }
+                        return;
+                    }
+
+                    const freshUrl = card.getAttribute('data-create-url') || initialUrl;
+                    formEl.setAttribute('action', freshUrl);
+                });
             });
         });
 

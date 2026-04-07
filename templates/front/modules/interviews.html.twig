@@ -117,17 +117,26 @@
 
             {# Bottom dock removed - buttons are now inline on cards #}
 
-            <div class="modal fade" id="interviewCalendarModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+            <div class="modal fade" id="interviewCalendarModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-                    <div class="modal-content tb-admin-card">
-                        <div class="modal-header">
+                    <div class="modal-content tb-admin-card tb-modal-shell">
+                        <div class="modal-header tb-modal-header">
                             <h5 class="modal-title"><i class="ti ti-calendar-event me-1"></i>Interviews Calendar</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
+                            <div class="tb-calendar-tools">
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Calendar navigation">
+                                    <button type="button" class="btn btn-outline-primary" id="tbCalendarPrevMonth"><i class="ti ti-chevron-left"></i></button>
+                                    <button type="button" class="btn btn-outline-primary" id="tbCalendarToday">Today</button>
+                                    <button type="button" class="btn btn-outline-primary" id="tbCalendarNextMonth"><i class="ti ti-chevron-right"></i></button>
+                                </div>
+                                <div class="tb-calendar-legend"><span class="tb-calendar-legend-dot"></span><span>Highlighted days contain interviews</span></div>
+                            </div>
+                            <h6 id="tbCalendarMonthLabel" class="tb-calendar-title"></h6>
+                            <div id="tbCalendarSummary" class="tb-calendar-summary small"></div>
                             <div class="tb-calendar" id="tbInterviewCalendar" data-events='{{ upcomingInterviews|default([])|json_encode|e('html_attr') }}'></div>
                             <div id="tbCalendarDayDetails" class="tb-calendar-day-details mt-3"></div>
-                            <div class="small text-secondary mt-3">Highlighted dates contain interviews from your current list.</div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
@@ -139,8 +148,8 @@
             {% if role == 'recruiter' %}
                 <div class="modal fade" id="editInterviewModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg modal-dialog-centered">
-                        <div class="modal-content tb-admin-card">
-                            <div class="modal-header">
+                        <div class="modal-content tb-admin-card tb-modal-shell">
+                            <div class="modal-header tb-modal-header">
                                 <h5 class="modal-title"><i class="ti ti-edit me-1"></i>Modify Interview</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
@@ -188,8 +197,8 @@
 
                 <div class="modal fade" id="reviewInterviewModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-lg modal-dialog-centered">
-                        <div class="modal-content tb-admin-card">
-                            <div class="modal-header">
+                        <div class="modal-content tb-admin-card tb-modal-shell">
+                            <div class="modal-header tb-modal-header">
                                 <h5 class="modal-title"><i class="ti ti-message-2-check me-1"></i>Interview Review</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
@@ -251,72 +260,312 @@
             let events = [];
             try { events = JSON.parse(raw); } catch (e) { events = []; }
 
+            const calendarMonthLabel = document.getElementById('tbCalendarMonthLabel');
+            const calendarSummary = document.getElementById('tbCalendarSummary');
+            const prevMonthBtn = document.getElementById('tbCalendarPrevMonth');
+            const nextMonthBtn = document.getElementById('tbCalendarNextMonth');
+            const todayBtn = document.getElementById('tbCalendarToday');
+            const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
             const today = new Date();
-            const year = today.getFullYear();
-            const month = today.getMonth();
-            const monthStart = new Date(year, month, 1);
-            const monthEnd = new Date(year, month + 1, 0);
-            const firstDay = (monthStart.getDay() + 6) % 7;
-            const totalDays = monthEnd.getDate();
-            const eventsByDay = {};
-            events.forEach(function (e) {
-                const dateObj = e.ymd ? new Date(e.ymd + 'T00:00:00') : new Date(e.timestamp * 1000);
-                const key = dateObj.toDateString();
-                if (!eventsByDay[key]) eventsByDay[key] = [];
-                eventsByDay[key].push(e);
+
+            const pad = function (value) {
+                return String(value).padStart(2, '0');
+            };
+
+            const toYmd = function (date) {
+                return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+            };
+
+            const parseYmd = function (ymd) {
+                const parts = (ymd || '').split('-');
+                if (parts.length !== 3) return null;
+                const y = Number(parts[0]);
+                const m = Number(parts[1]);
+                const d = Number(parts[2]);
+                if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+                return new Date(y, m - 1, d);
+            };
+
+            const escapeHtml = function (value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            };
+
+            const formatPrettyDate = function (ymd) {
+                const parsed = parseYmd(ymd);
+                if (!parsed) return ymd || 'Selected date';
+                return parsed.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+            };
+
+            const normalizedEvents = [];
+            events.forEach(function (entry) {
+                if (!entry) return;
+                const fallbackDate = entry.timestamp ? new Date(Number(entry.timestamp) * 1000) : null;
+                const dateObj = entry.ymd ? parseYmd(entry.ymd) : fallbackDate;
+                if (!dateObj || Number.isNaN(dateObj.getTime())) return;
+                const rawInterviewId = entry.interview_id || entry.interviewId || '';
+
+                normalizedEvents.push({
+                    interviewId: rawInterviewId === null || typeof rawInterviewId === 'undefined' ? '' : String(rawInterviewId),
+                    ymd: toYmd(dateObj),
+                    title: entry.title || 'Interview',
+                    date: entry.date || '',
+                    mode: entry.mode || 'n/a',
+                    status: entry.status || 'pending',
+                    location: entry.location || 'No location specified',
+                    timestamp: Number(entry.timestamp || 0)
+                });
             });
-            const eventDays = new Set(Object.keys(eventsByDay));
+            normalizedEvents.sort(function (a, b) { return a.timestamp - b.timestamp; });
 
-            const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            const monthName = monthStart.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            const eventsByDay = {};
+            normalizedEvents.forEach(function (entry) {
+                if (!eventsByDay[entry.ymd]) eventsByDay[entry.ymd] = [];
+                eventsByDay[entry.ymd].push(entry);
+            });
 
-            let html = '<div class="tb-calendar-title">' + monthName + '</div><div class="tb-calendar-grid tb-calendar-head">';
-            names.forEach(function (n) { html += '<div>' + n + '</div>'; });
-            html += '</div><div class="tb-calendar-grid">';
+            let viewYear = today.getFullYear();
+            let viewMonth = today.getMonth();
+            const todayKey = toYmd(today);
+            let selectedKey = todayKey;
 
-            for (let i = 0; i < firstDay; i++) {
-                html += '<div class="tb-calendar-cell tb-empty"></div>';
-            }
-            for (let d = 1; d <= totalDays; d++) {
-                const date = new Date(year, month, d);
-                const key = date.toDateString();
-                const hasEvent = eventDays.has(key);
-                html += '<button type="button" class="tb-calendar-cell ' + (hasEvent ? 'tb-has-event' : '') + '" data-calendar-date="' + key + '">' + d + (hasEvent ? '<span class="tb-dot"></span>' : '') + '</button>';
-            }
-            html += '</div>';
-            calendarRoot.innerHTML = html;
+            const firstEventForMonth = function (year, month) {
+                const prefix = year + '-' + pad(month + 1) + '-';
+                for (let i = 0; i < normalizedEvents.length; i++) {
+                    if (normalizedEvents[i].ymd.indexOf(prefix) === 0) return normalizedEvents[i].ymd;
+                }
+                return null;
+            };
 
-            const renderDayDetails = function (key) {
+            const countEventsForMonth = function (year, month) {
+                const prefix = year + '-' + pad(month + 1) + '-';
+                let total = 0;
+                Object.keys(eventsByDay).forEach(function (key) {
+                    if (key.indexOf(prefix) === 0) {
+                        total += eventsByDay[key].length;
+                    }
+                });
+                return total;
+            };
+
+            const ensureSelectionForCurrentView = function () {
+                const monthPrefix = viewYear + '-' + pad(viewMonth + 1) + '-';
+                if (selectedKey && selectedKey.indexOf(monthPrefix) === 0) return;
+                selectedKey = firstEventForMonth(viewYear, viewMonth) || (viewYear + '-' + pad(viewMonth + 1) + '-01');
+            };
+
+            const focusInterviewCard = function (interviewId, interviewTimestamp) {
+                const id = String(interviewId || '').trim();
+                const ts = String(interviewTimestamp || '').trim();
+
+                const findCard = function () {
+                    if (id !== '') {
+                        const byId = document.querySelector('.tb-module-card[data-interview-id="' + id + '"]');
+                        if (byId) return byId;
+                    }
+
+                    if (ts !== '') {
+                        const byTs = document.querySelector('.tb-module-card[data-sort-date="' + ts + '"]');
+                        if (byTs) return byTs;
+                    }
+
+                    return null;
+                };
+
+                const activateCard = function () {
+                    const card = findCard();
+                    if (!card) return false;
+
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.click();
+                    card.classList.add('tb-calendar-linked');
+                    window.setTimeout(function () {
+                        card.classList.remove('tb-calendar-linked');
+                    }, 1400);
+                    return true;
+                };
+
+                const forceCloseCalendarModal = function () {
+                    if (!calendarModalEl) return;
+
+                    calendarModalEl.classList.remove('show');
+                    calendarModalEl.setAttribute('aria-hidden', 'true');
+                    calendarModalEl.removeAttribute('aria-modal');
+                    calendarModalEl.style.display = 'none';
+
+                    const hasAnyOpenModal = document.querySelectorAll('.modal.show').length > 0;
+                    if (!hasAnyOpenModal) {
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('padding-right');
+                        document.body.style.removeProperty('overflow');
+                        document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) {
+                            backdrop.remove();
+                        });
+                    }
+                };
+
+                if (!calendarModalEl) {
+                    return activateCard();
+                }
+
+                if (typeof bootstrap !== 'undefined') {
+                    const modalInstance = bootstrap.Modal.getOrCreateInstance(calendarModalEl);
+                    modalInstance.hide();
+                }
+
+                // Always force-close to avoid transition/backdrop desync, then activate card.
+                forceCloseCalendarModal();
+                window.setTimeout(function () {
+                    activateCard();
+                }, 80);
+                return true;
+            };
+
+            const renderDayDetails = function (ymd) {
                 if (!dayDetails) return;
-                const dayEvents = eventsByDay[key] || [];
+
+                const dayEvents = eventsByDay[ymd] || [];
+                let block = '<div class="tb-calendar-day-title">Interviews on ' + escapeHtml(formatPrettyDate(ymd)) + '</div>';
+
                 if (dayEvents.length === 0) {
-                    dayDetails.innerHTML = '<div class="text-secondary small">No interviews on selected date.</div>';
+                    block += '<div class="tb-calendar-day-empty">No interviews on this date.</div>';
+                    dayDetails.innerHTML = block;
                     return;
                 }
 
-                let block = '<div class="tb-calendar-day-title">Interviews on ' + key + '</div>';
-                dayEvents.forEach(function (e) {
-                    block += '<div class="tb-calendar-event-item"><div><strong>' + e.title + '</strong></div><div class="small text-secondary">' + e.date + ' | ' + e.mode + ' | ' + e.status + ' | ' + (e.location || 'N/A') + '</div></div>';
+                dayEvents.forEach(function (entry) {
+                    const hasLink = String(entry.interviewId || '').trim() !== '' || String(entry.timestamp || '').trim() !== '';
+                    block += '<button type="button" class="tb-calendar-event-item' + (hasLink ? ' tb-calendar-event-action' : '') + '" data-calendar-interview-id="' + escapeHtml(entry.interviewId) + '" data-calendar-interview-ts="' + escapeHtml(String(entry.timestamp || '')) + '">';
+                    block += '<div class="tb-calendar-event-head">';
+                    block += '<div class="tb-calendar-event-title">' + escapeHtml(entry.title) + '</div>';
+                    block += '<span class="tb-calendar-event-status">' + escapeHtml(entry.status) + '</span>';
+                    block += '</div>';
+                    block += '<div class="small text-secondary">' + escapeHtml(entry.date || formatPrettyDate(entry.ymd)) + '</div>';
+                    block += '<div class="small text-secondary">Mode: ' + escapeHtml(entry.mode) + ' | Location: ' + escapeHtml(entry.location) + '</div>';
+                    if (hasLink) {
+                        block += '<div class="small text-primary mt-1">Open interview details</div>';
+                    }
+                    block += '</button>';
                 });
+
                 dayDetails.innerHTML = block;
+
+                dayDetails.querySelectorAll('.tb-calendar-event-action').forEach(function (item) {
+                    item.addEventListener('click', function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const interviewId = item.getAttribute('data-calendar-interview-id') || '';
+                        const interviewTs = item.getAttribute('data-calendar-interview-ts') || '';
+                        focusInterviewCard(interviewId, interviewTs);
+                    });
+                });
             };
 
-            calendarRoot.querySelectorAll('[data-calendar-date]').forEach(function (cell) {
-                cell.addEventListener('click', function () {
-                    calendarRoot.querySelectorAll('.tb-calendar-cell.is-selected').forEach(function (c) { c.classList.remove('is-selected'); });
-                    cell.classList.add('is-selected');
-                    renderDayDetails(cell.getAttribute('data-calendar-date'));
-                });
-            });
+            const renderCalendar = function () {
+                ensureSelectionForCurrentView();
 
-            const firstEventKey = Object.keys(eventsByDay)[0];
-            if (firstEventKey) {
-                const firstCell = calendarRoot.querySelector('[data-calendar-date="' + firstEventKey + '"]');
-                if (firstCell) firstCell.classList.add('is-selected');
-                renderDayDetails(firstEventKey);
-            } else {
-                renderDayDetails('');
+                const monthStart = new Date(viewYear, viewMonth, 1);
+                const firstDay = (monthStart.getDay() + 6) % 7;
+                const totalDays = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+                if (calendarMonthLabel) {
+                    calendarMonthLabel.textContent = monthStart.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                }
+
+                if (calendarSummary) {
+                    const monthlyEvents = countEventsForMonth(viewYear, viewMonth);
+                    calendarSummary.textContent = monthlyEvents === 0
+                        ? 'No interviews scheduled this month.'
+                        : monthlyEvents + (monthlyEvents === 1 ? ' interview scheduled this month.' : ' interviews scheduled this month.');
+                }
+
+                let html = '<div class="tb-calendar-grid tb-calendar-head">';
+                dayNames.forEach(function (name) { html += '<div>' + name + '</div>'; });
+                html += '</div><div class="tb-calendar-grid tb-calendar-days">';
+
+                for (let i = 0; i < firstDay; i++) {
+                    html += '<div class="tb-calendar-cell tb-empty" aria-hidden="true"></div>';
+                }
+
+                for (let d = 1; d <= totalDays; d++) {
+                    const currentDate = new Date(viewYear, viewMonth, d);
+                    const key = toYmd(currentDate);
+                    const dayEvents = eventsByDay[key] || [];
+                    const classes = ['tb-calendar-cell'];
+                    if (dayEvents.length) classes.push('tb-has-event');
+                    if (key === selectedKey) classes.push('is-selected');
+                    if (key === todayKey) classes.push('tb-is-today');
+
+                    html += '<button type="button" class="' + classes.join(' ') + '" data-calendar-date="' + key + '" aria-label="' + escapeHtml(formatPrettyDate(key)) + '">';
+                    html += String(d);
+                    if (dayEvents.length) {
+                        html += '<span class="tb-dot"></span><span class="tb-count">' + dayEvents.length + '</span>';
+                    }
+                    html += '</button>';
+                }
+
+                const cellsUsed = firstDay + totalDays;
+                const trailing = (7 - (cellsUsed % 7)) % 7;
+                for (let i = 0; i < trailing; i++) {
+                    html += '<div class="tb-calendar-cell tb-empty" aria-hidden="true"></div>';
+                }
+
+                html += '</div>';
+                calendarRoot.innerHTML = html;
+
+                calendarRoot.querySelectorAll('[data-calendar-date]').forEach(function (cell) {
+                    cell.addEventListener('click', function () {
+                        selectedKey = cell.getAttribute('data-calendar-date') || selectedKey;
+                        renderCalendar();
+                    });
+                });
+
+                renderDayDetails(selectedKey);
+            };
+
+            if (prevMonthBtn) {
+                prevMonthBtn.addEventListener('click', function () {
+                    const prev = new Date(viewYear, viewMonth - 1, 1);
+                    viewYear = prev.getFullYear();
+                    viewMonth = prev.getMonth();
+                    selectedKey = '';
+                    renderCalendar();
+                });
             }
+
+            if (nextMonthBtn) {
+                nextMonthBtn.addEventListener('click', function () {
+                    const next = new Date(viewYear, viewMonth + 1, 1);
+                    viewYear = next.getFullYear();
+                    viewMonth = next.getMonth();
+                    selectedKey = '';
+                    renderCalendar();
+                });
+            }
+
+            if (todayBtn) {
+                todayBtn.addEventListener('click', function () {
+                    viewYear = today.getFullYear();
+                    viewMonth = today.getMonth();
+                    selectedKey = todayKey;
+                    renderCalendar();
+                });
+            }
+
+            if (calendarModalEl) {
+                calendarModalEl.addEventListener('shown.bs.modal', renderCalendar);
+            }
+
+            renderCalendar();
         }
 
         const now = new Date();
