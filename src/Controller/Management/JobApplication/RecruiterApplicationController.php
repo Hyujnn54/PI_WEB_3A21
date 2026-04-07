@@ -188,6 +188,10 @@ class RecruiterApplicationController extends AbstractController
             return false;
         }
 
+        if ($application->getIs_archived()) {
+            return false;
+        }
+
         $offer = $application->getOffer_id();
         if (!$offer) {
             return false;

@@ -118,6 +118,11 @@
 
         <div class="page-content">
             <section class="pt-4 px-3 px-xl-5">
+                {% for label in ['success', 'warning', 'error'] %}
+                    {% for message in app.flashes(label) %}
+                        <div class="alert alert-{{ label == 'error' ? 'danger' : (label == 'warning' ? 'warning' : 'success') }}" role="alert">{{ message }}</div>
+                    {% endfor %}
+                {% endfor %}
                 {% block admin_content %}{% endblock %}
             </section>
         </div>

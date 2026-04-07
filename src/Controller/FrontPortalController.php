@@ -69,7 +69,7 @@ class FrontPortalController extends AbstractController
                 $ownedOffers = $em->getRepository(Job_offer::class)->findBy(['recruiter_id' => $recruiter]);
                 if (!empty($ownedOffers)) {
                     $applications = $em->getRepository(Job_application::class)->findBy(
-                        ['offer_id' => $ownedOffers],
+                        ['offer_id' => $ownedOffers, 'is_archived' => false],
                         ['applied_at' => 'DESC']
                     );
 
@@ -105,7 +105,7 @@ class FrontPortalController extends AbstractController
             $candidate = $em->getRepository(Candidate::class)->find($candidateId);
             if ($candidate) {
                 $applications = $em->getRepository(Job_application::class)->findBy(
-                    ['candidate_id' => $candidate],
+                    ['candidate_id' => $candidate, 'is_archived' => false],
                     ['applied_at' => 'DESC']
                 );
 

@@ -31,7 +31,7 @@
         {% set currentRole = queryRole in ['candidate', 'recruiter'] ? queryRole : 'candidate' %}
         {% set routeName = app.request.attributes.get('_route') %}
         {% set isAdminPage = routeName starts with 'management_' or routeName == 'back_dashboard' or routeName starts with 'app_admin' %}
-        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status', 'app_candidate_apply', 'app_candidate_application_details', 'app_candidate_application_edit', 'app_recruiter_application_details'] %}
+        {% set unsafeRoleRoutes = ['front_interview_create', 'front_interview_edit', 'front_interview_delete', 'front_interview_feedback', 'front_application_set_status', 'app_candidate_apply', 'app_candidate_application_details', 'app_candidate_application_edit', 'app_recruiter_application_details', 'management_job_applications_details'] %}
         {% set roleSwitchRoute = routeName in unsafeRoleRoutes ? 'front_interviews' : routeName %}
         <div class="page tb-page-shell">
             {% if not isAdminPage %}
@@ -85,13 +85,15 @@
                 </div>
             </header>
             {% endif %}
-            <div class="container-xl mt-2">
-                {% for label in ['success', 'warning', 'error'] %}
-                    {% for message in app.flashes(label) %}
-                        <div class="alert alert-{{ label == 'error' ? 'danger' : (label == 'warning' ? 'warning' : 'success') }}" role="alert">{{ message }}</div>
+            {% if not isAdminPage %}
+                <div class="container-xl mt-2">
+                    {% for label in ['success', 'warning', 'error'] %}
+                        {% for message in app.flashes(label) %}
+                            <div class="alert alert-{{ label == 'error' ? 'danger' : (label == 'warning' ? 'warning' : 'success') }}" role="alert">{{ message }}</div>
+                        {% endfor %}
                     {% endfor %}
-                {% endfor %}
-            </div>
+                </div>
+            {% endif %}
             {% block body %}{% endblock %}
         </div>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
