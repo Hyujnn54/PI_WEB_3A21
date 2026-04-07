@@ -78,6 +78,7 @@
                                 data-accept-url="{{ card.accept_url|default('#') }}" 
                                 data-decline-url="{{ card.decline_url|default('#') }}" 
                                 data-create-url="{{ card.create_interview_url|default('#') }}" 
+                                data-create-check-url="{{ card.create_interview_check_url|default('') }}"
                                 data-create-disabled="{{ canCreateInterview ? '0' : '1' }}" 
                                 data-create-reason="{{ card.interview_block_reason|default('Interview already created for this application.')|e('html_attr') }}"
                                 data-details-url="{{ card.details_url|default('#') }}"
@@ -108,12 +109,17 @@
                                         <input type="hidden" name="return_to" value="list">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Reject</button>
                                     </form>
-                                    <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal {{ not canCreateInterview ? 'tb-create-locked' : '' }}" 
-                                        data-application-id="{{ card.id|default(0) }}" 
-                                        data-create-url="{{ card.create_interview_url|default('#') }}"
-                                        {% if not canCreateInterview %}disabled title="{{ card.interview_block_reason|default('Interview already exists') }}"{% endif %}>
-                                        <i class="ti ti-calendar-plus me-1"></i>{{ canCreateInterview ? 'Create Interview' : 'Interview Exists' }}
-                                    </button>
+                                    {% if canCreateInterview %}
+                                        <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal" 
+                                            data-application-id="{{ card.id|default(0) }}" 
+                                            data-create-url="{{ card.create_interview_url|default('#') }}">
+                                            <i class="ti ti-calendar-plus me-1"></i>Create Interview
+                                        </button>
+                                    {% else %}
+                                        <span class="btn btn-sm btn-secondary disabled" title="{{ card.interview_block_reason|default('Interview already created') }}" aria-disabled="true">
+                                            <i class="ti ti-check me-1"></i>Interview Already Created
+                                        </span>
+                                    {% endif %}
                                 </div>
                             {% endif %}
                             {# Candidate inline buttons #}

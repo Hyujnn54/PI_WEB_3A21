@@ -118,6 +118,10 @@ class FrontPortalController extends AbstractController
                             'applicationId' => (string) $application->getId(),
                             'role' => $role
                         ] + $request->query->all());
+                        $createInterviewCheckUrl = $this->generateUrl('front_application_interview_availability', [
+                            'applicationId' => (string) $application->getId(),
+                            'role' => $role,
+                        ] + $request->query->all());
                         $acceptUrl = $this->generateUrl('front_application_set_status', [
                             'applicationId' => (string) $application->getId(),
                             'status' => 'accepted',
@@ -141,6 +145,7 @@ class FrontPortalController extends AbstractController
                             'reject_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
                             // From interview: interview creation with one-per-application rule
                             'create_interview_url' => $hasActiveInterview ? '#' : $createInterviewUrl,
+                            'create_interview_check_url' => $createInterviewCheckUrl,
                             'can_create_interview' => !$hasActiveInterview,
                             'interview_block_reason' => $hasActiveInterview ? 'Interview already created for this application.' : '',
                             'accept_url' => $acceptUrl,
