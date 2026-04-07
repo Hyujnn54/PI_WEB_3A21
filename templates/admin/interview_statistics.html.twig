@@ -1,0 +1,308 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Talent Bridge | Interview Statistics{% endblock %}
+
+{% block admin_content %}
+    {% set total = global.total %}
+    {% set scheduledPct = total > 0 ? (global.scheduled * 100 / total) : 0 %}
+    {% set completedPct = total > 0 ? (global.completed * 100 / total) : 0 %}
+    {% set cancelledPct = total > 0 ? (global.cancelled * 100 / total) : 0 %}
+    {% set pendingPct = total > 0 ? (global.pending * 100 / total) : 0 %}
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Interview Statistics</h1>
+            <p class="text-muted mb-0">Global interview performance, feedback analysis, and per-offer breakdown.</p>
+        </div>
+        <a href="{{ path('management_interviews_statistics') }}" class="btn btn-outline-primary">
+            <i class="ti ti-refresh me-1"></i>Refresh
+        </a>
+    </div>
+
+    {# KPI Cards #}
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Total</div>
+                    <div class="h4 mb-0">{{ global.total }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Scheduled</div>
+                    <div class="h4 mb-0 text-primary">{{ global.scheduled }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Completed</div>
+                    <div class="h4 mb-0 text-success">{{ global.completed }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Cancelled</div>
+                    <div class="h4 mb-0 text-danger">{{ global.cancelled }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Upcoming</div>
+                    <div class="h4 mb-0 text-info">{{ global.upcoming }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Past</div>
+                    <div class="h4 mb-0">{{ global.past }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Charts Row #}
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-4">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <h2 class="h6 mb-3">Status Distribution</h2>
+                    <div id="interviewStatusChart" style="min-height: 280px;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <h2 class="h6 mb-3">Interview Mode</h2>
+                    <div id="interviewModeChart" style="min-height: 280px;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <h2 class="h6 mb-3">Feedback Decisions</h2>
+                    <div id="feedbackDecisionChart" style="min-height: 280px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Completion Rate & Feedback Stats #}
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-6">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h2 class="h6 mb-0">Interview Completion Rate</h2>
+                        <span class="fw-semibold text-success">{{ global.completion_rate }}%</span>
+                    </div>
+                    <div class="progress" role="progressbar" style="height: 12px;">
+                        <div class="progress-bar bg-success" id="completionRateBar"></div>
+                    </div>
+                    <small class="text-muted">Percentage of interviews completed or already reviewed.</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-6">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h2 class="h6 mb-0">Candidate Acceptance Rate</h2>
+                        <span class="fw-semibold text-primary">{{ feedback.acceptance_rate }}%</span>
+                    </div>
+                    <div class="progress" role="progressbar" style="height: 12px;">
+                        <div class="progress-bar bg-primary" id="acceptanceRateBar"></div>
+                    </div>
+                    <small class="text-muted">Based on {{ feedback.total }} feedback(s). Avg Score: {{ feedback.avg_score }}/100</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Per-Offer Table #}
+    <div class="card border">
+        <div class="card-body pb-0">
+            <h2 class="h6 mb-3">Per-Offer Interview Statistics</h2>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Job Offer</th>
+                        <th>Total</th>
+                        <th>Scheduled</th>
+                        <th>Completed</th>
+                        <th>Cancelled</th>
+                        <th>Completion Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in offerRows %}
+                        <tr>
+                            <td>{{ row.offer_title }}</td>
+                            <td>{{ row.total }}</td>
+                            <td><span class="text-primary">{{ row.scheduled }}</span></td>
+                            <td><span class="text-success">{{ row.completed }}</span></td>
+                            <td><span class="text-danger">{{ row.cancelled }}</span></td>
+                            <td style="min-width: 180px;">
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span>{{ row.completion_rate }}%</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-success js-stat-progress" data-rate="{{ row.completion_rate }}"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">No interview statistics available.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const initKey = '__tbAdminInterviewStatsInit';
+
+            const initInterviewStats = function (retryCount) {
+                const statusChartEl = document.getElementById('interviewStatusChart');
+                const modeChartEl = document.getElementById('interviewModeChart');
+                const feedbackChartEl = document.getElementById('feedbackDecisionChart');
+                if (!statusChartEl && !modeChartEl && !feedbackChartEl) {
+                    return;
+                }
+
+                document.querySelectorAll('.js-stat-progress').forEach(function (bar) {
+                    const rate = Number(bar.getAttribute('data-rate') || 0);
+                    bar.style.width = Math.max(0, Math.min(100, rate)) + '%';
+                });
+
+                var completionBar = document.getElementById('completionRateBar');
+                if (completionBar) {
+                    completionBar.style.width = '{{ global.completion_rate }}%';
+                }
+
+                var acceptanceBar = document.getElementById('acceptanceRateBar');
+                if (acceptanceBar) {
+                    acceptanceBar.style.width = '{{ feedback.acceptance_rate }}%';
+                }
+
+                if (typeof ApexCharts === 'undefined') {
+                    if ((retryCount || 0) < 15) {
+                        window.setTimeout(function () {
+                            initInterviewStats((retryCount || 0) + 1);
+                        }, 120);
+                    }
+                    return;
+                }
+
+                if (statusChartEl) {
+                    if (statusChartEl._tbApexInstance) {
+                        statusChartEl._tbApexInstance.destroy();
+                    }
+                    statusChartEl.innerHTML = '';
+
+                    var statusOptions = {
+                        series: [{{ global.scheduled }}, {{ global.completed }}, {{ global.cancelled }}, {{ global.pending }}],
+                        chart: { type: 'donut', height: 280 },
+                        labels: ['Scheduled', 'Completed', 'Cancelled', 'Pending'],
+                        colors: ['#0d6efd', '#198754', '#dc3545', '#6c757d'],
+                        legend: { position: 'bottom' },
+                        plotOptions: {
+                            pie: {
+                                donut: {
+                                    size: '55%',
+                                    labels: {
+                                        show: true,
+                                        total: {
+                                            show: true,
+                                            label: 'Total',
+                                            formatter: function () { return '{{ global.total }}'; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    };
+
+                    statusChartEl._tbApexInstance = new ApexCharts(statusChartEl, statusOptions);
+                    statusChartEl._tbApexInstance.render();
+                }
+
+                if (modeChartEl) {
+                    if (modeChartEl._tbApexInstance) {
+                        modeChartEl._tbApexInstance.destroy();
+                    }
+                    modeChartEl.innerHTML = '';
+
+                    var modeOptions = {
+                        series: [{{ global.online }}, {{ global.onsite }}],
+                        chart: { type: 'pie', height: 280 },
+                        labels: ['Online', 'Onsite'],
+                        colors: ['#0dcaf0', '#ffc107'],
+                        legend: { position: 'bottom' }
+                    };
+
+                    modeChartEl._tbApexInstance = new ApexCharts(modeChartEl, modeOptions);
+                    modeChartEl._tbApexInstance.render();
+                }
+
+                if (feedbackChartEl) {
+                    if (feedbackChartEl._tbApexInstance) {
+                        feedbackChartEl._tbApexInstance.destroy();
+                    }
+                    feedbackChartEl.innerHTML = '';
+
+                    var feedbackOptions = {
+                        series: [{{ feedback.accepted }}, {{ feedback.rejected }}],
+                        chart: { type: 'donut', height: 280 },
+                        labels: ['Accepted', 'Rejected'],
+                        colors: ['#198754', '#dc3545'],
+                        legend: { position: 'bottom' },
+                        plotOptions: {
+                            pie: {
+                                donut: {
+                                    size: '55%',
+                                    labels: {
+                                        show: true,
+                                        total: {
+                                            show: true,
+                                            label: 'Feedbacks',
+                                            formatter: function () { return '{{ feedback.total }}'; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    };
+
+                    feedbackChartEl._tbApexInstance = new ApexCharts(feedbackChartEl, feedbackOptions);
+                    feedbackChartEl._tbApexInstance.render();
+                }
+            };
+
+            if (!window[initKey]) {
+                window[initKey] = true;
+                document.addEventListener('DOMContentLoaded', function () { initInterviewStats(0); });
+                document.addEventListener('turbo:load', function () { initInterviewStats(0); });
+            }
+
+            initInterviewStats(0);
+        })();
+    </script>
+{% endblock %}

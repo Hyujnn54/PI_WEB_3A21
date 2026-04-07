@@ -14,34 +14,42 @@
 
     <section class="py-5">
         <div class="container-xl">
+            <div class="tb-front-home-hero">
             <div class="row align-items-center g-4">
                 <div class="col-lg-6">
-                    <h1 class="display-6 fw-bold mb-3">Recruitment Platform Template Setup</h1>
-                    <p class="lead mb-4">This home page is now switched to the template-handoff layout and kept as a UI-only showcase.</p>
+                    <div class="badge rounded-pill text-bg-light mb-3">Talent Bridge Portal</div>
+                    <h1 class="display-5 fw-bold mb-3">A Hiring Workspace That Feels Alive</h1>
+                    <p class="lead mb-4 text-secondary">Navigate offers, interviews, applications, and events from one unified front portal with stronger visual hierarchy and faster actions.</p>
                     <div class="d-flex gap-2 flex-wrap">
-                        <a href="{{ path('back_dashboard') }}" class="btn btn-primary">Go to Dashboard</a>
+                        <a href="{{ path('front_job_offers', {role: 'candidate'}) }}" class="btn btn-primary">Start as Candidate</a>
+                        <a href="{{ path('front_job_offers', {role: 'recruiter'}) }}" class="btn btn-outline-primary">Switch to Recruiter</a>
                         <a href="{{ path('front_job_offers', {role: 'candidate'}) }}" class="btn btn-outline-primary">Explore Job Offers</a>
+                        <a href="{{ path('back_dashboard') }}" class="btn btn-outline-secondary">Admin Dashboard</a>
                     </div>
                 </div>
                 <div class="col-lg-6 text-center">
-                    <img src="{{ asset('team_uploads/logo.png') }}" class="img-fluid" alt="TalentBridge illustration" style="max-width: 260px;">
+                    <div class="tb-front-home-logo-ring">
+                        <img src="{{ asset('assets/team_uploads/logo.png') }}" class="img-fluid" alt="TalentBridge illustration" style="max-width: 58%;">
+                    </div>
                 </div>
+            </div>
             </div>
         </div>
     </section>
 
-    <section class="py-5">
+    <section class="pt-2 pb-5">
         <div class="container-xl">
             <div class="row mb-4">
                 <div class="col-12 text-center">
-                    <h2 class="h3 mb-0">Core Modules</h2>
+                    <h2 class="h3 mb-2">Core Modules</h2>
+                    <p class="text-secondary mb-0">Each module is optimized for role-based workflows without changing existing business logic.</p>
                 </div>
             </div>
             <div class="row g-4">
                 {% for module in modules %}
                     <div class="col-md-6 col-lg-4">
-                        <div class="card card-body border h-100">
-                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-blue-lt text-blue mb-3" style="width: 44px; height: 44px;">
+                        <div class="card card-body tb-front-home-card">
+                            <div class="tb-front-home-icon mb-3">
                                 <i class="{{ module.icon }}"></i>
                             </div>
                             <h5>{{ module.title }}</h5>

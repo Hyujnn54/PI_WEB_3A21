@@ -6,13 +6,13 @@
 {% set role = authUser.role|default('candidate') %}
 <div class="page-wrapper">
     <div class="page-header d-print-none">
-        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2 tb-front-page-head">
             <div>
                 <h2 class="page-title"><i class="ti ti-message-2 me-1"></i>Interviews</h2>
                 <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Organize panels, evaluate candidates, and finalize outcomes.' : 'Track all interview outcomes and decision progress.' }}</p>
             </div>
             <div class="d-flex gap-2">
-                <button type="button" class="btn btn-outline-primary" id="openInterviewCalendarBtn" data-bs-toggle="modal" data-bs-target="#interviewCalendarModal">Calendar</button>
+                <button type="button" class="btn btn-outline-primary" id="openInterviewCalendarBtn">Calendar</button>
             </div>
         </div>
     </div>
@@ -63,6 +63,30 @@
                                     </div>
                                     <h3>{{ card.title }}</h3>
                                     <p>{{ card.text }}</p>
+                                    {# Inline action buttons for recruiter #}
+                                    {% if role == 'recruiter' %}
+                                        <div class="d-flex flex-wrap gap-2 mt-3">
+                                            <button type="button" class="btn btn-sm btn-primary tb-inline-modify {{ card.can_modify|default(false) ? '' : 'disabled' }}" 
+                                                data-interview-id="{{ card.id|default(0) }}"
+                                                {% if not card.can_modify|default(false) %}disabled title="Cannot modify - interview date has passed or is within 2 hours"{% endif %}>
+                                                <i class="ti ti-edit me-1"></i>Modify
+                                            </button>
+                                            <form method="post" action="{{ card.delete_url|default('#') }}" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger {{ card.can_modify|default(false) ? '' : 'disabled' }}"
+                                                    {% if not card.can_modify|default(false) %}disabled title="Cannot delete - interview date has passed or is within 2 hours"{% endif %}
+                                                    onclick="return confirm('Are you sure you want to delete this interview?');">
+                                                    <i class="ti ti-trash me-1"></i>Delete
+                                                </button>
+                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-primary tb-inline-review {{ card.can_feedback|default(false) ? '' : 'disabled' }}"
+                                                data-interview-id="{{ card.id|default(0) }}"
+                                                data-feedback-url="{{ card.feedback_url|default('#') }}"
+                                                {% if not card.can_feedback|default(false) %}disabled title="Cannot review - interview has not ended yet"{% endif %}>
+                                                <i class="ti ti-message-2-check me-1"></i>{{ card.review_label|default('Review') }}
+                                            </button>
+                                        </div>
+                                    {% endif %}
+                                    {# Candidate view is read-only in interview cards (no action buttons). #}
                                 </div>
                             </div>
                         {% else %}
@@ -91,22 +115,7 @@
                 </div>
             </div>
 
-            {% if role == 'recruiter' %}
-                <div id="interviewActionDock" class="tb-interview-action-dock d-none">
-                    <div class="container-xl">
-                        <div class="tb-interview-action-dock-inner">
-                            <div class="small text-secondary">Selected interview actions</div>
-                            <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
-                                <a href="#" class="btn btn-primary tb-dock-primary tb-detail-primary"><i class="ti ti-edit me-1"></i>Modify</a>
-                                <form method="post" action="#" class="d-inline tb-dock-delete-form">
-                                    <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Delete</button>
-                                </form>
-                                <a href="#" class="btn btn-outline-primary tb-dock-tertiary tb-open-review-modal"><i class="ti ti-message-2-check me-1"></i>Review</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
+            {# Bottom dock removed - buttons are now inline on cards #}
 
             <div class="modal fade" id="interviewCalendarModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
                 <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -230,7 +239,7 @@
         const calendarOpenBtn = document.getElementById('openInterviewCalendarBtn');
 
         if (calendarModalEl && calendarOpenBtn && typeof bootstrap !== 'undefined') {
-            const calendarModal = new bootstrap.Modal(calendarModalEl);
+            const calendarModal = bootstrap.Modal.getOrCreateInstance(calendarModalEl);
             calendarOpenBtn.addEventListener('click', function (event) {
                 event.preventDefault();
                 calendarModal.show();
@@ -438,15 +447,24 @@
                 reviewModal.show();
             };
 
-            const reviewBtn = document.querySelector('.tb-open-review-modal');
-            if (reviewBtn) {
-                reviewBtn.addEventListener('click', function (e) {
+            // Handle inline review buttons (new approach)
+            document.querySelectorAll('.tb-inline-review').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
                     e.preventDefault();
-                    if (reviewBtn.classList.contains('disabled')) return;
-                    const card = document.querySelector('.tb-module-card.is-selected');
-                    openReviewModalForCard(card);
+                    e.stopPropagation();
+                    if (btn.disabled || btn.classList.contains('disabled')) return;
+                    const card = btn.closest('.tb-module-card');
+                    if (card) {
+                        const feedbackUrl = btn.getAttribute('data-feedback-url') || card.getAttribute('data-action-tertiary-href') || '#';
+                        reviewForm.setAttribute('action', feedbackUrl);
+                        if (reviewScore) reviewScore.value = card.getAttribute('data-review-score') || '80';
+                        if (reviewDecision) reviewDecision.value = card.getAttribute('data-review-decision') || 'accepted';
+                        if (reviewComment) reviewComment.value = card.getAttribute('data-review-comment') || '';
+                        if (reviewCommentCount && reviewComment) reviewCommentCount.textContent = String(reviewComment.value.length);
+                        reviewModal.show();
+                    }
                 });
-            }
+            });
 
             const openReviewFor = params.get('openReviewFor');
             if (openReviewFor) {
@@ -455,52 +473,58 @@
             }
         }
 
-        const actionDock = document.getElementById('interviewActionDock');
-        if (actionDock) {
-            const dockPrimary = actionDock.querySelector('.tb-dock-primary');
-            const dockSecondary = actionDock.querySelector('.tb-dock-secondary');
-            const dockTertiary = actionDock.querySelector('.tb-dock-tertiary');
-            const dockDeleteForm = actionDock.querySelector('.tb-dock-delete-form');
+        // Handle inline modify buttons (new approach)
+        document.querySelectorAll('.tb-inline-modify').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (btn.disabled || btn.classList.contains('disabled')) return;
+                const card = btn.closest('.tb-module-card');
+                if (card) {
+                    const editModalEl = document.getElementById('editInterviewModal');
+                    const editForm = document.getElementById('editInterviewForm');
+                    if (editModalEl && editForm && typeof bootstrap !== 'undefined') {
+                        const editModal = bootstrap.Modal.getOrCreateInstance(editModalEl);
+                        editForm.setAttribute('action', card.getAttribute('data-edit-url') || '#');
+                        const scheduledAt = card.getAttribute('data-edit-scheduled-at') || '';
+                        const duration = card.getAttribute('data-edit-duration') || '60';
+                        const mode = card.getAttribute('data-edit-mode') || 'online';
+                        const meetingLink = card.getAttribute('data-edit-meeting-link') || '';
+                        const location = card.getAttribute('data-edit-location') || '';
+                        const notes = card.getAttribute('data-edit-notes') || '';
 
-            const syncDockWithCard = function (card) {
-                if (!card) {
-                    actionDock.classList.add('d-none');
-                    return;
+                        const scheduleInput = editForm.querySelector('input[name="scheduled_at"]');
+                        const durationInput = editForm.querySelector('input[name="duration_minutes"]');
+                        const modeSelect = editForm.querySelector('select[name="mode"]');
+                        const meetingInput = editForm.querySelector('input[name="meeting_link"]');
+                        const locationInput = editForm.querySelector('input[name="location"]');
+                        const notesInput = editForm.querySelector('textarea[name="notes"]');
+                        const notesCount = editForm.querySelector('[data-edit-notes-count]');
+                        const onlineField = editForm.querySelector('[data-online-field]');
+                        const onsiteField = editForm.querySelector('[data-onsite-field]');
+
+                        if (scheduleInput) scheduleInput.value = scheduledAt;
+                        if (durationInput) durationInput.value = duration;
+                        if (modeSelect) modeSelect.value = mode;
+                        if (meetingInput) meetingInput.value = meetingLink;
+                        if (locationInput) locationInput.value = location;
+                        if (notesInput) notesInput.value = notes;
+                        
+                        // Apply mode fields
+                        if (mode === 'onsite') {
+                            if (onlineField) onlineField.classList.add('d-none');
+                            if (onsiteField) onsiteField.classList.remove('d-none');
+                        } else {
+                            if (onsiteField) onsiteField.classList.add('d-none');
+                            if (onlineField) onlineField.classList.remove('d-none');
+                        }
+                        
+                        if (notesCount && notesInput) notesCount.textContent = String(notesInput.value.length);
+                        editModal.show();
+                    }
                 }
-
-                actionDock.classList.remove('d-none');
-
-                if (dockPrimary) {
-                    dockPrimary.textContent = card.getAttribute('data-action-primary') || 'Modify';
-                    dockPrimary.insertAdjacentHTML('afterbegin', '<i class="ti ti-edit me-1"></i>');
-                    dockPrimary.setAttribute('href', card.getAttribute('data-action-primary-href') || '#');
-                    const isDisabled = card.getAttribute('data-action-primary-disabled') === '1';
-                    dockPrimary.classList.toggle('disabled', isDisabled);
-                    dockPrimary.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
-                }
-
-                if (dockSecondary && dockDeleteForm) {
-                    dockDeleteForm.setAttribute('action', card.getAttribute('data-action-secondary-href') || '#');
-                    const isDisabled = card.getAttribute('data-action-secondary-disabled') === '1';
-                    dockSecondary.toggleAttribute('disabled', isDisabled);
-                }
-
-                if (dockTertiary) {
-                    dockTertiary.textContent = card.getAttribute('data-action-tertiary') || 'Review';
-                    dockTertiary.insertAdjacentHTML('afterbegin', '<i class="ti ti-message-2-check me-1"></i>');
-                    dockTertiary.setAttribute('href', card.getAttribute('data-action-tertiary-href') || '#');
-                    const isDisabled = card.getAttribute('data-action-tertiary-disabled') === '1';
-                    dockTertiary.classList.toggle('disabled', isDisabled);
-                    dockTertiary.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
-                }
-            };
-
-            document.querySelectorAll('#interviewCardsGrid .tb-module-card').forEach(function (card) {
-                card.addEventListener('click', function () {
-                    setTimeout(function () { syncDockWithCard(card); }, 0);
-                });
             });
-        }
+        });
 
     };
 
