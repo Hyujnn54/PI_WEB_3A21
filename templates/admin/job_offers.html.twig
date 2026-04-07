@@ -28,11 +28,13 @@
                         <th>Status</th>
                         <th>Created</th>
                         <th>Deadline</th>
+                        <th>Warning</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for offer in offers %}
-                    <tr>
+                    {% set warned = offer.is_warned|default(0) == 1 %}
+                    <tr class="{{ warned ? 'table-warning' : '' }}">
                         <td>#{{ offer.id }}</td>
                         <td>{{ offer.title }}</td>
                         <td>{{ offer.recruiter_id }}</td>
@@ -41,10 +43,21 @@
                         <td>{{ offer.status }}</td>
                         <td>{{ offer.created_at ? offer.created_at|date('Y-m-d H:i') : '-' }}</td>
                         <td>{{ offer.deadline ? offer.deadline|date('Y-m-d H:i') : '-' }}</td>
+                        <td style="min-width: 280px;">
+                            {% if warned %}
+                                <div class="small fw-semibold text-warning-emphasis mb-1">Already warned</div>
+                                <div class="small text-secondary">Reason: {{ offer.warning_reason|default('-') }}</div>
+                            {% else %}
+                                <form method="post" action="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}" class="d-flex flex-column gap-2">
+                                    <textarea name="reason" rows="2" class="form-control form-control-sm" placeholder="Reason for warning..." required></textarea>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Send Warning</button>
+                                </form>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="8" class="text-secondary">No job offers found.</td>
+                        <td colspan="9" class="text-secondary">No job offers found.</td>
                     </tr>
                 {% endfor %}
                 </tbody>
