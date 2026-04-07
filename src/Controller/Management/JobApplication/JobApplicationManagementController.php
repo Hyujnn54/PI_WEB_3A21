@@ -5,6 +5,7 @@ namespace App\Controller\Management\JobApplication;
 use App\Entity\Admin;
 use App\Entity\Application_status_history;
 use App\Entity\Job_application;
+use App\Entity\Job_offer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -21,6 +22,92 @@ class JobApplicationManagementController extends AbstractController
         'INTERVIEW',
         'HIRED',
     ];
+
+    #[Route('/applicationmanagement/admin/applications-statistics', name: 'management_job_applications_statistics')]
+    public function statistics(EntityManagerInterface $em): Response
+    {
+        $offers = $em->getRepository(Job_offer::class)->findBy([], ['created_at' => 'DESC']);
+        $applications = $em->getRepository(Job_application::class)->findBy([]);
+
+        $offerRows = [];
+        foreach ($offers as $offer) {
+            $offerId = (string) $offer->getId();
+            $offerRows[$offerId] = [
+                'offer_id' => $offerId,
+                'offer_title' => (string) $offer->getTitle(),
+                'total' => 0,
+                'submitted' => 0,
+                'shortlisted' => 0,
+                'rejected' => 0,
+                'interview' => 0,
+                'hired' => 0,
+                'acceptance_rate' => 0,
+            ];
+        }
+
+        $global = [
+            'total' => 0,
+            'submitted' => 0,
+            'shortlisted' => 0,
+            'rejected' => 0,
+            'interview' => 0,
+            'hired' => 0,
+            'acceptance_rate' => 0,
+        ];
+
+        foreach ($applications as $application) {
+            $status = strtoupper((string) $application->getCurrent_status());
+            $offer = $application->getOffer_id();
+            $offerId = $offer ? (string) $offer->getId() : null;
+
+            $global['total']++;
+            if ($status === 'SUBMITTED') {
+                $global['submitted']++;
+            } elseif ($status === 'SHORTLISTED') {
+                $global['shortlisted']++;
+            } elseif ($status === 'REJECTED') {
+                $global['rejected']++;
+            } elseif ($status === 'INTERVIEW') {
+                $global['interview']++;
+            } elseif ($status === 'HIRED') {
+                $global['hired']++;
+            }
+
+            if ($offerId === null || !isset($offerRows[$offerId])) {
+                continue;
+            }
+
+            $offerRows[$offerId]['total']++;
+            if ($status === 'SUBMITTED') {
+                $offerRows[$offerId]['submitted']++;
+            } elseif ($status === 'SHORTLISTED') {
+                $offerRows[$offerId]['shortlisted']++;
+            } elseif ($status === 'REJECTED') {
+                $offerRows[$offerId]['rejected']++;
+            } elseif ($status === 'INTERVIEW') {
+                $offerRows[$offerId]['interview']++;
+            } elseif ($status === 'HIRED') {
+                $offerRows[$offerId]['hired']++;
+            }
+        }
+
+        foreach ($offerRows as &$row) {
+            $row['acceptance_rate'] = $row['total'] > 0
+                ? (int) round((($row['shortlisted'] + $row['hired']) / $row['total']) * 100)
+                : 0;
+        }
+        unset($row);
+
+        $global['acceptance_rate'] = $global['total'] > 0
+            ? (int) round((($global['shortlisted'] + $global['hired']) / $global['total']) * 100)
+            : 0;
+
+        return $this->render('admin/application_statistics.html.twig', [
+            'global' => $global,
+            'offerRows' => array_values($offerRows),
+            'authUser' => ['role' => 'admin'],
+        ]);
+    }
 
     #[Route('/applicationmanagement/admin/job-applications', name: 'management_job_applications')]
     public function index(EntityManagerInterface $em): Response

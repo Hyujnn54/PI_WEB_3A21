@@ -1,0 +1,187 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Talent Bridge | Applications Statistics{% endblock %}
+
+{% block admin_content %}
+    {% set total = global.total %}
+    {% set submittedPct = total > 0 ? (global.submitted * 100 / total) : 0 %}
+    {% set shortlistedPct = total > 0 ? (global.shortlisted * 100 / total) : 0 %}
+    {% set rejectedPct = total > 0 ? (global.rejected * 100 / total) : 0 %}
+    {% set interviewPct = total > 0 ? (global.interview * 100 / total) : 0 %}
+    {% set hiredPct = total > 0 ? (global.hired * 100 / total) : 0 %}
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Applications Statistics</h1>
+            <p class="text-muted mb-0">Global and per-offer application performance overview.</p>
+        </div>
+        <a href="{{ path('management_job_applications_statistics') }}" class="btn btn-outline-primary">
+            <i class="ti ti-refresh me-1"></i>Refresh
+        </a>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Total</div>
+                    <div class="h4 mb-0">{{ global.total }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Submitted</div>
+                    <div class="h4 mb-0">{{ global.submitted }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Shortlisted</div>
+                    <div class="h4 mb-0">{{ global.shortlisted }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Rejected</div>
+                    <div class="h4 mb-0">{{ global.rejected }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Interview</div>
+                    <div class="h4 mb-0">{{ global.interview }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Hired</div>
+                    <div class="h4 mb-0">{{ global.hired }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-8">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h2 class="h6 mb-0">Global Acceptance Rate</h2>
+                        <span class="fw-semibold text-success">{{ global.acceptance_rate }}%</span>
+                    </div>
+                    <div class="progress" role="progressbar" aria-label="Global acceptance rate" aria-valuenow="{{ global.acceptance_rate }}" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
+                        <div class="progress-bar bg-success js-stat-progress" data-rate="{{ global.acceptance_rate }}"></div>
+                    </div>
+                    <small class="text-muted">Calculated as (Shortlisted + Hired) / Total applications.</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4">
+            <div class="card border h-100">
+                <div class="card-body">
+                    <h2 class="h6 mb-3">Status Distribution</h2>
+                    <div class="d-flex justify-content-center mb-3">
+                        <div
+                            class="js-admin-status-distribution"
+                            data-submitted="{{ submittedPct }}"
+                            data-shortlisted="{{ shortlistedPct }}"
+                            data-rejected="{{ rejectedPct }}"
+                            data-interview="{{ interviewPct }}"
+                            style="width: 180px; height: 180px; border-radius: 50%;"
+                        ></div>
+                    </div>
+                    <div class="small d-grid gap-1">
+                        <div><span class="badge" style="background:#6c757d">&nbsp;</span> Submitted: {{ global.submitted }}</div>
+                        <div><span class="badge" style="background:#f39c12">&nbsp;</span> Shortlisted: {{ global.shortlisted }}</div>
+                        <div><span class="badge" style="background:#e74c3c">&nbsp;</span> Rejected: {{ global.rejected }}</div>
+                        <div><span class="badge" style="background:#9b59b6">&nbsp;</span> Interview: {{ global.interview }}</div>
+                        <div><span class="badge" style="background:#2ecc71">&nbsp;</span> Hired: {{ global.hired }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border">
+        <div class="card-body pb-0">
+            <h2 class="h6 mb-3">Per-Offer Statistics</h2>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Offer</th>
+                        <th>Total</th>
+                        <th>Submitted</th>
+                        <th>Shortlisted</th>
+                        <th>Rejected</th>
+                        <th>Interview</th>
+                        <th>Hired</th>
+                        <th>Acceptance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in offerRows %}
+                        <tr>
+                            <td>{{ row.offer_title }}</td>
+                            <td>{{ row.total }}</td>
+                            <td>{{ row.submitted }}</td>
+                            <td>{{ row.shortlisted }}</td>
+                            <td>{{ row.rejected }}</td>
+                            <td>{{ row.interview }}</td>
+                            <td>{{ row.hired }}</td>
+                            <td style="min-width: 180px;">
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span>{{ row.acceptance_rate }}%</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-success js-stat-progress" data-rate="{{ row.acceptance_rate }}"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">No offer statistics available.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.js-stat-progress').forEach(function (bar) {
+                const rate = Number(bar.getAttribute('data-rate') || 0);
+                bar.style.width = Math.max(0, Math.min(100, rate)) + '%';
+            });
+
+            const donut = document.querySelector('.js-admin-status-distribution');
+            if (!donut) {
+                return;
+            }
+
+            const submitted = Number(donut.getAttribute('data-submitted') || 0);
+            const shortlisted = Number(donut.getAttribute('data-shortlisted') || 0);
+            const rejected = Number(donut.getAttribute('data-rejected') || 0);
+            const interview = Number(donut.getAttribute('data-interview') || 0);
+
+            const p1 = submitted;
+            const p2 = submitted + shortlisted;
+            const p3 = p2 + rejected;
+            const p4 = p3 + interview;
+
+            donut.style.background = 'conic-gradient(#6c757d 0% ' + p1 + '%, #f39c12 ' + p1 + '% ' + p2 + '%, #e74c3c ' + p2 + '% ' + p3 + '%, #9b59b6 ' + p3 + '% ' + p4 + '%, #2ecc71 ' + p4 + '% 100%)';
+        });
+    </script>
+{% endblock %}
