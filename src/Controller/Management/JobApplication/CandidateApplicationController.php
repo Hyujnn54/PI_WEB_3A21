@@ -34,6 +34,18 @@ class CandidateApplicationController extends AbstractController
             return new Response('Candidate or Job Offer not found!', Response::HTTP_NOT_FOUND);
         }
 
+        $existingApplication = $em->getRepository(Job_application::class)->findOneBy([
+            'offer_id' => $jobOffer,
+            'candidate_id' => $candidate,
+            'is_archived' => false,
+        ]);
+
+        if ($existingApplication) {
+            $this->addFlash('warning', 'You have already applied for this job offer.');
+
+            return $this->redirectToRoute('front_job_offers', ['role' => 'candidate']);
+        }
+
         $application = new Job_application();
         $application->setOffer_id($jobOffer);
         $application->setCandidate_id($candidate);
@@ -51,13 +63,18 @@ class CandidateApplicationController extends AbstractController
             $cvFile = $form->get('cv_file')->getData();
 
             if ($useProfileCv) {
-                // Suppose the candidate entity has getResume or getCvPath
-                if (method_exists($candidate, 'getCv_path') && $candidate->getCv_path()) {
-                    $application->setCv_path($candidate->getCv_path());
-                } else {
-                    // Fallback dummy
-                    $application->setCv_path('profile_cv_dummy.pdf');
+                $profileCvPath = method_exists($candidate, 'getCv_path') ? $candidate->getCv_path() : null;
+                if (empty($profileCvPath)) {
+                    $this->addFlash('warning', 'No CV found in your profile. Please upload a CV.');
+
+                    return $this->render('management/job_application/apply.html.twig', [
+                        'form' => $form->createView(),
+                        'offer' => $jobOffer,
+                        'candidate' => $candidate,
+                    ]);
                 }
+
+                $application->setCv_path($profileCvPath);
             } elseif ($cvFile) {
                 $originalFilename = pathinfo($cvFile->getClientOriginalName(), PATHINFO_FILENAME);
                 $safeFilename = $slugger->slug($originalFilename);
@@ -71,10 +88,22 @@ class CandidateApplicationController extends AbstractController
                     $cvFile->move($uploadPath, $newFilename);
                     $application->setCv_path($newFilename);
                 } catch (FileException $e) {
-                    $application->setCv_path('upload_error.pdf');
+                    $this->addFlash('error', 'CV upload failed. Please try again.');
+
+                    return $this->render('management/job_application/apply.html.twig', [
+                        'form' => $form->createView(),
+                        'offer' => $jobOffer,
+                        'candidate' => $candidate,
+                    ]);
                 }
             } else {
-                $application->setCv_path('no_cv_provided.pdf');
+                $this->addFlash('warning', 'Please choose a CV source: profile CV or upload a new one.');
+
+                return $this->render('management/job_application/apply.html.twig', [
+                    'form' => $form->createView(),
+                    'offer' => $jobOffer,
+                    'candidate' => $candidate,
+                ]);
             }
 
             // Default properties
@@ -85,7 +114,7 @@ class CandidateApplicationController extends AbstractController
             $em->persist($application);
             $em->flush();
 
-            return $this->redirectToRoute('front_job_offers'); // Redirect back to offers after submitting
+            return $this->redirectToRoute('front_job_offers', ['role' => 'candidate']);
         }
 
         return $this->render('management/job_application/apply.html.twig', [

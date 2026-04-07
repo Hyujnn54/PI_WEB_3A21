@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\Entity\Candidate;
+use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -17,6 +19,23 @@ class FrontPortalController extends AbstractController
         $role = (string) $request->query->get('role', 'candidate');
         
         $jobOffers = $em->getRepository(Job_offer::class)->findAll();
+        $candidateId = 3;
+        $appliedOfferIds = [];
+
+        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        if ($candidate) {
+            $activeApplications = $em->getRepository(Job_application::class)->findBy([
+                'candidate_id' => $candidate,
+                'is_archived' => false,
+            ]);
+
+            foreach ($activeApplications as $activeApplication) {
+                $offer = $activeApplication->getOffer_id();
+                if ($offer) {
+                    $appliedOfferIds[(string) $offer->getId()] = true;
+                }
+            }
+        }
         
         $cards = [];
         foreach ($jobOffers as $offer) {
@@ -25,6 +44,7 @@ class FrontPortalController extends AbstractController
                 'meta' => $offer->getLocation() . ' | ' . $offer->getContract_type(),
                 'title' => $offer->getTitle(),
                 'text' => $offer->getDescription(),
+                'already_applied' => isset($appliedOfferIds[(string) $offer->getId()]),
             ];
         }
 
