@@ -357,6 +357,12 @@
             return card.getAttribute('data-create-disabled') !== '1';
         };
 
+        const refreshAllCreateAvailability = function () {
+            document.querySelectorAll('#applicationCardsGrid .tb-module-card[data-create-check-url]').forEach(function (card) {
+                refreshCreateAvailability(card);
+            });
+        };
+
         document.querySelectorAll('#applicationCardsGrid .tb-module-card').forEach(function (card) {
             syncInlineCreateButton(card);
             card.addEventListener('click', function () {
@@ -399,10 +405,10 @@
             refreshCreateAvailability(initiallySelected);
         }
 
+        refreshAllCreateAvailability();
+
         window.addEventListener('pageshow', function () {
-            if (selectedCard) {
-                refreshCreateAvailability(selectedCard);
-            }
+            refreshAllCreateAvailability();
         });
 
         applyModeFields();
