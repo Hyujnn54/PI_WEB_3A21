@@ -181,26 +181,80 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_job_offers', ['role' => $role]);
         }
 
-        if ($request->isMethod('POST')) {
-            $title = trim((string) $request->request->get('title', ''));
-            $description = trim((string) $request->request->get('description', ''));
-            $location = trim((string) $request->request->get('location', ''));
-            $contractType = trim((string) $request->request->get('contract_type', ''));
-            $jobStatus = trim((string) $request->request->get('status', 'open'));
-            $deadlineInput = trim((string) $request->request->get('deadline', ''));
-            $skills = $this->normalizeSkills((array) $request->request->all('skills'));
+        $formData = [
+            'title' => '',
+            'contract_type' => '',
+            'status' => 'open',
+            'description' => '',
+            'location' => '',
+            'deadline' => '',
+            'skills' => [['name' => '', 'level' => '']],
+        ];
+        $fieldErrors = [];
 
-            if ($title === '' || $description === '' || $location === '' || $contractType === '' || $jobStatus === '' || $deadlineInput === '' || count($skills) === 0) {
-                $this->addFlash('error', 'Please fill in all required fields.');
-            } elseif (!in_array($contractType, self::CONTRACT_TYPES, true)) {
-                $this->addFlash('error', 'Please select a valid contract type.');
-            } elseif (!in_array($jobStatus, self::JOB_STATUSES, true)) {
-                $this->addFlash('error', 'Please select a valid status.');
+        if ($request->isMethod('POST')) {
+            $formData = [
+                'title' => trim((string) $request->request->get('title', '')),
+                'contract_type' => trim((string) $request->request->get('contract_type', '')),
+                'status' => trim((string) $request->request->get('status', 'open')),
+                'description' => trim((string) $request->request->get('description', '')),
+                'location' => trim((string) $request->request->get('location', '')),
+                'deadline' => trim((string) $request->request->get('deadline', '')),
+                'skills' => array_map(static function ($entry): array {
+                    return [
+                        'name' => trim((string) ($entry['name'] ?? '')),
+                        'level' => trim((string) ($entry['level'] ?? '')),
+                    ];
+                }, (array) $request->request->all('skills')),
+            ];
+
+            if (count($formData['skills']) === 0) {
+                $formData['skills'] = [['name' => '', 'level' => '']];
+            }
+
+            if ($formData['title'] === '') {
+                $fieldErrors['title'] = 'Title is required.';
+            }
+            if ($formData['contract_type'] === '') {
+                $fieldErrors['contract_type'] = 'Contract type is required.';
+            } elseif (!in_array($formData['contract_type'], self::CONTRACT_TYPES, true)) {
+                $fieldErrors['contract_type'] = 'Please select a valid contract type.';
+            }
+            if ($formData['status'] === '') {
+                $fieldErrors['status'] = 'Status is required.';
+            } elseif (!in_array($formData['status'], self::JOB_STATUSES, true)) {
+                $fieldErrors['status'] = 'Please select a valid status.';
+            }
+            if ($formData['description'] === '') {
+                $fieldErrors['description'] = 'Description is required.';
+            }
+            if ($formData['location'] === '') {
+                $fieldErrors['location'] = 'Location is required.';
+            }
+            if ($formData['deadline'] === '') {
+                $fieldErrors['deadline'] = 'Deadline is required.';
             } else {
-                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $deadlineInput);
+                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
                 if (!$deadline) {
-                    $this->addFlash('error', 'Invalid deadline format.');
-                } else {
+                    $fieldErrors['deadline'] = 'Invalid deadline format.';
+                } elseif ($deadline <= new \DateTimeImmutable()) {
+                    $fieldErrors['deadline'] = 'Deadline must be greater than today.';
+                }
+            }
+            foreach ($formData['skills'] as $index => $skill) {
+                if ($skill['name'] === '') {
+                    $fieldErrors['skills'][$index]['name'] = 'Skill name is required.';
+                }
+                if ($skill['level'] === '') {
+                    $fieldErrors['skills'][$index]['level'] = 'Skill level is required.';
+                } elseif (!in_array($skill['level'], self::SKILL_LEVELS, true)) {
+                    $fieldErrors['skills'][$index]['level'] = 'Invalid skill level.';
+                }
+            }
+
+            if (empty($fieldErrors)) {
+                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                if ($deadline) {
                     $now = new \DateTimeImmutable();
                     $newId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
                     try {
@@ -209,22 +263,22 @@ class FrontPortalController extends AbstractController
                         $connection->insert('job_offer', [
                             'id' => $newId,
                             'recruiter_id' => self::STATIC_RECRUITER_ID,
-                            'title' => $title,
-                            'description' => $description,
-                            'location' => $location,
-                            'latitude' => (float) $request->request->get('latitude', 0),
-                            'longitude' => (float) $request->request->get('longitude', 0),
-                            'contract_type' => $contractType,
+                            'title' => $formData['title'],
+                            'description' => $formData['description'],
+                            'location' => $formData['location'],
+                            'latitude' => 0,
+                            'longitude' => 0,
+                            'contract_type' => $formData['contract_type'],
                             'created_at' => $now->format('Y-m-d H:i:s'),
                             'deadline' => $deadline->format('Y-m-d H:i:s'),
-                            'status' => $jobStatus,
+                            'status' => $formData['status'],
                             'quality_score' => 100,
                             'ai_suggestions' => '',
                             'is_flagged' => 0,
                             'flagged_at' => $now->format('Y-m-d H:i:s'),
                         ]);
 
-                        foreach ($skills as $skill) {
+                        foreach ($formData['skills'] as $skill) {
                             $connection->insert('offer_skill', [
                                 'id' => (string) ((int) round(microtime(true) * 1000) . random_int(100, 999)),
                                 'offer_id' => $newId,
@@ -252,6 +306,8 @@ class FrontPortalController extends AbstractController
             'contractTypes' => self::CONTRACT_TYPES,
             'jobStatuses' => self::JOB_STATUSES,
             'skillLevels' => self::SKILL_LEVELS,
+            'formData' => $formData,
+            'fieldErrors' => $fieldErrors,
         ]);
     }
 
@@ -265,7 +321,7 @@ class FrontPortalController extends AbstractController
         }
 
         $offer = $connection->fetchAssociative(
-            'SELECT id, recruiter_id, title, description, location, latitude, longitude, contract_type, deadline FROM job_offer WHERE id = :id AND recruiter_id = :recruiter_id LIMIT 1',
+            'SELECT id, recruiter_id, title, description, location, contract_type, deadline FROM job_offer WHERE id = :id AND recruiter_id = :recruiter_id LIMIT 1',
             [
                 'id' => $id,
                 'recruiter_id' => self::STATIC_RECRUITER_ID,
@@ -281,41 +337,106 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
         }
 
-        if ($request->isMethod('POST')) {
-            $title = trim((string) $request->request->get('title', ''));
-            $description = trim((string) $request->request->get('description', ''));
-            $location = trim((string) $request->request->get('location', ''));
-            $contractType = trim((string) $request->request->get('contract_type', ''));
-            $deadlineInput = trim((string) $request->request->get('deadline', ''));
-            $skills = $this->normalizeSkills((array) $request->request->all('skills'));
+        $deadlineValue = (string) ($offer['deadline'] ?? '');
+        if ($deadlineValue !== '' && str_contains($deadlineValue, ' ')) {
+            $deadlineValue = substr(str_replace(' ', 'T', $deadlineValue), 0, 16);
+        }
 
-            if ($title === '' || $description === '' || $location === '' || $contractType === '' || $deadlineInput === '' || count($skills) === 0) {
-                $this->addFlash('error', 'Please fill in all required fields.');
-            } elseif (!in_array($contractType, self::CONTRACT_TYPES, true)) {
-                $this->addFlash('error', 'Please select a valid contract type.');
+        $formData = [
+            'title' => (string) ($offer['title'] ?? ''),
+            'contract_type' => (string) ($offer['contract_type'] ?? ''),
+            'description' => (string) ($offer['description'] ?? ''),
+            'location' => (string) ($offer['location'] ?? ''),
+            'deadline' => $deadlineValue,
+            'skills' => array_map(static function (array $skill): array {
+                return [
+                    'name' => (string) ($skill['skill_name'] ?? ''),
+                    'level' => (string) ($skill['level_required'] ?? ''),
+                ];
+            }, $skills),
+        ];
+        if (count($formData['skills']) === 0) {
+            $formData['skills'] = [['name' => '', 'level' => '']];
+        }
+
+        $fieldErrors = [];
+
+        if ($request->isMethod('POST')) {
+            $formData = [
+                'title' => trim((string) $request->request->get('title', '')),
+                'contract_type' => trim((string) $request->request->get('contract_type', '')),
+                'description' => trim((string) $request->request->get('description', '')),
+                'location' => trim((string) $request->request->get('location', '')),
+                'deadline' => trim((string) $request->request->get('deadline', '')),
+                'skills' => array_map(static function ($entry): array {
+                    return [
+                        'name' => trim((string) ($entry['name'] ?? '')),
+                        'level' => trim((string) ($entry['level'] ?? '')),
+                    ];
+                }, (array) $request->request->all('skills')),
+            ];
+
+            if (count($formData['skills']) === 0) {
+                $formData['skills'] = [['name' => '', 'level' => '']];
+            }
+
+            if ($formData['title'] === '') {
+                $fieldErrors['title'] = 'Title is required.';
+            }
+            if ($formData['contract_type'] === '') {
+                $fieldErrors['contract_type'] = 'Contract type is required.';
+            } elseif (!in_array($formData['contract_type'], self::CONTRACT_TYPES, true)) {
+                $fieldErrors['contract_type'] = 'Please select a valid contract type.';
+            }
+            if ($formData['description'] === '') {
+                $fieldErrors['description'] = 'Description is required.';
+            }
+            if ($formData['location'] === '') {
+                $fieldErrors['location'] = 'Location is required.';
+            }
+            if ($formData['deadline'] === '') {
+                $fieldErrors['deadline'] = 'Deadline is required.';
             } else {
-                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $deadlineInput);
+                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
                 if (!$deadline) {
-                    $this->addFlash('error', 'Invalid deadline format.');
-                } else {
+                    $fieldErrors['deadline'] = 'Invalid deadline format.';
+                } elseif ($deadline <= new \DateTimeImmutable()) {
+                    $fieldErrors['deadline'] = 'Deadline must be greater than today.';
+                }
+            }
+
+            foreach ($formData['skills'] as $index => $skill) {
+                if ($skill['name'] === '') {
+                    $fieldErrors['skills'][$index]['name'] = 'Skill name is required.';
+                }
+                if ($skill['level'] === '') {
+                    $fieldErrors['skills'][$index]['level'] = 'Skill level is required.';
+                } elseif (!in_array($skill['level'], self::SKILL_LEVELS, true)) {
+                    $fieldErrors['skills'][$index]['level'] = 'Invalid skill level.';
+                }
+            }
+
+            if (empty($fieldErrors)) {
+                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                if ($deadline) {
                     try {
                         $connection->beginTransaction();
 
                         $connection->update('job_offer', [
-                            'title' => $title,
-                            'description' => $description,
-                            'location' => $location,
-                            'contract_type' => $contractType,
+                            'title' => $formData['title'],
+                            'description' => $formData['description'],
+                            'location' => $formData['location'],
+                            'contract_type' => $formData['contract_type'],
                             'deadline' => $deadline->format('Y-m-d H:i:s'),
-                            'latitude' => (float) $request->request->get('latitude', 0),
-                            'longitude' => (float) $request->request->get('longitude', 0),
+                            'latitude' => 0,
+                            'longitude' => 0,
                         ], [
                             'id' => $id,
                             'recruiter_id' => self::STATIC_RECRUITER_ID,
                         ]);
 
                         $connection->delete('offer_skill', ['offer_id' => $id]);
-                        foreach ($skills as $skill) {
+                        foreach ($formData['skills'] as $skill) {
                             $connection->insert('offer_skill', [
                                 'id' => (string) ((int) round(microtime(true) * 1000) . random_int(100, 999)),
                                 'offer_id' => $id,
@@ -352,17 +473,6 @@ class FrontPortalController extends AbstractController
                     }
                 }
             }
-
-            $offer = [
-                'id' => $id,
-                'title' => $title,
-                'description' => $description,
-                'location' => $location,
-                'contract_type' => $contractType,
-                'deadline' => $deadlineInput,
-                'latitude' => (string) $request->request->get('latitude', '0'),
-                'longitude' => (string) $request->request->get('longitude', '0'),
-            ];
         }
 
         return $this->render('front/modules/job_offer_edit.html.twig', [
@@ -371,6 +481,8 @@ class FrontPortalController extends AbstractController
             'skills' => $skills,
             'contractTypes' => self::CONTRACT_TYPES,
             'skillLevels' => self::SKILL_LEVELS,
+            'formData' => $formData,
+            'fieldErrors' => $fieldErrors,
         ]);
     }
 

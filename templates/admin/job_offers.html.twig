@@ -219,8 +219,9 @@
                                         <i class="ti ti-alert-triangle me-1"></i>Send Another Warning
                                     </button>
                                     <div class="collapse mt-2" id="warning-form-{{ offer.id }}">
-                                        <form method="post" action="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}" class="d-flex flex-column gap-2">
-                                            <textarea name="reason" rows="2" class="form-control form-control-sm" placeholder="New warning reason..." required></textarea>
+                                        <form method="post" action="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}" class="d-flex flex-column gap-2 warning-reason-form" novalidate>
+                                            <textarea name="reason" rows="2" class="form-control form-control-sm" placeholder="New warning reason..."></textarea>
+                                            <div class="invalid-feedback d-block" data-warning-error></div>
                                             <button type="submit" class="btn btn-sm btn-danger">Submit Warning</button>
                                         </form>
                                     </div>
@@ -231,8 +232,9 @@
                                 </div>
                                 <div class="small text-secondary">Reason: {{ offer.warning_reason|default('-') }}</div>
                             {% else %}
-                                <form method="post" action="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}" class="d-flex flex-column gap-2">
-                                    <textarea name="reason" rows="2" class="form-control form-control-sm" placeholder="Reason for warning..." required></textarea>
+                                <form method="post" action="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}" class="d-flex flex-column gap-2 warning-reason-form" novalidate>
+                                    <textarea name="reason" rows="2" class="form-control form-control-sm" placeholder="Reason for warning..."></textarea>
+                                    <div class="invalid-feedback d-block" data-warning-error></div>
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Send Warning</button>
                                 </form>
                             {% endif %}
@@ -262,6 +264,29 @@
             const deadlineInput = document.getElementById('adminFilterDeadline');
             const resetBtn = document.getElementById('adminClearOfferFilters');
             const resultLabel = document.getElementById('adminOfferFilterResults');
+
+            const warningForms = Array.from(document.querySelectorAll('.warning-reason-form'));
+            warningForms.forEach(function (form) {
+                const reasonInput = form.querySelector('textarea[name="reason"]');
+                const errorNode = form.querySelector('[data-warning-error]');
+                if (!reasonInput || !errorNode) return;
+
+                form.addEventListener('submit', function (event) {
+                    const reasonValue = reasonInput.value.trim();
+                    if (reasonValue === '') {
+                        event.preventDefault();
+                        reasonInput.classList.add('is-invalid');
+                        errorNode.textContent = 'Warning reason is required.';
+                    }
+                });
+
+                reasonInput.addEventListener('input', function () {
+                    if (reasonInput.value.trim() !== '') {
+                        reasonInput.classList.remove('is-invalid');
+                        errorNode.textContent = '';
+                    }
+                });
+            });
 
             const runFilters = function () {
                 const locationQuery = ((locationInput && locationInput.value) || '').trim().toLowerCase();

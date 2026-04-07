@@ -19,37 +19,54 @@
         <div class="container-xl">
             <div class="card tb-admin-card">
                 <div class="card-body">
-                    <form method="post" class="row g-3">
+                    <form method="post" class="row g-3" novalidate id="jobOfferEditForm">
                         <div class="col-md-6">
                             <label class="form-label">Title</label>
-                            <input type="text" name="title" class="form-control" value="{{ offer.title|default('') }}" required>
+                            <input type="text" name="title" class="form-control {{ fieldErrors.title|default(null) ? 'is-invalid' : '' }}" value="{{ formData.title|default(offer.title|default('')) }}">
+                            <div class="invalid-feedback d-block" data-error-for="title"></div>
+                            {% if fieldErrors.title|default(null) %}
+                                <div class="invalid-feedback d-block">{{ fieldErrors.title }}</div>
+                            {% endif %}
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label">Contract Type</label>
-                            <select name="contract_type" class="form-select" required>
+                            <select name="contract_type" class="form-select {{ fieldErrors.contract_type|default(null) ? 'is-invalid' : '' }}">
                                 <option value="">Choose contract type</option>
                                 {% for contractType in contractTypes %}
-                                    <option value="{{ contractType }}" {{ offer.contract_type|default('') == contractType ? 'selected' : '' }}>{{ contractType }}</option>
+                                    <option value="{{ contractType }}" {{ formData.contract_type|default(offer.contract_type|default('')) == contractType ? 'selected' : '' }}>{{ contractType }}</option>
                                 {% endfor %}
                             </select>
+                            <div class="invalid-feedback d-block" data-error-for="contract_type"></div>
+                            {% if fieldErrors.contract_type|default(null) %}
+                                <div class="invalid-feedback d-block">{{ fieldErrors.contract_type }}</div>
+                            {% endif %}
                         </div>
 
                         <div class="col-12">
                             <label class="form-label d-block">Required Skills</label>
                             <div id="skillsContainer" class="d-flex flex-column gap-2">
-                                {% for skill in skills|default([]) %}
+                                {% for skill in formData.skills|default([]) %}
+                                    {% set skillError = fieldErrors.skills[loop.index0]|default({}) %}
                                     <div class="row g-2 skill-row">
                                         <div class="col-md-6">
-                                            <input type="text" name="skills[{{ loop.index0 }}][name]" class="form-control" value="{{ skill.skill_name|default('') }}" placeholder="e.g. Symfony" required>
+                                            <input type="text" name="skills[{{ loop.index0 }}][name]" class="form-control {{ skillError.name|default(null) ? 'is-invalid' : '' }}" value="{{ skill.name|default('') }}" placeholder="e.g. Symfony">
+                                            <div class="invalid-feedback d-block" data-skill-error="name"></div>
+                                            {% if skillError.name|default(null) %}
+                                                <div class="invalid-feedback d-block">{{ skillError.name }}</div>
+                                            {% endif %}
                                         </div>
                                         <div class="col-md-4">
-                                            <select name="skills[{{ loop.index0 }}][level]" class="form-select" required>
+                                            <select name="skills[{{ loop.index0 }}][level]" class="form-select {{ skillError.level|default(null) ? 'is-invalid' : '' }}">
                                                 <option value="">Choose skill level</option>
                                                 {% for skillLevel in skillLevels %}
-                                                    <option value="{{ skillLevel }}" {{ skill.level_required|default('') == skillLevel ? 'selected' : '' }}>{{ skillLevel|capitalize }}</option>
+                                                    <option value="{{ skillLevel }}" {{ skill.level|default('') == skillLevel ? 'selected' : '' }}>{{ skillLevel|capitalize }}</option>
                                                 {% endfor %}
                                             </select>
+                                            <div class="invalid-feedback d-block" data-skill-error="level"></div>
+                                            {% if skillError.level|default(null) %}
+                                                <div class="invalid-feedback d-block">{{ skillError.level }}</div>
+                                            {% endif %}
                                         </div>
                                         <div class="col-md-2">
                                             <button type="button" class="btn btn-outline-danger w-100 remove-skill-btn">Remove</button>
@@ -58,15 +75,17 @@
                                 {% else %}
                                     <div class="row g-2 skill-row">
                                         <div class="col-md-6">
-                                            <input type="text" name="skills[0][name]" class="form-control" placeholder="e.g. Symfony" required>
+                                            <input type="text" name="skills[0][name]" class="form-control" placeholder="e.g. Symfony">
+                                            <div class="invalid-feedback d-block" data-skill-error="name"></div>
                                         </div>
                                         <div class="col-md-4">
-                                            <select name="skills[0][level]" class="form-select" required>
+                                            <select name="skills[0][level]" class="form-select">
                                                 <option value="">Choose skill level</option>
                                                 {% for skillLevel in skillLevels %}
                                                     <option value="{{ skillLevel }}">{{ skillLevel|capitalize }}</option>
                                                 {% endfor %}
                                             </select>
+                                            <div class="invalid-feedback d-block" data-skill-error="level"></div>
                                         </div>
                                         <div class="col-md-2">
                                             <button type="button" class="btn btn-outline-danger w-100 remove-skill-btn" disabled>Remove</button>
@@ -75,35 +94,34 @@
                                 {% endfor %}
                             </div>
                             <button type="button" id="addSkillBtn" class="btn btn-outline-primary btn-sm mt-2">Add Skill</button>
+                            <div class="invalid-feedback d-block fw-semibold" data-error-for="skills"></div>
                         </div>
 
                         <div class="col-12">
                             <label class="form-label">Description</label>
-                            <textarea name="description" class="form-control" rows="4" required>{{ offer.description|default('') }}</textarea>
+                            <textarea name="description" class="form-control {{ fieldErrors.description|default(null) ? 'is-invalid' : '' }}" rows="4">{{ formData.description|default(offer.description|default('')) }}</textarea>
+                            <div class="invalid-feedback d-block" data-error-for="description"></div>
+                            {% if fieldErrors.description|default(null) %}
+                                <div class="invalid-feedback d-block">{{ fieldErrors.description }}</div>
+                            {% endif %}
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label">Location</label>
-                            <input type="text" name="location" class="form-control" value="{{ offer.location|default('') }}" required>
+                            <input type="text" name="location" class="form-control {{ fieldErrors.location|default(null) ? 'is-invalid' : '' }}" value="{{ formData.location|default(offer.location|default('')) }}">
+                            <div class="invalid-feedback d-block" data-error-for="location"></div>
+                            {% if fieldErrors.location|default(null) %}
+                                <div class="invalid-feedback d-block">{{ fieldErrors.location }}</div>
+                            {% endif %}
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label">Deadline</label>
-                            {% set deadlineValue = offer.deadline|default('') %}
-                            {% if deadlineValue and (' ' in deadlineValue) %}
-                                {% set deadlineValue = deadlineValue|replace({' ': 'T'})|slice(0, 16) %}
+                            <input type="datetime-local" name="deadline" class="form-control {{ fieldErrors.deadline|default(null) ? 'is-invalid' : '' }}" value="{{ formData.deadline|default('') }}" min="{{ 'now'|date('Y-m-d\\TH:i') }}">
+                            <div class="invalid-feedback d-block" data-error-for="deadline"></div>
+                            {% if fieldErrors.deadline|default(null) %}
+                                <div class="invalid-feedback d-block">{{ fieldErrors.deadline }}</div>
                             {% endif %}
-                            <input type="datetime-local" name="deadline" class="form-control" value="{{ deadlineValue }}" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Latitude (optional)</label>
-                            <input type="number" step="0.000001" name="latitude" class="form-control" value="{{ offer.latitude|default('0') }}">
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Longitude (optional)</label>
-                            <input type="number" step="0.000001" name="longitude" class="form-control" value="{{ offer.longitude|default('0') }}">
                         </div>
 
                         <div class="col-12 d-flex justify-content-end gap-2">
@@ -121,9 +139,133 @@
     (function () {
         const container = document.getElementById('skillsContainer');
         const addBtn = document.getElementById('addSkillBtn');
-        if (!container || !addBtn) return;
+        const form = document.getElementById('jobOfferEditForm');
+        if (!container || !addBtn || !form) return;
 
         const levelOptionsHtml = `{% for skillLevel in skillLevels %}<option value="{{ skillLevel }}">{{ skillLevel|capitalize }}</option>{% endfor %}`;
+
+        const setError = function (fieldName, message) {
+            const target = form.querySelector('[data-error-for="' + fieldName + '"]');
+            if (!target) return;
+            target.textContent = message || '';
+        };
+
+        const setInvalidState = function (field, isInvalid) {
+            if (!field) return;
+            field.classList.toggle('is-invalid', isInvalid);
+        };
+
+        const clearSkillRowErrors = function (row) {
+            row.querySelectorAll('[data-skill-error]').forEach(function (node) {
+                node.textContent = '';
+            });
+        };
+
+        const validateSkillRow = function (row) {
+            clearSkillRowErrors(row);
+            const nameInput = row.querySelector('input');
+            const levelSelect = row.querySelector('select');
+            let valid = true;
+
+            if (nameInput && nameInput.value.trim() === '') {
+                const errorNode = row.querySelector('[data-skill-error="name"]');
+                if (errorNode) errorNode.textContent = 'Skill name is required.';
+                setInvalidState(nameInput, true);
+                valid = false;
+            } else {
+                setInvalidState(nameInput, false);
+            }
+
+            if (levelSelect && levelSelect.value.trim() === '') {
+                const errorNode = row.querySelector('[data-skill-error="level"]');
+                if (errorNode) errorNode.textContent = 'Skill level is required.';
+                setInvalidState(levelSelect, true);
+                valid = false;
+            } else {
+                setInvalidState(levelSelect, false);
+            }
+
+            return valid;
+        };
+
+        const validateForm = function () {
+            let valid = true;
+            const title = form.querySelector('[name="title"]');
+            const contractType = form.querySelector('[name="contract_type"]');
+            const description = form.querySelector('[name="description"]');
+            const location = form.querySelector('[name="location"]');
+            const deadline = form.querySelector('[name="deadline"]');
+
+            ['title', 'contract_type', 'description', 'location', 'deadline', 'skills'].forEach(function (fieldName) {
+                setError(fieldName, '');
+            });
+
+            if (!title || title.value.trim() === '') {
+                setError('title', 'You need to fill in the title.');
+                setInvalidState(title, true);
+                valid = false;
+            } else {
+                setInvalidState(title, false);
+            }
+
+            if (!contractType || contractType.value.trim() === '') {
+                setError('contract_type', 'You need to choose a contract type.');
+                setInvalidState(contractType, true);
+                valid = false;
+            } else {
+                setInvalidState(contractType, false);
+            }
+
+            if (!description || description.value.trim() === '') {
+                setError('description', 'You need to fill in the description.');
+                setInvalidState(description, true);
+                valid = false;
+            } else {
+                setInvalidState(description, false);
+            }
+
+            if (!location || location.value.trim() === '') {
+                setError('location', 'You need to fill in the location.');
+                setInvalidState(location, true);
+                valid = false;
+            } else {
+                setInvalidState(location, false);
+            }
+
+            if (!deadline || deadline.value.trim() === '') {
+                setError('deadline', 'You need to choose a deadline.');
+                setInvalidState(deadline, true);
+                valid = false;
+            } else {
+                const deadlineDate = new Date(deadline.value);
+                const now = new Date();
+                if (isNaN(deadlineDate.getTime()) || deadlineDate <= now) {
+                    setError('deadline', 'Deadline must be greater than today.');
+                    setInvalidState(deadline, true);
+                    valid = false;
+                } else {
+                    setInvalidState(deadline, false);
+                }
+            }
+
+            const rows = Array.from(container.querySelectorAll('.skill-row'));
+            let atLeastOneSkillFilled = false;
+            rows.forEach(function (row) {
+                const rowValid = validateSkillRow(row);
+                const nameInput = row.querySelector('input');
+                const levelSelect = row.querySelector('select');
+                if (nameInput && nameInput.value.trim() !== '') atLeastOneSkillFilled = true;
+                if (levelSelect && levelSelect.value.trim() !== '') atLeastOneSkillFilled = true;
+                if (!rowValid) valid = false;
+            });
+
+            if (!atLeastOneSkillFilled) {
+                setError('skills', 'You need to fill in at least one skill.');
+                valid = false;
+            }
+
+            return valid;
+        };
 
         const refreshIndexes = function () {
             const rows = Array.from(container.querySelectorAll('.skill-row'));
@@ -137,12 +279,72 @@
             });
         };
 
+        form.addEventListener('submit', function (event) {
+            if (!validateForm()) {
+                event.preventDefault();
+            }
+        });
+
+        form.addEventListener('input', function (event) {
+            const field = event.target;
+            if (!(field instanceof HTMLElement)) return;
+
+            const name = field.getAttribute('name');
+            if (name === 'title') {
+                setError('title', '');
+                setInvalidState(field, field.value.trim() === '');
+            }
+            if (name === 'contract_type') {
+                setError('contract_type', '');
+                setInvalidState(field, field.value.trim() === '');
+            }
+            if (name === 'description') {
+                setError('description', '');
+                setInvalidState(field, field.value.trim() === '');
+            }
+            if (name === 'location') {
+                setError('location', '');
+                setInvalidState(field, field.value.trim() === '');
+            }
+            if (name === 'deadline') {
+                const deadlineValue = field.value.trim();
+                if (deadlineValue === '') {
+                    setError('deadline', '');
+                    setInvalidState(field, true);
+                } else {
+                    const typedDeadline = new Date(deadlineValue);
+                    const now = new Date();
+                    if (isNaN(typedDeadline.getTime()) || typedDeadline <= now) {
+                        setError('deadline', 'Deadline must be greater than today.');
+                        setInvalidState(field, true);
+                    } else {
+                        setError('deadline', '');
+                        setInvalidState(field, false);
+                    }
+                }
+            }
+
+            const row = field.closest('.skill-row');
+            if (row) {
+                const rowNameInput = row.querySelector('input');
+                const rowLevelSelect = row.querySelector('select');
+                setError('skills', '');
+                if (rowNameInput) setInvalidState(rowNameInput, rowNameInput.value.trim() === '');
+                if (rowLevelSelect) setInvalidState(rowLevelSelect, rowLevelSelect.value.trim() === '');
+
+                const rowErrorName = row.querySelector('[data-skill-error="name"]');
+                const rowErrorLevel = row.querySelector('[data-skill-error="level"]');
+                if (rowNameInput && rowNameInput.value.trim() !== '' && rowErrorName) rowErrorName.textContent = '';
+                if (rowLevelSelect && rowLevelSelect.value.trim() !== '' && rowErrorLevel) rowErrorLevel.textContent = '';
+            }
+        });
+
         addBtn.addEventListener('click', function () {
             const row = document.createElement('div');
             row.className = 'row g-2 skill-row';
             row.innerHTML =
-                '<div class="col-md-6"><input type="text" class="form-control" placeholder="e.g. Symfony" required></div>' +
-                '<div class="col-md-4"><select class="form-select" required><option value="">Choose skill level</option>' + levelOptionsHtml + '</select></div>' +
+                '<div class="col-md-6"><input type="text" class="form-control" placeholder="e.g. Symfony"><div class="invalid-feedback d-block" data-skill-error="name"></div></div>' +
+                '<div class="col-md-4"><select class="form-select"><option value="">Choose skill level</option>' + levelOptionsHtml + '</select><div class="invalid-feedback d-block" data-skill-error="level"></div></div>' +
                 '<div class="col-md-2"><button type="button" class="btn btn-outline-danger w-100 remove-skill-btn">Remove</button></div>';
             container.appendChild(row);
             refreshIndexes();

@@ -202,7 +202,7 @@
                 {% for card in cards %}
                     {% set isPendingReview = card.warning_status|default(null) == 'RESOLVED' %}
                     <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-location="{{ card.location|default('')|lower }}" data-filter-contract-type="{{ card.contract_type|default('')|lower }}" data-filter-status="{{ card.status|default('')|lower }}" data-filter-deadline="{{ card.deadline|default('') }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ (card.meta|split(' | ')|last) ~ '||Location: ' ~ (card.meta|split(' | ')|first)) }}">
+                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : 'Apply for Offer' }}" data-action-primary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) : '#' }}" data-action-primary-disabled="{{ role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0' }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete Offer' : 'Save Offer' }}" data-action-secondary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) : '#' }}" data-action-secondary-disabled="{{ role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0' }}" data-action-tertiary="{{ role == 'recruiter' ? 'View Applicants' : 'Compare Offer' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ (card.meta|split(' | ')|last) ~ '||Location: ' ~ (card.meta|split(' | ')|first)) }}">
                             {% if isPendingReview %}
                                 <div class="badge bg-info mb-2" style="position: absolute; top: 8px; right: 8px;">Pending Review</div>
                             {% endif %}
@@ -239,13 +239,6 @@
                     <div class="card-body">
                         <p class="mb-3 tb-detail-text">Select an offer card to display details here.</p>
                         <div class="tb-detail-extra small text-secondary mb-0"></div>
-                        <div class="mt-3 d-flex flex-column gap-2">
-                            <a href="#" class="btn btn-primary btn-sm tb-detail-primary">Modify Offer</a>
-                            <form method="post" action="#" class="d-inline">
-                                <button type="submit" class="btn btn-outline-danger btn-sm w-100 tb-detail-secondary">Delete Offer</button>
-                            </form>
-                            <a href="#" class="btn btn-outline-primary btn-sm tb-detail-tertiary">View Applicants</a>
-                        </div>
                     </div>
                 </div>
                     </div>
