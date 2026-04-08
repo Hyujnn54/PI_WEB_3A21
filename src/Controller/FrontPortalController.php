@@ -6,6 +6,9 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use App\Form\ProfileType;
+use App\Repository\UsersRepository;
+use Doctrine\ORM\EntityManagerInterface;
 
 class FrontPortalController extends AbstractController
 {
@@ -72,4 +75,46 @@ class FrontPortalController extends AbstractController
             'cards' => $cards,
         ]);
     }
+
+
+#[Route('/front/profile', name: 'front_profile')]
+public function profile(
+    Request $request, 
+    UsersRepository $userRepo, 
+    EntityManagerInterface $entityManager
+): Response {
+    // 1. Get the user_id from the session you set in LoginController
+    $userId = $request->getSession()->get('user_id');
+
+    // 2. Fetch the actual entity from the database
+    $user = $userRepo->find($userId);
+
+    if (!$user) {
+        $this->addFlash('error', 'Please log in to access your profile.');
+        return $this->redirectToRoute('app_login');
+    }
+
+    // 3. Pass the actual $user entity to the form
+    // Symfony will call $user->getFirstName(), $user->getLastName(), etc.
+    $form = $this->createForm(ProfileType::class, $user);
+
+    $form->handleRequest($request);
+
+    if ($form->isSubmitted() && $form->isValid()) {
+        // 4. Save the changes back to the database
+        $entityManager->flush();
+
+        // Optional: Update the session 'user_name' if they changed their first name
+        $request->getSession()->set('user_name', $user->getFirstName());
+
+        $this->addFlash('success', 'Profile updated successfully!');
+        return $this->redirectToRoute('front_profile');
+    }
+
+    return $this->render('front/profile.html.twig', [
+        'form' => $form->createView(),
+        'authUser' => ['role' => 'candidate'], 
+    ]);
+}
+
 }
