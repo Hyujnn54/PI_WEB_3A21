@@ -1,0 +1,84 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block admin_content %}
+<div class="container-xl">
+    <div class="page-header d-print-none mb-4">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title text-white">Platform Statistics</h2>
+                <div class="text-muted small mt-1">Visual overview of user distribution</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="card bg-primary text-primary-fg shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="subheader text-white-50">Total Users</div>
+                    </div>
+                    <div class="h1 mb-0">{{ totalUsers }}</div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card bg-dark border-secondary shadow-sm">
+                <div class="card-header border-secondary">
+                    <h3 class="card-title text-white">User Role Distribution</h3>
+                </div>
+                <div class="card-body">
+                    <div id="chart-container" style="min-height: 350px;">
+                         <canvas id="userPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // This replaces the DOMContentLoaded listener
+    document.addEventListener('turbo:load', function() {
+        const canvas = document.getElementById('userPieChart');
+        
+        // Safety check to ensure we only run this on the stats page
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        
+        // Optional: Destroy existing chart instance to prevent memory leaks if navigating back/forth
+        let existingChart = Chart.getChart("userPieChart");
+        if (existingChart) {
+            existingChart.destroy();
+        }
+
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Admins', 'Recruiters', 'Candidates'],
+                datasets: [{
+                    data: {{ chartData|json_encode }},
+                    backgroundColor: ['#206bc4', '#f59f00', '#2fb344'],
+                    borderColor: '#1b2431',
+                    borderWidth: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#ffffff' }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

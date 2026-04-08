@@ -175,4 +175,27 @@ public function editUser(int $id, UsersRepository $userRepo, Request $request, E
     ]);
 }
 
+#[Route('/admin/stats', name: 'app_admin_stats')]
+public function userStats(UsersRepository $userRepo): Response
+{
+    $allUsers = $userRepo->findAll();
+    $admins = 0; $candidates = 0; $recruiters = 0;
+
+    foreach ($allUsers as $user) {
+        $roles = $user->getRoles();
+        if (in_array('ROLE_ADMIN', $roles)) $admins++;
+        if (in_array('ROLE_CANDIDATE', $roles)) $candidates++;
+        if (in_array('ROLE_RECRUITER', $roles)) $recruiters++;
+    }
+
+    return $this->render('admin/stats.html.twig', [
+        'totalUsers' => count($allUsers),
+        'admins' => $admins,
+        'candidates' => $candidates,
+        'recruiters' => $recruiters,
+        // Pass as array for the chart
+        'chartData' => [$admins, $recruiters, $candidates]
+    ]);
+}
+
 }
