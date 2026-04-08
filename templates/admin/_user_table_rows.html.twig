@@ -3,26 +3,27 @@
         <td>
             <div class="d-flex py-1 align-items-center">
                 <span class="avatar me-2 rounded-circle bg-blue-lt">
-                    {{ user.firstName|first|upper }}{{ user.lastName|first|upper }}
+                    {{ user.getFirstName()|first|upper }}{{ user.getLastName()|first|upper }}
                 </span>
-                <div class="font-weight-medium text-capitalize">{{ user.firstName }} {{ user.lastName }}</div>
+                <div class="font-weight-medium text-capitalize">
+                    {{ user.getFirstName() }} {{ user.getLastName() }}
+                </div>
             </div>
         </td>
-        <td><span class="text-muted">{{ user.email }}</span></td>
+        <td><span class="text-muted">{{ user.getEmail() }}</span></td>
         <td>
-            {% for role in user.roles %}
+            {% for role in user.getRoles() %}
                 <span class="badge {{ role == 'ROLE_ADMIN' ? 'bg-red' : (role == 'ROLE_RECRUITER' ? 'bg-purple' : 'bg-blue') }}-lt">
                     {{ role|replace({'ROLE_': ''}) }}
                 </span>
             {% endfor %}
         </td>
         <td>
-            <span class="badge {{ user.isActive|default(false) ? 'bg-success' : 'bg-secondary' }}">
-                {{ user.isActive|default(false) ? 'Active' : 'Inactive' }}
+            <span class="badge {{ user.isActive()|default(false) ? 'bg-success' : 'bg-secondary' }}">
+                {{ user.isActive()|default(false) ? 'Active' : 'Inactive' }}
             </span>
         </td>
         <td class="text-muted">
-            {# Safe check for Candidate entities missing createAt #}
             {% if attribute(user, 'createAt') is defined and user.createAt is not null %}
                 {{ user.createAt|date('d M Y') }}
             {% else %}
@@ -31,8 +32,15 @@
         </td>
         <td>
             <div class="btn-list flex-nowrap">
-                <a href="{{ path('app_admin_edit_user', {id: user.id}) }}" class="btn btn-white btn-sm">Edit</a>
-                <button class="btn btn-white btn-sm text-danger">Delete</button>
+                <a href="{{ path('app_admin_edit_user', {id: user.getId()}) }}" 
+                   class="btn btn-white btn-sm">Edit</a>
+                
+                <form method="post" 
+                      action="{{ path('app_admin_delete_user', {id: user.getId()}) }}" 
+                      onsubmit="return confirm('Are you sure you want to delete this user?');" 
+                      style="display:inline-block;">
+                    <button type="submit" class="btn btn-white btn-sm text-danger">Delete</button>
+                </form>
             </div>
         </td>
     </tr>

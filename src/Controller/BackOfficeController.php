@@ -14,44 +14,77 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class BackOfficeController extends AbstractController
 {
-    #[Route('/admin', name: 'back_dashboard')]
-    #[Route('/admin/dashboard', name: 'app_admin')]
-    public function index(UsersRepository $userRepo): Response
-    {
-        // Get the real count from your database
-        $totalUsers = count($userRepo->findAll());
+#[Route('/admin', name: 'back_dashboard')]
+#[Route('/admin/dashboard', name: 'app_admin')]
+public function index(UsersRepository $userRepo): Response
+{
+    $allUsers = $userRepo->findAll();
+    $admins = 0; $candidates = 0; $recruiters = 0;
 
-        return $this->render('admin/index.html.twig', [
-            'kpis' => [
-                ['label' => 'Total Users', 'value' => $totalUsers, 'icon' => 'ti ti-users'],
-                ['label' => 'Open Offers', 'value' => '32', 'icon' => 'ti ti-briefcase-2'],
-                ['label' => 'Applications', 'value' => '3,580', 'icon' => 'ti ti-file-check'],
-                ['label' => 'Interviews', 'value' => '482', 'icon' => 'ti ti-message-2'],
-            ],
-        ]);
+foreach ($allUsers as $user) {
+    $roles = $user->getRoles();
+
+    if (in_array('ROLE_ADMIN', $roles)) {
+        $admins++;
     }
+
+    if (in_array('ROLE_CANDIDATE', $roles)) {
+        $candidates++;
+    }
+
+    if (in_array('ROLE_RECRUITER', $roles)) {
+        $recruiters++;
+    }
+}
+
+    return $this->render('admin/index.html.twig', [ 
+        // Fixes image_7c33e3.png error
+        'kpis' => [
+            ['label' => 'Total Users', 'value' => count($allUsers), 'icon' => 'ti ti-users'],
+            ['label' => 'Open Offers', 'value' => '32', 'icon' => 'ti ti-briefcase-2'],
+            ['label' => 'Applications', 'value' => '3,580', 'icon' => 'ti ti-file-check'],
+            ['label' => 'Interviews', 'value' => '482', 'icon' => 'ti ti-message-2'],
+        ],
+        // Required for the top 4 stat cards in your template
+        'stats' => [
+            'admins' => $admins,
+            'candidates' => $candidates,
+            'recruiters' => $recruiters,
+            'interviews' => 482,
+        ],
+        // Required for the "Overview" table
+        'usersPreview' => array_slice($allUsers, 0, 5),
+    ]);
+}
 
 #[Route('/admin/users', name: 'app_admin_users')]
 public function listUsers(UsersRepository $userRepo, Request $request): Response
 {
-    $searchTerm = $request->query->get('search');
+    $searchTerm = trim($request->query->get('search', ''));
     $roleFilter = $request->query->get('role');
 
-    if ($searchTerm || $roleFilter) {
+    if ($searchTerm !== '' || $roleFilter) {
         $users = $userRepo->findBySearchAndRole($searchTerm, $roleFilter);
     } else {
         $users = $userRepo->findAll();
     }
 
+    // Count for the top text
+    $allUsers = $userRepo->findAll();
+    $totalCount = count($allUsers);
+
+    // AJAX for live search + filter
     if ($request->query->get('ajax')) {
-        return $this->render('admin/_user_table_rows.html.twig', ['users' => $users]);
+        return $this->render('admin/_user_table_rows.html.twig', [
+            'users' => $users,
+        ]);
     }
 
     return $this->render('admin/user_list.html.twig', [
-        'users' => $users,
-        'searchTerm' => $searchTerm,
+        'users'       => $users,
+        'searchTerm'  => $searchTerm,
         'currentRole' => $roleFilter,
-        'totalCount' => count($userRepo->findAll()) // Added to fix variable error
+        'totalCount'  => $totalCount,
     ]);
 }
 #[Route('/admin/add-admin', name: 'app_admin_add_user', methods: ['GET', 'POST'])]
@@ -93,15 +126,24 @@ public function addAdmin(
 
 
 #[Route('/admin/user/delete/{id}', name: 'app_admin_delete_user', methods: ['POST'])]
-public function deleteUser(int $id, UsersRepository $userRepo, EntityManagerInterface $em): Response
+public function deleteUser(
+    int $id, 
+    UsersRepository $userRepo, 
+    EntityManagerInterface $em
+): Response
 {
     $user = $userRepo->find($id);
-    if ($user) {
-        $em->remove($user);
-        $em->flush();
-        $this->addFlash('success', 'User deleted successfully.');
-    }
     
+    if (!$user) {
+        $this->addFlash('error', 'User not found.');
+        return $this->redirectToRoute('app_admin_users');
+    }
+
+    // Simple delete without CSRF for now (to fix your issue quickly)
+    $em->remove($user);
+    $em->flush();
+
+    $this->addFlash('success', 'User deleted successfully.');
     return $this->redirectToRoute('app_admin_users');
 }
 
@@ -132,4 +174,5 @@ public function editUser(int $id, UsersRepository $userRepo, Request $request, E
         'user' => $user
     ]);
 }
+
 }

@@ -18,23 +18,46 @@ class UsersRepository extends ServiceEntityRepository
 
     
 }
-public function findBySearchAndRole(?string $search, ?string $role)
+public function findBySearchAndRole(?string $search = null, ?string $role = null): array
 {
-    $qb = $this->createQueryBuilder('u');
+    $users = $this->findAll();   // Get all users
 
-    if ($search) {
-        $qb->andWhere('u.email LIKE :search OR u.firstName LIKE :search OR u.lastName LIKE :search')
-           ->setParameter('search', '%' . $search . '%');
+    $filtered = [];
+
+    foreach ($users as $user) {
+        $match = true;
+
+        // Search filter (name or email)
+        if ($search && $search !== '') {
+            $searchLower = strtolower($search);
+            $fullName = strtolower($user->getFirstName() . ' ' . $user->getLastName());
+            $email = strtolower($user->getEmail() ?? '');
+
+            if (strpos($fullName, $searchLower) === false && strpos($email, $searchLower) === false) {
+                $match = false;
+            }
+        }
+
+        // Role filter
+        if ($role && $match) {
+            $userRoles = $user->getRoles();
+            if (!in_array($role, $userRoles, true)) {
+                $match = false;
+            }
+        }
+
+        if ($match) {
+            $filtered[] = $user;
+        }
     }
 
-    if ($role) {
-        $qb->andWhere('u.roles LIKE :role')
-           ->setParameter('role', '%' . $role . '%');
-    }
+    // Optional: sort by first name
+    usort($filtered, function($a, $b) {
+        return strcmp($a->getFirstName(), $b->getFirstName());
+    });
 
-    return $qb->getQuery()->getResult();
+    return $filtered;
 }
-
 public function findByRole(string $role)
 {
     return $this->createQueryBuilder('u')
