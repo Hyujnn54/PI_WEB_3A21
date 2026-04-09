@@ -1,12 +1,12 @@
 <?php
 
 namespace App\Entity;
-
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+
 
 #[ORM\Entity(repositoryClass: UsersRepository::class)]
 #[ORM\Table(name: 'users')]
@@ -70,7 +70,12 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface
      * @see PasswordAuthenticatedUserInterface
      */
     public function getPassword(): ?string { return $this->password; }
-    public function setPassword(string $password): self { $this->password = $password; return $this; }
+    public function setPassword(string $password): self
+    {
+        $this->password = $password;
+
+        return $this;
+    }
 
     /**
      * @see UserInterface

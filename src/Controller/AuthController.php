@@ -16,28 +16,7 @@ class AuthController extends AbstractController
         return $this->redirectToRoute('front_home');
     }
 
-    #[Route('/login', name: 'app_login', methods: ['GET', 'POST'])]
-    public function login(Request $request): Response
-    {
-        if ($request->isMethod('POST')) {
-            $fullName = trim((string) $request->request->get('full_name', ''));
-            $email = trim((string) $request->request->get('email', ''));
-            $role = (string) $request->request->get('role', 'candidate');
 
-            if ($fullName === '' || $email === '') {
-                $this->addFlash('error', 'Please fill all required fields.');
-                return $this->redirectToRoute('app_login');
-            }
-
-            if (!in_array($role, ['admin', 'candidate', 'recruiter'], true)) {
-                $role = 'candidate';
-            }
-
-            return $this->redirectByRole($role);
-        }
-
-        return $this->render('auth/login.html.twig');
-    }
 
     #[Route('/register', name: 'app_register', methods: ['GET', 'POST'])]
     public function register(Request $request): Response
