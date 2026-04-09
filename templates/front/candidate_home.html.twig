@@ -1,0 +1,58 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}TalentBridge | Candidate Home{% endblock %}
+
+{% block body %}
+    {% set modules = [
+        { title: 'My Skills', description: 'Manage your professional technical skills and expertise.', icon: 'ti ti-star', link: path('app_candidate_skills') },
+        { title: 'Job Offers', description: 'Explore and apply to the latest open positions.', icon: 'ti ti-briefcase-2', link: path('front_job_offers') },
+        { title: 'Applications', description: 'Monitor your submitted job applications.', icon: 'ti ti-file-check', link: path('front_job_applications') },
+        { title: 'Interviews', description: 'Review your upcoming interview cycles.', icon: 'ti ti-message-2', link: '#' },
+        { title: 'Events', description: 'Coordinate and engage in recruitment activities.', icon: 'ti ti-calendar-event', link: path('front_events') },
+        { title: 'Profile', description: 'Update your personal and professional identity.', icon: 'ti ti-user', link: '#' }
+    ] %}
+
+    <section class="py-5">
+        <div class="container-xl">
+            <div class="row align-items-center g-4">
+                <div class="col-lg-6">
+                    <h1 class="display-6 fw-bold mb-3">Candidate Portal</h1>
+                    <p class="lead mb-4">Welcome back! Use this workspace to track your progress and manage your recruitment profile.</p>
+<div class="d-flex gap-2 flex-wrap">
+    <a href="{{ path('app_candidate_skills') }}" class="btn btn-primary">
+        <i class="ti ti-star me-2"></i>My Skills
+    </a>
+    <a href="#" class="btn btn-outline-primary">Browse Jobs</a>
+</div>
+                </div>
+                <div class="col-lg-6 text-center">
+                    <img src="{{ asset('assets/team_uploads/logo.png') }}" class="img-fluid" alt="TalentBridge" style="max-width: 240px;">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-5">
+        <div class="container-xl">
+            <div class="row mb-4 text-center">
+                <div class="col-12">
+                    <h2 class="h3 mb-0">Your Dashboard</h2>
+                </div>
+            </div>
+            <div class="row g-4">
+                {% for module in modules %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card card-body border h-100 shadow-sm-hover">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-blue-lt text-blue mb-3" style="width: 44px; height: 44px;">
+                                <i class="{{ module.icon }} fs-2"></i>
+                            </div>
+                            <h5>{{ module.title }}</h5>
+                            <p class="mb-3 text-muted">{{ module.description }}</p>
+                            <a href="{{ module.link }}" class="btn btn-sm btn-ghost-primary mt-auto">Manage</a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+{% endblock %}

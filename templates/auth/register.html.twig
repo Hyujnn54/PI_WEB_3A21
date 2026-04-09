@@ -18,21 +18,67 @@
                     {% for message in app.flashes('success') %}
                         <div class="alert alert-success">{{ message }}</div>
                     {% endfor %}
-                    <form method="post" action="{{ path('app_register') }}" novalidate>
-                        <div class="mb-3">
-                            <label class="form-label">Full Name</label>
-                            <input type="text" name="full_name" class="form-control">
+                    <form method="post" action="{{ path('app_register') }}" enctype="multipart/form-data" novalidate>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">First Name</label>
+                                <input type="text" name="first_name" class="form-control" placeholder="John" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Last Name</label>
+                                <input type="text" name="last_name" class="form-control" placeholder="Doe" required>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="text" name="email" class="form-control">
+                            <label class="form-label">Email Address</label>
+                            <input type="email" name="email" class="form-control" placeholder="example@test.com" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Role</label>
-                            <select name="role" class="form-select">
+                            <label class="form-label">Phone Number</label>
+                            <input type="text" name="phone" class="form-control" placeholder="55 123 456" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" name="password" class="form-control" placeholder="********" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">I am registering as a:</label>
+                            <select name="role" id="roleSelector" class="form-select" required>
                                 <option value="candidate">Candidate</option>
                                 <option value="recruiter">Recruiter</option>
                             </select>
+                        </div>
+
+                        <div id="candidateFields">
+                            <div class="hr-text text-blue">Candidate Details</div>
+                            <div class="mb-3">
+                                <label class="form-label">Personal Location</label>
+                                <input type="text" name="location" class="form-control" placeholder="City, Country">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Education Level</label>
+                                <input type="text" name="education_level" class="form-control" placeholder="e.g. Master in IT">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Years of Experience</label>
+                                <input type="number" name="experience_years" class="form-control" min="0">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Upload CV (PDF)</label>
+                                <input type="file" name="cv_file" class="form-control" accept=".pdf">
+                            </div>
+                        </div>
+
+                        <div id="recruiterFields" style="display: none;">
+                            <div class="hr-text text-blue">Company Details</div>
+                            <div class="mb-3">
+                                <label class="form-label">Company Name</label>
+                                <input type="text" name="company_name" class="form-control" placeholder="Google">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Company Location</label>
+                                <input type="text" name="company_location" class="form-control" placeholder="California, USA">
+                            </div>
                         </div>
                         <div class="form-footer">
                             <button type="submit" class="btn btn-primary w-100">Register</button>
@@ -46,4 +92,19 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.getElementById('roleSelector').addEventListener('change', function () {
+        const candidateDiv = document.getElementById('candidateFields');
+        const recruiterDiv = document.getElementById('recruiterFields');
+
+        if (this.value === 'candidate') {
+            candidateDiv.style.display = 'block';
+            recruiterDiv.style.display = 'none';
+        } else {
+            candidateDiv.style.display = 'none';
+            recruiterDiv.style.display = 'block';
+        }
+    });
+</script>
 {% endblock %}

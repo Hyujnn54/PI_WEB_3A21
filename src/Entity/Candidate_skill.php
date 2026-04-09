@@ -3,64 +3,63 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-
 use App\Entity\Candidate;
 
 #[ORM\Entity]
 class Candidate_skill
 {
-
     #[ORM\Id]
-    #[ORM\Column(type: "bigint")]
-    private string $id;
+    #[ORM\GeneratedValue] // FIX 1: This tells MySQL to auto-increment the ID
+    #[ORM\Column(type: "integer")] // FIX 2: Use integer instead of string for ID
+    private ?int $id = null;
 
-        #[ORM\ManyToOne(targetEntity: Candidate::class, inversedBy: "candidate_skills")]
+    // FIX 3: Renamed property to $candidate (it represents the WHOLE object, not just the ID)
+    #[ORM\ManyToOne(targetEntity: Candidate::class, inversedBy: "candidate_skills")]
     #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    private Candidate $candidate_id;
+    private ?Candidate $candidate = null;
 
     #[ORM\Column(type: "string", length: 100)]
     private string $skill_name;
 
-    #[ORM\Column(type: "string")]
+    #[ORM\Column(type: "string", length: 255)]
     private string $level;
 
-    public function getId()
+    public function getId(): ?int
     {
         return $this->id;
     }
 
-    public function setId($value)
+    public function getCandidate(): ?Candidate
     {
-        $this->id = $value;
+        return $this->candidate;
     }
 
-    public function getCandidate_id()
+    public function setCandidate(?Candidate $candidate): self
     {
-        return $this->candidate_id;
+        $this->candidate = $candidate;
+        return $this;
     }
 
-    public function setCandidate_id($value)
-    {
-        $this->candidate_id = $value;
-    }
-
-    public function getSkill_name()
+    public function getSkillName(): ?string
     {
         return $this->skill_name;
     }
 
-    public function setSkill_name($value)
-    {
-        $this->skill_name = $value;
-    }
-
-    public function getLevel()
+public function setSkillName(string $skill_name): self
+{
+    $this->skill_name = $skill_name;
+    return $this;
+}
+    public function getLevel(): ?string
     {
         return $this->level;
     }
 
-    public function setLevel($value)
+    public function setLevel(string $level): self
     {
-        $this->level = $value;
+        $this->level = $level;
+        return $this;
     }
+
+
 }

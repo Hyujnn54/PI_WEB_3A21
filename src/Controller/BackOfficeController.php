@@ -2,11 +2,15 @@
 
 namespace App\Controller;
 
+use App\Entity\Admin;
+use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/offermanagement')]
@@ -16,24 +20,181 @@ class BackOfficeController extends AbstractController
 
     #[Route('/admin', name: 'back_dashboard')]
     #[Route('/admin', name: 'app_admin')]
-    public function index(): Response
+    public function index(UsersRepository $userRepo): Response
     {
+        $allUsers = $userRepo->findAll();
+        $admins = 0;
+        $candidates = 0;
+        $recruiters = 0;
+
+        foreach ($allUsers as $user) {
+            $roles = $user->getRoles();
+
+            if (in_array('ROLE_ADMIN', $roles, true)) {
+                $admins += 1;
+            }
+
+            if (in_array('ROLE_CANDIDATE', $roles, true)) {
+                $candidates += 1;
+            }
+
+            if (in_array('ROLE_RECRUITER', $roles, true)) {
+                $recruiters += 1;
+            }
+        }
+
         return $this->render('admin/index.html.twig', [
             'authUser' => ['role' => 'admin'],
             'kpis' => [
-                ['label' => 'Total Users', 'value' => '1,378', 'icon' => 'ti ti-users'],
+                ['label' => 'Total Users', 'value' => (string) count($allUsers), 'icon' => 'ti ti-users'],
                 ['label' => 'Open Offers', 'value' => '32', 'icon' => 'ti ti-briefcase-2'],
                 ['label' => 'Applications', 'value' => '3,580', 'icon' => 'ti ti-file-check'],
                 ['label' => 'Interviews', 'value' => '482', 'icon' => 'ti ti-message-2'],
             ],
+            'stats' => [
+                'admins' => $admins,
+                'candidates' => $candidates,
+                'recruiters' => $recruiters,
+                'interviews' => 482,
+            ],
+            'usersPreview' => array_slice($allUsers, 0, 5),
         ]);
     }
 
-    #[Route('/admin/add-user', name: 'app_admin_add_user')]
-    public function addUser(): Response
+    #[Route('/admin/users', name: 'app_admin_users')]
+    public function listUsers(UsersRepository $userRepo, Request $request): Response
     {
+        $searchTerm = trim((string) $request->query->get('search', ''));
+        $roleFilter = $request->query->get('role');
+
+        if ($searchTerm !== '' || $roleFilter) {
+            $users = $userRepo->findBySearchAndRole($searchTerm, $roleFilter);
+        } else {
+            $users = $userRepo->findAll();
+        }
+
+        $allUsers = $userRepo->findAll();
+        $totalCount = count($allUsers);
+
+        if ($request->query->get('ajax')) {
+            return $this->render('admin/_user_table_rows.html.twig', [
+                'users' => $users,
+            ]);
+        }
+
+        return $this->render('admin/user_list.html.twig', [
+            'authUser' => ['role' => 'admin'],
+            'users' => $users,
+            'searchTerm' => $searchTerm,
+            'currentRole' => $roleFilter,
+            'totalCount' => $totalCount,
+        ]);
+    }
+
+    #[Route('/admin/add-user', name: 'app_admin_add_user', methods: ['GET', 'POST'])]
+    public function addUser(Request $request, UserPasswordHasherInterface $hasher, EntityManagerInterface $entityManager): Response
+    {
+        if ($request->isMethod('POST')) {
+            $user = new Admin();
+
+            $user->setFirstName((string) $request->request->get('first_name'));
+            $user->setLastName((string) $request->request->get('last_name'));
+            $user->setEmail((string) $request->request->get('email'));
+            $user->setPhone((string) $request->request->get('phone'));
+
+            if (method_exists($user, 'setAssignedArea')) {
+                $user->setAssignedArea('General Management');
+            }
+
+            $plainPassword = (string) $request->request->get('password');
+            $user->setPassword($hasher->hashPassword($user, $plainPassword));
+            $user->setRoles(['ROLE_ADMIN']);
+            $user->setIsActive(true);
+
+            $entityManager->persist($user);
+            $entityManager->flush();
+
+            $this->addFlash('success', 'Admin created successfully!');
+            return $this->redirectToRoute('app_admin_users');
+        }
+
         return $this->render('admin/add_user.html.twig', [
             'authUser' => ['role' => 'admin'],
+        ]);
+    }
+
+    #[Route('/admin/user/delete/{id}', name: 'app_admin_delete_user', methods: ['POST'])]
+    public function deleteUser(int $id, UsersRepository $userRepo, EntityManagerInterface $entityManager): Response
+    {
+        $user = $userRepo->find($id);
+        if (!$user) {
+            $this->addFlash('error', 'User not found.');
+            return $this->redirectToRoute('app_admin_users');
+        }
+
+        $entityManager->remove($user);
+        $entityManager->flush();
+
+        $this->addFlash('success', 'User deleted successfully.');
+        return $this->redirectToRoute('app_admin_users');
+    }
+
+    #[Route('/admin/user/edit/{id}', name: 'app_admin_edit_user', methods: ['GET', 'POST'])]
+    public function editUser(int $id, UsersRepository $userRepo, Request $request, EntityManagerInterface $entityManager): Response
+    {
+        $user = $userRepo->find($id);
+
+        if (!$user) {
+            $this->addFlash('error', 'User not found.');
+            return $this->redirectToRoute('app_admin_users');
+        }
+
+        if ($request->isMethod('POST')) {
+            $user->setFirstName((string) $request->request->get('first_name'));
+            $user->setLastName((string) $request->request->get('last_name'));
+            $user->setEmail((string) $request->request->get('email'));
+
+            $entityManager->flush();
+
+            $this->addFlash('success', 'User updated successfully.');
+            return $this->redirectToRoute('app_admin_users');
+        }
+
+        return $this->render('admin/edit_user.html.twig', [
+            'authUser' => ['role' => 'admin'],
+            'user' => $user,
+        ]);
+    }
+
+    #[Route('/admin/stats', name: 'app_admin_stats')]
+    public function userStats(UsersRepository $userRepo): Response
+    {
+        $allUsers = $userRepo->findAll();
+        $admins = 0;
+        $candidates = 0;
+        $recruiters = 0;
+
+        foreach ($allUsers as $user) {
+            $roles = $user->getRoles();
+
+            if (in_array('ROLE_ADMIN', $roles, true)) {
+                $admins += 1;
+            }
+            if (in_array('ROLE_CANDIDATE', $roles, true)) {
+                $candidates += 1;
+            }
+            if (in_array('ROLE_RECRUITER', $roles, true)) {
+                $recruiters += 1;
+            }
+        }
+
+        return $this->render('admin/stats.html.twig', [
+            'authUser' => ['role' => 'admin'],
+            'totalUsers' => count($allUsers),
+            'admins' => $admins,
+            'candidates' => $candidates,
+            'recruiters' => $recruiters,
+            'chartData' => [$admins, $recruiters, $candidates],
         ]);
     }
 

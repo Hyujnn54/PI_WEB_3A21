@@ -9,7 +9,10 @@ use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
+use App\Form\ProfileType;
+use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -1144,6 +1147,34 @@ class FrontPortalController extends AbstractController
         $this->addFlash('success', 'Interview review saved.');
 
         return $this->redirectToRoute('front_interviews', $request->query->all());
+    }
+
+    #[Route('/front/profile', name: 'front_profile')]
+    public function profile(Request $request, UsersRepository $userRepo, EntityManagerInterface $entityManager): Response
+    {
+        $userId = $request->getSession()->get('user_id');
+        $user = $userRepo->find($userId);
+
+        if (!$user) {
+            $this->addFlash('error', 'Please log in to access your profile.');
+            return $this->redirectToRoute('app_login');
+        }
+
+        $form = $this->createForm(ProfileType::class, $user);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $entityManager->flush();
+            $request->getSession()->set('user_name', $user->getFirstName());
+
+            $this->addFlash('success', 'Profile updated successfully!');
+            return $this->redirectToRoute('front_profile');
+        }
+
+        return $this->render('front/profile.html.twig', [
+            'form' => $form->createView(),
+            'authUser' => ['role' => 'candidate'],
+        ]);
     }
 
     private function validateInterviewPayload(array $data): array

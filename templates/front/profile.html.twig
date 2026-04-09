@@ -1,0 +1,110 @@
+{% extends 'base.html.twig' %}
+
+{% form_theme form 'bootstrap_5_layout.html.twig' %}
+
+{% block title %}My Profile - Talent Bridge{% endblock %}
+
+
+
+{% block body %}
+
+<div class="container-xl py-5">
+
+
+
+    <div class="row justify-content-center">
+
+        <div class="col-lg-8 col-xl-7">
+
+
+
+            <!-- Page Header -->
+
+            <div class="d-flex align-items-center mb-4">
+
+                <i class="ti ti-user-circle text-primary me-3" style="font-size: 2.8rem;"></i>
+
+                <div>
+
+                    <h1 class="h3 mb-1 fw-bold">My Profile</h1>
+
+                    <p class="text-muted mb-0">Manage and update your personal information</p>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="card shadow-sm">
+
+                <div class="card-body p-4">
+
+
+
+{% if form %}
+    {{ form_start(form, {'attr': {'class': 'row g-3'}}) }}
+
+        <div class="col-md-6">
+            {{ form_row(form.firstName) }}
+        </div>
+
+        <div class="col-md-6">
+            {{ form_row(form.lastName) }}
+        </div>
+
+        <div class="col-12">
+            {{ form_row(form.email) }}
+        </div>
+
+        <div class="col-12">
+            {{ form_row(form.phone) }}
+        </div>
+
+        <div class="col-12">
+            {{ form_row(form.plainPassword) }}
+        </div>
+
+        <div class="col-12 mt-4">
+            <button type="submit" class="btn btn-primary btn-lg px-5">
+                <i class="ti ti-device-floppy me-2"></i>
+                Save Changes
+            </button>
+        </div>
+
+    {{ form_end(form) }}
+{% else %}
+    <div class="alert alert-warning">
+        Profile form not ready yet.
+    </div>
+{% endif %}
+
+
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Back to Home -->
+
+            <div class="text-center mt-4">
+
+                <a href="{{ path('front_home') }}" class="btn btn-link text-muted">
+
+                    ← Back to Candidate Portal
+
+                </a>
+
+            </div>
+
+
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
