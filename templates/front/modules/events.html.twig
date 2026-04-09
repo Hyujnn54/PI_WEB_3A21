@@ -14,10 +14,10 @@
             <div class="d-flex gap-2">
                 {% if role == 'recruiter' %}
                     <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createEventModal">Create Event</a>
+                    <a href="{{ path('recruiter_event_registrations', {'role': 'recruiter'}) }}" class="btn btn-outline-primary">View Registrations</a>
                 {% else %}
-                    <a href="#" class="btn btn-primary">My Registrations</a>
+                    <a href="{{ path('front_event_registrations', {'role': 'candidate'}) }}" class="btn btn-primary">My Registrations</a>
                 {% endif %}
-                <a href="#" class="btn btn-outline-primary">Calendar View</a>
             </div>
         </div>
     </div>
@@ -48,10 +48,10 @@
                             <input type="text" class="form-control" placeholder="Search events by title, date, location..." data-filter-search>
                         </div>
                         <select class="form-select" style="max-width: 220px;" data-filter-criteria>
-                            <option value="all">Search In: All</option>
-                            <option value="title">Title</option>
-                            <option value="meta">Meta</option>
-                            <option value="description">Description</option>
+                            <option value="all">All event types</option>
+                            <option value="Workshop">Workshop</option>
+                            <option value="Hiring Day">Hiring Day</option>
+                            <option value="Webinar">Webinar</option>
                         </select>
                         <select class="form-select" style="max-width: 230px;" data-filter-sort>
                             <option value="default">Default Order</option>
@@ -67,10 +67,17 @@
 
             <div id="eventCardsGrid" class="row row-cards">
                 {% for card in cards %}
-                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}">
-                            <div class="tb-module-meta">{{ card.meta }}</div>
-                            <h3>{{ card.title }}</h3>
+                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-type="{{ card.event_type|lower }}" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
+                        <div class="tb-module-card h-100" data-event-id="{{ card.id }}" data-event-type="{{ card.event_type }}" data-event-location="{{ card.location }}" data-event-capacity="{{ card.capacity }}" data-event-meet-link="{{ card.meet_link }}" data-event-date-value="{{ card.event_date_value }}" data-event-registered="{{ card.registered ? '1' : '0' }}" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Delete Event' : 'Add to Calendar' }}" data-action-secondary-href="{{ role == 'recruiter' ? path('recruiter_delete_event', {'id': card.id}) : '#' }}" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div class="tb-module-meta">{{ card.meta }}</div>
+                                    <h3>{{ card.title }}</h3>
+                                </div>
+                                {% if card.registered and role == 'candidate' %}
+                                    <span class="badge bg-success">Registered</span>
+                                {% endif %}
+                            </div>
                             <p>{{ card.text }}</p>
                         </div>
                     </div>
@@ -105,14 +112,308 @@
                     <div class="tb-interview-action-dock-inner">
                         <div class="small text-secondary">Selected event actions</div>
                         <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
-                            <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-edit me-1"></i>Primary Action</a>
-                            <form method="post" action="#" class="d-inline tb-dock-secondary-form">
-                                <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
-                            </form>
-                            <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
+                            {% if role == 'recruiter' %}
+                                <a href="#" id="editEventButton" class="btn btn-primary tb-dock-primary" data-bs-toggle="modal" data-bs-target="#createEventModal"><i class="ti ti-edit me-1"></i>Modify Event</a>
+                                <form method="post" action="#" class="d-inline tb-dock-secondary-form" id="deleteEventForm">
+                                    <button type="submit" class="btn btn-outline-danger tb-dock-secondary" onclick="return confirm('Are you sure you want to delete this event?');"><i class="ti ti-trash me-1"></i>Delete Event</button>
+                                </form>
+                                <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Review Event Feedback</a>
+                            {% else %}
+                                <form method="post" action="#" id="registerEventForm" class="d-inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('front_event_register') }}" />
+                                    <button type="submit" class="btn btn-primary tb-dock-primary" id="registerEventButton"><i class="ti ti-calendar-plus me-1"></i>Register</button>
+                                </form>
+                                <button type="button" class="btn btn-outline-primary tb-dock-tertiary" id="viewEventDetailsButton"><i class="ti ti-link me-1"></i>Event Details</button>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .tb-module-card.selected {
+        border: 2px solid #0d6efd;
+        box-shadow: 0 0 10px rgba(13, 110, 253, 0.3);
+    }
+</style>
+
+<script>
+    function initEventsPage() {
+        const selectedEvents = new Map(); // id -> event object
+        let lastSelectedId = null;
+
+        const editEventButton = document.getElementById('editEventButton');
+        const deleteForm = document.getElementById('deleteEventForm');
+        const registerEventForm = document.getElementById('registerEventForm');
+        const viewEventDetailsButton = document.getElementById('viewEventDetailsButton');
+        const actionDock = document.getElementById('eventActionDock');
+        const eventDetailPanel = document.getElementById('eventDetailPanel');
+        const formErrorsDiv = document.getElementById('formErrors');
+
+        function updateActionDock() {
+            const count = selectedEvents.size;
+            if (count > 0) {
+                actionDock.classList.remove('d-none');
+                const registerButton = registerEventForm.querySelector('button[type="submit"]');
+                if (registerButton) {
+                    registerButton.textContent = `Register for ${count} Event${count > 1 ? 's' : ''}`;
+                    registerButton.disabled = false;
+                }
+            } else {
+                actionDock.classList.add('d-none');
+            }
+        }
+
+        function updateCardUI(card, registered) {
+            const badge = card.querySelector('.badge');
+            if (registered) {
+                if (!badge) {
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'badge bg-success';
+                    newBadge.textContent = 'Registered';
+                    card.querySelector('.d-flex').appendChild(newBadge);
+                }
+                card.dataset.eventRegistered = '1';
+            } else {
+                if (badge) badge.remove();
+                card.dataset.eventRegistered = '0';
+            }
+        }
+
+        document.querySelectorAll('.tb-module-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const id = this.dataset.eventId;
+                if (selectedEvents.has(id)) {
+                    selectedEvents.delete(id);
+                    this.classList.remove('selected');
+                } else {
+                    const eventData = {
+                        id: id,
+                        title: this.dataset.detailTitle,
+                        text: this.dataset.detailText,
+                        meta: this.dataset.detailMeta,
+                        type: this.dataset.eventType,
+                        location: this.dataset.eventLocation,
+                        capacity: this.dataset.eventCapacity,
+                        meetLink: this.dataset.eventMeetLink,
+                        dateValue: this.dataset.eventDateValue,
+                        registered: this.dataset.eventRegistered === '1',
+                    };
+                    selectedEvents.set(id, eventData);
+                    this.classList.add('selected');
+                }
+                lastSelectedId = id;
+                updateActionDock();
+
+                // Update detail panel for last selected
+                if (selectedEvents.has(lastSelectedId)) {
+                    const event = selectedEvents.get(lastSelectedId);
+                    eventDetailPanel.querySelector('.tb-detail-meta').textContent = event.meta;
+                    eventDetailPanel.querySelector('.card-title').textContent = event.title;
+                    eventDetailPanel.querySelector('.tb-detail-text').textContent = event.text;
+                    eventDetailPanel.querySelector('.tb-detail-extra').textContent = `Date & Place: ${event.meta}`;
+                } else {
+                    eventDetailPanel.querySelector('.tb-detail-meta').textContent = '';
+                    eventDetailPanel.querySelector('.card-title').textContent = 'Event Details';
+                    eventDetailPanel.querySelector('.tb-detail-text').textContent = 'Select an event card to display details here.';
+                    eventDetailPanel.querySelector('.tb-detail-extra').textContent = '';
+                }
+
+                if (deleteForm && lastSelectedId) {
+                    deleteForm.action = '{{ path("recruiter_delete_event", {"id": "EVENT_ID"}) }}'.replace('EVENT_ID', lastSelectedId);
+                }
+            });
+        });
+
+        if (registerEventForm) {
+            registerEventForm.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                if (selectedEvents.size === 0) {
+                    alert('Please select at least one event to register.');
+                    return;
+                }
+
+                const csrfToken = document.querySelector('input[name="_token"]')?.value || '';
+                let successCount = 0;
+                let warningCount = 0;
+
+                for (const [id, eventData] of selectedEvents) {
+                    if (eventData.registered) {
+                        warningCount++;
+                        continue;
+                    }
+
+                    try {
+                        const response = await fetch('{{ path("front_event_register", {"id": "EVENT_ID"}) }}'.replace('EVENT_ID', id), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: new URLSearchParams({ '_token': csrfToken }),
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.success) {
+                                successCount++;
+                                eventData.registered = true;
+                                const card = document.querySelector(`.tb-module-card[data-event-id="${id}"]`);
+                                if (card) {
+                                    updateCardUI(card, true);
+                                }
+                                selectedEvents.delete(id);
+                                document.querySelector(`.tb-module-card[data-event-id="${id}"]`).classList.remove('selected');
+                            } else if (result.warning) {
+                                warningCount++;
+                            }
+                        } else {
+                            console.error('Registration failed for event', id);
+                        }
+                    } catch (error) {
+                        console.error('Error registering for event', id, error);
+                    }
+                }
+
+                updateActionDock();
+
+                // Show messages
+                if (successCount > 0) {
+                    alert(`Successfully registered for ${successCount} event${successCount > 1 ? 's' : ''}.`);
+                }
+                if (warningCount > 0) {
+                    alert(`${warningCount} event${warningCount > 1 ? 's' : ''} were already registered.`);
+                }
+            });
+        }
+
+        if (viewEventDetailsButton) {
+            viewEventDetailsButton.addEventListener('click', function() {
+                if (!lastSelectedId || !selectedEvents.has(lastSelectedId)) {
+                    alert('Please select an event first.');
+                    return;
+                }
+                const event = selectedEvents.get(lastSelectedId);
+                const detailModalEl = document.getElementById('eventDetailModal');
+                if (!detailModalEl) {
+                    return;
+                }
+
+                detailModalEl.querySelector('.modal-title').textContent = event.title || 'Event details';
+                detailModalEl.querySelector('.event-detail-meta').textContent = event.meta || '';
+                detailModalEl.querySelector('.event-detail-type').textContent = event.type || '';
+                detailModalEl.querySelector('.event-detail-location').textContent = event.location || '';
+                detailModalEl.querySelector('.event-detail-capacity').textContent = event.capacity || '';
+                
+                if (event.type && event.type.toLowerCase() === 'webinar') {
+                    detailModalEl.querySelector('.event-detail-meet-link-lbl').classList.remove('d-none');
+                    detailModalEl.querySelector('.event-detail-meet-link-val').classList.remove('d-none');
+                    detailModalEl.querySelector('.event-detail-meet-link').textContent = event.meetLink || 'No meeting link provided';
+                    detailModalEl.querySelector('.event-detail-meet-link').href = event.meetLink || '#';
+                } else {
+                    detailModalEl.querySelector('.event-detail-meet-link-lbl').classList.add('d-none');
+                    detailModalEl.querySelector('.event-detail-meet-link-val').classList.add('d-none');
+                }
+                
+                detailModalEl.querySelector('.event-detail-description').textContent = event.text || '';
+                detailModalEl.querySelector('.event-detail-date').textContent = event.dateValue ? new Date(event.dateValue).toLocaleString() : '';
+
+                const detailModal = new bootstrap.Modal(detailModalEl);
+                detailModal.show();
+            });
+        }
+
+        if (editEventButton) {
+            editEventButton.addEventListener('click', function(event) {
+                if (!lastSelectedId || !selectedEvents.has(lastSelectedId)) {
+                    event.preventDefault();
+                    alert('Please select an event first.');
+                    return;
+                }
+                const eventData = selectedEvents.get(lastSelectedId);
+
+                const form = document.getElementById('createEventForm');
+                if (!form) {
+                    return;
+                }
+
+                form.action = '{{ path("recruiter_update_event", {"id": "EVENT_ID"}) }}'.replace('EVENT_ID', lastSelectedId);
+                document.querySelector('#createEventModal .modal-title').textContent = 'Edit Recruitment Event';
+                document.querySelector('#createEventForm button[type="submit"]').textContent = 'Save Changes';
+
+                document.getElementById('title').value = eventData.title || '';
+                document.getElementById('description').value = eventData.text || '';
+                document.getElementById('event_type').value = eventData.type || '';
+                document.getElementById('location').value = eventData.location || '';
+                document.getElementById('event_date').value = eventData.dateValue || '';
+                document.getElementById('capacity').value = eventData.capacity || '';
+                document.getElementById('meet_link').value = eventData.meetLink || '';
+                
+                // Trigger change event to update meet_link visibility
+                const eventTypeSelect = document.getElementById('event_type');
+                if (eventTypeSelect) eventTypeSelect.dispatchEvent(new Event('change'));
+            });
+
+            const createModal = document.getElementById('createEventModal');
+            if (createModal) {
+                createModal.addEventListener('hidden.bs.modal', function () {
+                    const form = document.getElementById('createEventForm');
+                    if (!form) {
+                        return;
+                    }
+                    form.action = '{{ path('recruiter_create_event') }}';
+                    document.querySelector('#createEventModal .modal-title').textContent = 'Create Recruitment Event';
+                    document.querySelector('#createEventForm button[type="submit"]').textContent = 'Create Event';
+                    form.reset();
+                    document.querySelectorAll('[id$="Error"]').forEach(el => el.classList.add('d-none'));
+                    if (formErrorsDiv) {
+                        formErrorsDiv.classList.add('d-none');
+                    }
+                });
+            }
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initEventsPage);
+    } else {
+        initEventsPage();
+    }
+</script>
+
+<div class="modal fade" id="eventDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Event details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <p class="text-muted event-detail-meta"></p>
+                </div>
+                <dl class="row">
+                    <dt class="col-sm-4">Type</dt>
+                    <dd class="col-sm-8 event-detail-type"></dd>
+                    <dt class="col-sm-4">Date & Time</dt>
+                    <dd class="col-sm-8 event-detail-date"></dd>
+                    <dt class="col-sm-4">Location</dt>
+                    <dd class="col-sm-8 event-detail-location"></dd>
+                    <dt class="col-sm-4">Capacity</dt>
+                    <dd class="col-sm-8 event-detail-capacity"></dd>
+                    <dt class="col-sm-4 event-detail-meet-link-lbl d-none">Meeting Link</dt>
+                    <dd class="col-sm-8 event-detail-meet-link-val d-none"><a href="#" target="_blank" class="event-detail-meet-link">No meeting link provided</a></dd>
+                </dl>
+                <div>
+                    <h6>Description</h6>
+                    <p class="event-detail-description mb-0"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -126,39 +427,48 @@
                     <h5 class="modal-title"><i class="ti ti-calendar-plus me-1"></i>Create Recruitment Event</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="createEventForm" method="post" action="{{ path('recruiter_create_event') }}">
+                <div id="formErrors" class="alert alert-danger d-none mx-3 mt-3"></div>
+                <form id="createEventForm" method="post" action="{{ path('recruiter_create_event') }}" novalidate>
                     <div class="modal-body row g-3">
                         <div class="col-md-12">
-                            <label class="form-label">Event Title</label>
-                            <input type="text" name="title" class="form-control" required placeholder="e.g. Tech Hiring Day">
+                            <label class="form-label">Event Title <span class="text-danger">*</span></label>
+                            <input type="text" name="title" id="title" class="form-control" placeholder="e.g. Tech Hiring Day" minlength="3" maxlength="255">
+                            <small class="text-danger d-none" id="titleError"></small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Date & Time</label>
-                            <input type="datetime-local" name="event_date" class="form-control" required>
+                            <label class="form-label">Date & Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" name="event_date" id="event_date" class="form-control">
+                            <small class="text-danger d-none" id="event_dateError"></small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Event Type</label>
-                            <select name="event_type" class="form-control" required>
+                            <label class="form-label">Event Type <span class="text-danger">*</span></label>
+                            <select name="event_type" id="event_type" class="form-control">
+                                <option value="">-- Select Type --</option>
                                 <option value="Workshop">Workshop</option>
                                 <option value="Hiring Day">Hiring Day</option>
                                 <option value="Webinar">Webinar</option>
                             </select>
+                            <small class="text-danger d-none" id="event_typeError"></small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Location</label>
-                            <input type="text" name="location" class="form-control" required placeholder="Tunis, Sfax, or Remote">
+                            <label class="form-label">Location <span class="text-danger">*</span></label>
+                            <input type="text" name="location" id="location" class="form-control" placeholder="Tunis, Sfax, or Remote" minlength="2">
+                            <small class="text-danger d-none" id="locationError"></small>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Capacity</label>
-                            <input type="number" name="capacity" min="1" max="1000" value="50" class="form-control" required>
+                            <label class="form-label">Capacity <span class="text-danger">*</span></label>
+                            <input type="number" name="capacity" id="capacity" class="form-control" min="1" max="1000" value="50">
+                            <small class="text-danger d-none" id="capacityError"></small>
                         </div>
-                        <div class="col-md-12">
-                            <label class="form-label">Meeting Link (if remote)</label>
-                            <input type="url" name="meet_link" class="form-control" placeholder="https://meet.google.com/xyz">
+                        <div class="col-md-12 d-none" id="meetLinkContainer">
+                            <label class="form-label">Meeting Link</label>
+                            <input type="url" name="meet_link" id="meet_link" class="form-control" placeholder="https://meet.google.com/xyz">
+                            <small class="text-danger d-none" id="meet_linkError"></small>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Description</label>
-                            <textarea name="description" rows="4" class="form-control" required></textarea>
+                            <label class="form-label">Description <span class="text-danger">*</span></label>
+                            <textarea name="description" id="description" class="form-control" rows="4" placeholder="Describe the event..." minlength="10"></textarea>
+                            <small class="text-danger d-none" id="descriptionError"></small>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -169,6 +479,142 @@
             </div>
         </div>
     </div>
+
+    <script>
+        const createEventForm = document.getElementById('createEventForm');
+        const formErrorsDiv = document.getElementById('formErrors');
+        const eventTypeSelect = document.getElementById('event_type');
+        const meetLinkContainer = document.getElementById('meetLinkContainer');
+
+        if (eventTypeSelect && meetLinkContainer) {
+            eventTypeSelect.addEventListener('change', function() {
+                if (this.value === 'Webinar') {
+                    meetLinkContainer.classList.remove('d-none');
+                } else {
+                    meetLinkContainer.classList.add('d-none');
+                    document.getElementById('meet_link').value = '';
+                }
+            });
+        }
+
+        function validateForm() {
+            const errors = {};
+            const title = document.getElementById('title').value.trim();
+            const description = document.getElementById('description').value.trim();
+            const eventType = document.getElementById('event_type').value.trim();
+            const location = document.getElementById('location').value.trim();
+            const eventDate = document.getElementById('event_date').value;
+            const capacity = document.getElementById('capacity').value;
+            const meetLink = document.getElementById('meet_link').value.trim();
+
+            // Clear previous errors
+            document.querySelectorAll('[id$="Error"]').forEach(el => el.classList.add('d-none'));
+            formErrorsDiv.classList.add('d-none');
+
+            // Validate title
+            if (!title) {
+                errors.title = 'Event title is required.';
+            } else if (title.length < 3) {
+                errors.title = 'Event title must be at least 3 characters.';
+            } else if (title.length > 255) {
+                errors.title = 'Event title cannot exceed 255 characters.';
+            }
+
+            // Validate description
+            if (!description) {
+                errors.description = 'Description is required.';
+            } else if (description.length < 10) {
+                errors.description = 'Description must be at least 10 characters.';
+            }
+
+            // Validate event type
+            if (!eventType) {
+                errors.event_type = 'Event type is required.';
+            }
+
+            // Validate location
+            if (!location) {
+                errors.location = 'Location is required.';
+            } else if (location.length < 2) {
+                errors.location = 'Location must be at least 2 characters.';
+            }
+
+            // Validate event date
+            if (!eventDate) {
+                errors.event_date = 'Event date is required.';
+            } else {
+                const date = new Date(eventDate);
+                const now = new Date();
+                if (date <= now) {
+                    errors.event_date = 'Event date must be in the future.';
+                }
+            }
+
+            // Validate capacity
+            if (!capacity) {
+                errors.capacity = 'Capacity is required.';
+            } else {
+                const cap = parseInt(capacity);
+                if (cap < 1) {
+                    errors.capacity = 'Capacity must be at least 1.';
+                } else if (cap > 1000) {
+                    errors.capacity = 'Capacity cannot exceed 1000.';
+                }
+            }
+
+            // Validate meet link
+            if (eventType === 'Webinar' && meetLink && !isValidUrl(meetLink)) {
+                errors.meet_link = 'Please enter a valid URL.';
+            }
+
+            // Display errors
+            if (Object.keys(errors).length > 0) {
+                Object.keys(errors).forEach(field => {
+                    const errorEl = document.getElementById(field + 'Error');
+                    if (errorEl) {
+                        errorEl.textContent = errors[field];
+                        errorEl.classList.remove('d-none');
+                    }
+                });
+                formErrorsDiv.innerHTML = '<strong>Please fix the following errors:</strong>';
+                formErrorsDiv.classList.remove('d-none');
+                return false;
+            }
+            return true;
+        }
+
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        createEventForm.addEventListener('submit', function(e) {
+            if (!validateForm()) {
+                e.preventDefault();
+            }
+        });
+
+        // Show errors on form submit if returned from server
+        {% if errors is defined and errors is not empty %}
+            window.addEventListener('load', function() {
+                const modal = new bootstrap.Modal(document.getElementById('createEventModal'));
+                modal.show();
+                {% for field, message in errors %}
+                    const errorEl = document.getElementById('{{ field }}Error');
+                    if (errorEl) {
+                        errorEl.textContent = '{{ message }}';
+                        errorEl.classList.remove('d-none');
+                    }
+                {% endfor %}
+                formErrorsDiv.innerHTML = '<strong>Please fix the following errors:</strong>';
+                formErrorsDiv.classList.remove('d-none');
+            });
+        {% endif %}
+    </script>
 {% endif %}
 
 {% endblock %}

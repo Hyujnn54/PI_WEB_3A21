@@ -54,6 +54,7 @@
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-check"></i></span><span class="nav-link-title">Applications</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_events', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ path('front_event_registrations', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-check"></i></span><span class="nav-link-title">Registrations</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews', {role: currentRole}) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-message-2"></i></span><span class="nav-link-title">Interviews</span></a></li>
                             {% endif %}
                         </ul>
@@ -126,6 +127,9 @@
                     let visibleCount = 0;
                     items.forEach(function (item) {
                         let haystack = (item.dataset.filterText || '').toLowerCase();
+                        const itemType = (item.dataset.filterType || '').toLowerCase();
+                        let isMatch = true;
+
                         if (criteria === 'title') {
                             haystack = (item.dataset.filterTitle || '').toLowerCase();
                         } else if (criteria === 'meta') {
@@ -134,9 +138,15 @@
                             haystack = (item.dataset.filterDescription || '').toLowerCase();
                         } else if (criteria === 'status') {
                             haystack = (item.dataset.filterStatus || '').toLowerCase();
+                        } else if (criteria !== 'all') {
+                            // Use the selected value as an event type filter.
+                            isMatch = itemType === criteria.toLowerCase();
                         }
 
-                        const isMatch = query === '' || haystack.includes(query);
+                        if (isMatch && query !== '') {
+                            isMatch = haystack.includes(query);
+                        }
+
                         item.classList.toggle('d-none', !isMatch);
                         if (isMatch) {
                             visibleCount += 1;
