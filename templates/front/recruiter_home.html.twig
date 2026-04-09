@@ -1,0 +1,370 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}TalentBridge | Recruiter Home{% endblock %}
+
+{% block body %}
+    {% set recruiterName = recruiterName|default(app.session.get('user_name')|default('Recruiter')) %}
+    {% set companyName = companyName|default('') %}
+    {% set activitySummary = activitySummary|default({'offers_total': 0, 'applications_total': 0, 'interviews_upcoming': 0}) %}
+    {% set jobOffersSummary = jobOffersSummary|default({'total': 0, 'active': 0, 'inactive': 0}) %}
+    {% set applications = applications|default([]) %}
+    {% set applicationCounters = applicationCounters|default({'pending': 0, 'reviewed': 0, 'accepted': 0, 'rejected': 0}) %}
+    {% set interviews = interviews|default([]) %}
+
+    <style>
+        .tb-recruiter-home {
+            padding-bottom: 2rem;
+        }
+
+        .tb-recruiter-hero {
+            background: linear-gradient(130deg, rgba(13, 91, 215, 0.16), rgba(19, 182, 255, 0.05));
+            border: 1px solid #c9dcff;
+            border-radius: 18px;
+            box-shadow: 0 20px 40px rgba(16, 47, 94, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tb-recruiter-hero::after {
+            content: "";
+            position: absolute;
+            right: -50px;
+            bottom: -60px;
+            width: 190px;
+            height: 190px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(19, 182, 255, 0.32), rgba(19, 182, 255, 0));
+            pointer-events: none;
+        }
+
+        .tb-summary-chip {
+            min-width: 150px;
+            border: 1px solid #cfe0ff;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 0.7rem 0.9rem;
+        }
+
+        .tb-summary-chip .tb-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #133f79;
+        }
+
+        .tb-summary-chip .tb-label {
+            font-size: 0.8rem;
+            color: #5a7296;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .tb-dashboard-card {
+            border: 2px solid #d4e3ff;
+            border-radius: 14px;
+            background: #ffffff;
+        }
+
+        .tb-section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .tb-section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-bottom: 0;
+        }
+
+        .tb-section-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #eaf2ff;
+            color: #0d5bd7;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .tb-list-item {
+            border: 1px solid #e0eafe;
+            border-radius: 11px;
+            padding: 0.8rem 0.9rem;
+            background: #fcfdff;
+        }
+
+        .tb-list-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #193f6e;
+            margin-bottom: 0.2rem;
+        }
+
+        .tb-list-meta {
+            font-size: 0.82rem;
+            color: #587193;
+            margin-bottom: 0;
+        }
+
+        .tb-status-pill {
+            font-size: 0.74rem;
+            border-radius: 999px;
+            padding: 0.33rem 0.62rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .tb-status-pending {
+            background: #fff4d6;
+            color: #9a6700;
+            border: 1px solid #f2d28b;
+        }
+
+        .tb-status-reviewed {
+            background: #e7f1ff;
+            color: #1e5aa8;
+            border: 1px solid #bcd5f8;
+        }
+
+        .tb-status-accepted {
+            background: #dcf8e8;
+            color: #0f6b3e;
+            border: 1px solid #9ed8b7;
+        }
+
+        .tb-status-rejected {
+            background: #fde4e4;
+            color: #9e2f2f;
+            border: 1px solid #efb0b0;
+        }
+
+        .tb-filter-chip {
+            border-radius: 999px;
+            border: 1px solid #cadeff;
+            background: #f7faff;
+            color: #335b8f;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 0.36rem 0.68rem;
+        }
+
+        .tb-empty-state {
+            border: 1px dashed #bfd5fb;
+            border-radius: 12px;
+            background: #f8fbff;
+            color: #587193;
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 767.98px) {
+            .tb-summary-chip {
+                min-width: calc(50% - 0.4rem);
+            }
+        }
+    </style>
+
+    <section class="py-4 py-lg-5 tb-recruiter-home">
+        <div class="container-xl">
+            <div class="tb-recruiter-hero p-4 p-lg-5 mb-4">
+                <span class="badge bg-primary-lt text-primary mb-3">Recruiter Dashboard</span>
+                <h1 class="h2 mb-2">Welcome back, {{ recruiterName }}</h1>
+                <p class="text-secondary mb-1">Monitor your hiring pipeline, manage offers, and keep interviews on track from one dashboard.</p>
+                {% if companyName is not empty %}
+                    <p class="text-secondary mb-4"><i class="ti ti-building me-1"></i>{{ companyName }}</p>
+                {% else %}
+                    <div class="mb-4"></div>
+                {% endif %}
+
+                <div class="d-flex flex-wrap gap-2 mb-4">
+                    <a href="{{ path('front_job_offer_new', {role: 'recruiter'}) }}" class="btn btn-primary">
+                        <i class="ti ti-circle-plus me-1"></i>Create New Offer
+                    </a>
+                    <a href="{{ path('front_job_offers', {role: 'recruiter'}) }}" class="btn btn-outline-primary">
+                        <i class="ti ti-briefcase-2 me-1"></i>Manage Offers
+                    </a>
+                    <a href="{{ path('front_job_applications', {role: 'recruiter'}) }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-file-check me-1"></i>View Applications
+                    </a>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <div class="tb-summary-chip">
+                        <div class="tb-value">{{ activitySummary.offers_total|default(0) }}</div>
+                        <div class="tb-label">Offers Posted</div>
+                    </div>
+                    <div class="tb-summary-chip">
+                        <div class="tb-value">{{ activitySummary.applications_total|default(0) }}</div>
+                        <div class="tb-label">Recent Applications</div>
+                    </div>
+                    <div class="tb-summary-chip">
+                        <div class="tb-value">{{ activitySummary.interviews_upcoming|default(0) }}</div>
+                        <div class="tb-label">Upcoming Interviews</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-12 col-lg-5">
+                    <div class="card tb-dashboard-card h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="tb-section-head mb-3">
+                                <h2 class="h5 tb-section-title">
+                                    <span class="tb-section-icon"><i class="ti ti-briefcase-2"></i></span>
+                                    Job Offers Management
+                                </h2>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <div class="tb-list-item text-center">
+                                        <p class="tb-list-title mb-1">Active Offers</p>
+                                        <p class="h4 mb-0 text-green">{{ jobOffersSummary.active|default(0) }}</p>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="tb-list-item text-center">
+                                        <p class="tb-list-title mb-1">Inactive Offers</p>
+                                        <p class="h4 mb-0 text-muted">{{ jobOffersSummary.inactive|default(0) }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2 mt-auto">
+                                <a href="{{ path('front_job_offer_new', {role: 'recruiter'}) }}" class="btn btn-primary">
+                                    <i class="ti ti-circle-plus me-1"></i>Create New Offer
+                                </a>
+                                <a href="{{ path('front_job_offers', {role: 'recruiter'}) }}" class="btn btn-outline-primary">
+                                    <i class="ti ti-settings me-1"></i>Manage Offers
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-7">
+                    <div class="card tb-dashboard-card h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="tb-section-head mb-3">
+                                <h2 class="h5 tb-section-title">
+                                    <span class="tb-section-icon"><i class="ti ti-file-check"></i></span>
+                                    Applications Overview
+                                </h2>
+                                <a href="{{ path('front_job_applications', {role: 'recruiter'}) }}" class="btn btn-sm btn-outline-primary">Open Applications Module</a>
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <button type="button" class="tb-filter-chip" data-application-filter="all">All ({{ applications|length }})</button>
+                                <button type="button" class="tb-filter-chip" data-application-filter="pending">Pending ({{ applicationCounters.pending|default(0) }})</button>
+                                <button type="button" class="tb-filter-chip" data-application-filter="reviewed">Reviewed ({{ applicationCounters.reviewed|default(0) }})</button>
+                                <button type="button" class="tb-filter-chip" data-application-filter="accepted">Accepted ({{ applicationCounters.accepted|default(0) }})</button>
+                                <button type="button" class="tb-filter-chip" data-application-filter="rejected">Rejected ({{ applicationCounters.rejected|default(0) }})</button>
+                            </div>
+
+                            <div class="d-flex flex-column gap-2" id="recruiterApplicationsList">
+                                {% for application in applications %}
+                                    <div class="tb-list-item d-flex justify-content-between align-items-start gap-2 recruiter-application-row" data-status="{{ application.status_key }}">
+                                        <div>
+                                            <p class="tb-list-title mb-1">{{ application.offer_title }}</p>
+                                            <p class="tb-list-meta mb-1"><i class="ti ti-user me-1"></i>{{ application.candidate_name }}</p>
+                                            <p class="tb-list-meta"><i class="ti ti-clock-hour-4 me-1"></i>Applied {{ application.applied_at|date('M d, Y H:i') }}</p>
+                                        </div>
+                                        <span class="tb-status-pill tb-status-{{ application.status_key }}">{{ application.status_label }}</span>
+                                    </div>
+                                {% else %}
+                                    <div class="tb-empty-state">
+                                        <i class="ti ti-inbox-off d-block mb-1"></i>
+                                        No applications received yet.
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card tb-dashboard-card">
+                        <div class="card-body">
+                            <div class="tb-section-head mb-3">
+                                <h2 class="h5 tb-section-title">
+                                    <span class="tb-section-icon"><i class="ti ti-calendar-event"></i></span>
+                                    Interview Management
+                                </h2>
+                                <a href="{{ path('front_interviews', {role: 'recruiter'}) }}" class="btn btn-sm btn-outline-primary">Open Interviews Module</a>
+                            </div>
+
+                            <div class="row g-2 g-lg-3">
+                                {% for interview in interviews %}
+                                    <div class="col-12 col-md-6 col-xl-4">
+                                        <div class="tb-list-item h-100">
+                                            <p class="tb-list-title">{{ interview.title }}</p>
+                                            <p class="tb-list-meta mb-1"><i class="ti ti-user me-1"></i>{{ interview.candidate_name }}</p>
+                                            <p class="tb-list-meta mb-1"><i class="ti ti-calendar-time me-1"></i>{{ interview.scheduled_at|date('M d, Y H:i') }}</p>
+                                            <p class="tb-list-meta mb-1"><i class="ti ti-brand-abstract me-1"></i>{{ interview.mode }} | {{ interview.status }}</p>
+                                            <p class="tb-list-meta mb-0"><i class="ti ti-map-pin me-1"></i>{{ interview.meeting_info }}</p>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="col-12">
+                                        <div class="tb-empty-state">
+                                            <i class="ti ti-calendar-off d-block mb-1"></i>
+                                            No upcoming interviews scheduled.
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        (function () {
+            const list = document.getElementById('recruiterApplicationsList');
+            if (!list) {
+                return;
+            }
+
+            const rows = Array.from(list.querySelectorAll('.recruiter-application-row'));
+            const filters = Array.from(document.querySelectorAll('[data-application-filter]'));
+            if (rows.length === 0 || filters.length === 0) {
+                return;
+            }
+
+            const activateFilter = function (status) {
+                rows.forEach(function (row) {
+                    const rowStatus = row.getAttribute('data-status') || '';
+                    const visible = status === 'all' || rowStatus === status;
+                    row.classList.toggle('d-none', !visible);
+                });
+
+                filters.forEach(function (filter) {
+                    const filterStatus = filter.getAttribute('data-application-filter');
+                    if (filterStatus === status) {
+                        filter.classList.add('bg-primary-lt', 'text-primary');
+                    } else {
+                        filter.classList.remove('bg-primary-lt', 'text-primary');
+                    }
+                });
+            };
+
+            filters.forEach(function (filter) {
+                filter.addEventListener('click', function () {
+                    activateFilter(filter.getAttribute('data-application-filter') || 'all');
+                });
+            });
+
+            activateFilter('all');
+        })();
+    </script>
+{% endblock %}

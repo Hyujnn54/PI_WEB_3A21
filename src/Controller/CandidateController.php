@@ -4,6 +4,9 @@ namespace App\Controller;
 
 use App\Entity\Candidate;
 use App\Entity\Candidate_skill;
+use App\Entity\Interview;
+use App\Entity\Job_application;
+use App\Entity\Job_offer;
 use App\Repository\Candidate_skillRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -14,9 +17,161 @@ use Symfony\Component\Routing\Annotation\Route;
 class CandidateController extends AbstractController
 {
     #[Route('/candidate/home', name: 'candidate_home')]
-    public function home(): Response
+    public function home(Request $request, EntityManagerInterface $em): Response
     {
-        return $this->render('front/candidate_home.html.twig');
+        $session = $request->getSession();
+        $userId = (string) $session->get('user_id', '');
+        $roles = (array) $session->get('user_roles', []);
+
+        if ($userId === '') {
+            return $this->redirectToRoute('app_login');
+        }
+
+        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+            $this->addFlash('warning', 'This area is reserved for candidates.');
+
+            return $this->redirectToRoute('front_home');
+        }
+
+        $candidate = $em->getRepository(Candidate::class)->find($userId);
+        if (!$candidate instanceof Candidate) {
+            $this->addFlash('error', 'Candidate profile not found.');
+
+            return $this->redirectToRoute('front_home');
+        }
+
+        $candidateName = $this->resolveCandidateName($candidate, (string) $session->get('user_name', 'Candidate'));
+        $now = new \DateTimeImmutable();
+
+        $offers = $em->getRepository(Job_offer::class)
+            ->createQueryBuilder('offer')
+            ->where('LOWER(offer.status) = :status')
+            ->andWhere('offer.deadline >= :now')
+            ->setParameter('status', 'open')
+            ->setParameter('now', $now)
+            ->orderBy('offer.created_at', 'DESC')
+            ->setMaxResults(4)
+            ->getQuery()
+            ->getResult();
+
+        $offerCards = [];
+        foreach ($offers as $offer) {
+            if (!$offer instanceof Job_offer) {
+                continue;
+            }
+
+            $offerCards[] = [
+                'id' => (string) $offer->getId(),
+                'title' => (string) $offer->getTitle(),
+                'location' => (string) $offer->getLocation(),
+                'contract_type' => (string) $offer->getContract_type(),
+                'deadline' => $offer->getDeadline(),
+            ];
+        }
+
+        $applications = $em->getRepository(Job_application::class)
+            ->createQueryBuilder('application')
+            ->where('application.candidate_id = :candidate')
+            ->andWhere('application.is_archived = :isArchived')
+            ->setParameter('candidate', $candidate)
+            ->setParameter('isArchived', false)
+            ->orderBy('application.applied_at', 'DESC')
+            ->setMaxResults(5)
+            ->getQuery()
+            ->getResult();
+
+        $applicationCards = [];
+        $applicationSummary = ['pending' => 0, 'accepted' => 0, 'rejected' => 0];
+
+        foreach ($applications as $application) {
+            if (!$application instanceof Job_application) {
+                continue;
+            }
+
+            [$statusLabel, $statusKey] = $this->mapCandidateApplicationStatus((string) $application->getCurrent_status());
+            $applicationSummary[$statusKey]++;
+
+            $offer = $application->getOffer_id();
+            $applicationCards[] = [
+                'id' => (string) $application->getId(),
+                'offer_title' => $offer instanceof Job_offer ? (string) $offer->getTitle() : 'Unknown offer',
+                'status_label' => $statusLabel,
+                'status_key' => $statusKey,
+                'applied_at' => $application->getApplied_at(),
+            ];
+        }
+
+        $interviews = $em->getRepository(Interview::class)
+            ->createQueryBuilder('interview')
+            ->innerJoin('interview.application_id', 'application')
+            ->where('application.candidate_id = :candidate')
+            ->andWhere('interview.scheduled_at >= :now')
+            ->setParameter('candidate', $candidate)
+            ->setParameter('now', $now)
+            ->orderBy('interview.scheduled_at', 'ASC')
+            ->setMaxResults(4)
+            ->getQuery()
+            ->getResult();
+
+        $interviewCards = [];
+        foreach ($interviews as $interview) {
+            if (!$interview instanceof Interview) {
+                continue;
+            }
+
+            $application = $interview->getApplication_id();
+            $offer = $application instanceof Job_application ? $application->getOffer_id() : null;
+
+            $interviewCards[] = [
+                'title' => $offer instanceof Job_offer ? (string) $offer->getTitle() : 'Interview',
+                'scheduled_at' => $interview->getScheduled_at(),
+                'mode' => ucfirst((string) $interview->getMode()),
+                'status' => ucfirst(strtolower((string) $interview->getStatus())),
+            ];
+        }
+
+        return $this->render('front/candidate_home.html.twig', [
+            'candidateName' => $candidateName,
+            'introText' => 'Review open roles, track your applications, and stay prepared for upcoming interviews from one organized workspace.',
+            'jobOffers' => $offerCards,
+            'applications' => $applicationCards,
+            'applicationSummary' => $applicationSummary,
+            'interviews' => $interviewCards,
+        ]);
+    }
+
+    private function resolveCandidateName(Candidate $candidate, string $fallback): string
+    {
+        $firstName = trim((string) $candidate->getFirstName());
+        $lastName = trim((string) $candidate->getLastName());
+        $fullName = trim($firstName . ' ' . $lastName);
+
+        if ($fullName !== '') {
+            return $fullName;
+        }
+
+        if ($firstName !== '') {
+            return $firstName;
+        }
+
+        $fallback = trim($fallback);
+
+        return $fallback !== '' ? $fallback : 'Candidate';
+    }
+
+    private function mapCandidateApplicationStatus(string $status): array
+    {
+        $normalized = strtoupper(trim($status));
+
+        if (in_array($normalized, ['REJECTED', 'DECLINED'], true)) {
+            return ['Rejected', 'rejected'];
+        }
+
+        if (in_array($normalized, ['HIRED', 'ACCEPTED', 'SHORTLISTED'], true)) {
+            return ['Accepted', 'accepted'];
+        }
+
+        return ['Pending', 'pending'];
     }
 
     // ====================== SKILLS LIST + ADD ======================

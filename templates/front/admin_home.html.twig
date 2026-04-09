@@ -1,0 +1,252 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}TalentBridge | Admin Home{% endblock %}
+
+{% block body %}
+    {% set adminName = adminName|default(app.session.get('user_name')|default('Admin')) %}
+    {% set roleDescription = roleDescription|default('Manage the platform and supervise front-office operations.') %}
+    {% set platformOverview = platformOverview|default({'users': 0, 'job_offers': 0, 'applications': 0}) %}
+    {% set userOverview = userOverview|default({'candidates': 0, 'recruiters': 0}) %}
+
+    <style>
+        .tb-admin-front-home {
+            padding-bottom: 2rem;
+        }
+
+        .tb-admin-front-hero {
+            background: linear-gradient(130deg, rgba(13, 91, 215, 0.16), rgba(19, 182, 255, 0.05));
+            border: 1px solid #c9dcff;
+            border-radius: 18px;
+            box-shadow: 0 20px 40px rgba(16, 47, 94, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tb-admin-front-hero::after {
+            content: "";
+            position: absolute;
+            right: -45px;
+            top: -50px;
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(19, 182, 255, 0.32), rgba(19, 182, 255, 0));
+            pointer-events: none;
+        }
+
+        .tb-admin-front-chip {
+            min-width: 140px;
+            border: 1px solid #cfe0ff;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 0.7rem 0.9rem;
+        }
+
+        .tb-admin-front-chip .tb-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #133f79;
+        }
+
+        .tb-admin-front-chip .tb-label {
+            font-size: 0.8rem;
+            color: #5a7296;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .tb-admin-front-card {
+            border: 2px solid #d4e3ff;
+            border-radius: 14px;
+            background: #ffffff;
+        }
+
+        .tb-admin-front-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .tb-admin-front-title {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-bottom: 0;
+        }
+
+        .tb-admin-front-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #eaf2ff;
+            color: #0d5bd7;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .tb-admin-front-stat {
+            border: 1px solid #e0eafe;
+            border-radius: 11px;
+            padding: 0.8rem 0.9rem;
+            background: #fcfdff;
+            text-align: center;
+        }
+
+        .tb-admin-front-stat .tb-stat-label {
+            font-size: 0.82rem;
+            color: #587193;
+            margin-bottom: 0.2rem;
+        }
+
+        .tb-admin-front-stat .tb-stat-value {
+            font-size: 1.3rem;
+            line-height: 1;
+            font-weight: 700;
+            color: #193f6e;
+            margin-bottom: 0;
+        }
+
+        .tb-admin-front-note {
+            border: 1px dashed #bfd5fb;
+            border-radius: 12px;
+            background: #f8fbff;
+            color: #587193;
+            padding: 0.9rem;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 767.98px) {
+            .tb-admin-front-chip {
+                min-width: calc(50% - 0.4rem);
+            }
+        }
+    </style>
+
+    <section class="py-4 py-lg-5 tb-admin-front-home">
+        <div class="container-xl">
+            <div class="tb-admin-front-hero p-4 p-lg-5 mb-4">
+                <span class="badge bg-primary-lt text-primary mb-3">Front Office Admin</span>
+                <h1 class="h2 mb-2">Welcome back, {{ adminName }}</h1>
+                <p class="text-secondary mb-4">{{ roleDescription }}</p>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <div class="tb-admin-front-chip">
+                        <div class="tb-value">{{ platformOverview.users }}</div>
+                        <div class="tb-label">Users</div>
+                    </div>
+                    <div class="tb-admin-front-chip">
+                        <div class="tb-value">{{ platformOverview.job_offers }}</div>
+                        <div class="tb-label">Job Offers</div>
+                    </div>
+                    <div class="tb-admin-front-chip">
+                        <div class="tb-value">{{ platformOverview.applications }}</div>
+                        <div class="tb-label">Applications</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-12 col-lg-6">
+                    <div class="card tb-admin-front-card h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="tb-admin-front-head mb-3">
+                                <h2 class="h5 tb-admin-front-title">
+                                    <span class="tb-admin-front-icon"><i class="ti ti-layout-dashboard"></i></span>
+                                    Platform Overview
+                                </h2>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <div class="tb-admin-front-stat">
+                                        <p class="tb-stat-label">Users</p>
+                                        <p class="tb-stat-value">{{ platformOverview.users }}</p>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="tb-admin-front-stat">
+                                        <p class="tb-stat-label">Offers</p>
+                                        <p class="tb-stat-value">{{ platformOverview.job_offers }}</p>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="tb-admin-front-stat">
+                                        <p class="tb-stat-label">Apps</p>
+                                        <p class="tb-stat-value">{{ platformOverview.applications }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tb-admin-front-note mt-3">
+                                Use this overview to quickly assess current platform volume and move to the appropriate management area.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-6">
+                    <div class="card tb-admin-front-card h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="tb-admin-front-head mb-3">
+                                <h2 class="h5 tb-admin-front-title">
+                                    <span class="tb-admin-front-icon"><i class="ti ti-users"></i></span>
+                                    User Management
+                                </h2>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <div class="tb-admin-front-stat">
+                                        <p class="tb-stat-label">Candidates</p>
+                                        <p class="tb-stat-value">{{ userOverview.candidates }}</p>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="tb-admin-front-stat">
+                                        <p class="tb-stat-label">Recruiters</p>
+                                        <p class="tb-stat-value">{{ userOverview.recruiters }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-auto">
+                                <a href="{{ path('management_users') }}" class="btn btn-primary">
+                                    <i class="ti ti-users-group me-1"></i>Manage Users
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card tb-admin-front-card">
+                        <div class="card-body">
+                            <div class="tb-admin-front-head mb-3">
+                                <h2 class="h5 tb-admin-front-title">
+                                    <span class="tb-admin-front-icon"><i class="ti ti-briefcase-2"></i></span>
+                                    Job Offers & Applications
+                                </h2>
+                            </div>
+
+                            <p class="text-secondary mb-3">Quickly access front-office monitoring pages for offers and applications to review recruitment activity with read-only administrative visibility.</p>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="{{ path('front_job_offers') }}" class="btn btn-outline-primary">
+                                    <i class="ti ti-briefcase-2 me-1"></i>View Job Offers
+                                </a>
+                                <a href="{{ path('front_job_applications') }}" class="btn btn-outline-primary">
+                                    <i class="ti ti-file-check me-1"></i>View Applications
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+{% endblock %}

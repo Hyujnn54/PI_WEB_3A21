@@ -3,55 +3,308 @@
 {% block title %}TalentBridge | Candidate Home{% endblock %}
 
 {% block body %}
-    {% set modules = [
-        { title: 'My Skills', description: 'Manage your professional technical skills and expertise.', icon: 'ti ti-star', link: path('app_candidate_skills') },
-        { title: 'Job Offers', description: 'Explore and apply to the latest open positions.', icon: 'ti ti-briefcase-2', link: path('front_job_offers') },
-        { title: 'Applications', description: 'Monitor your submitted job applications.', icon: 'ti ti-file-check', link: path('front_job_applications') },
-        { title: 'Interviews', description: 'Review your upcoming interview cycles.', icon: 'ti ti-message-2', link: '#' },
-        { title: 'Events', description: 'Coordinate and engage in recruitment activities.', icon: 'ti ti-calendar-event', link: path('front_events') },
-        { title: 'Profile', description: 'Update your personal and professional identity.', icon: 'ti ti-user', link: '#' }
-    ] %}
+    {% set candidateName = candidateName|default(app.session.get('user_name')|default('Candidate')) %}
+    {% set introText = introText|default('Manage your opportunities and recruitment progress in one focused dashboard.') %}
+    {% set jobOffers = jobOffers|default([]) %}
+    {% set applications = applications|default([]) %}
+    {% set interviews = interviews|default([]) %}
+    {% set applicationSummary = applicationSummary|default({'pending': 0, 'accepted': 0, 'rejected': 0}) %}
 
-    <section class="py-5">
+    <style>
+        .tb-candidate-home {
+            padding-bottom: 2rem;
+        }
+
+        .tb-candidate-hero {
+            background: linear-gradient(132deg, rgba(13, 91, 215, 0.14), rgba(19, 182, 255, 0.05));
+            border: 1px solid #cfe0ff;
+            border-radius: 18px;
+            box-shadow: 0 18px 40px rgba(17, 50, 98, 0.09);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tb-candidate-hero::after {
+            content: "";
+            position: absolute;
+            right: -40px;
+            top: -40px;
+            width: 180px;
+            height: 180px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(19, 182, 255, 0.32), rgba(19, 182, 255, 0));
+            pointer-events: none;
+        }
+
+        .tb-candidate-intro {
+            max-width: 720px;
+            color: #385577;
+        }
+
+        .tb-overview-chip {
+            min-width: 130px;
+            border-radius: 12px;
+            border: 1px solid #cfe0ff;
+            background: #ffffff;
+            padding: 0.65rem 0.85rem;
+        }
+
+        .tb-overview-chip .tb-overview-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #133f79;
+            line-height: 1;
+        }
+
+        .tb-overview-chip .tb-overview-label {
+            font-size: 0.8rem;
+            color: #5a7296;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .tb-section-card {
+            border: 2px solid #d4e3ff;
+            border-radius: 14px;
+            background: #ffffff;
+        }
+
+        .tb-section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .tb-section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 0;
+        }
+
+        .tb-section-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #eaf2ff;
+            color: #0d5bd7;
+            font-size: 1.15rem;
+        }
+
+        .tb-list-item {
+            border: 1px solid #e0eafe;
+            border-radius: 11px;
+            padding: 0.8rem 0.9rem;
+            background: #fcfdff;
+        }
+
+        .tb-list-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #193f6e;
+            margin-bottom: 0.2rem;
+        }
+
+        .tb-list-meta {
+            font-size: 0.82rem;
+            color: #587193;
+            margin-bottom: 0;
+        }
+
+        .tb-status-badge {
+            font-size: 0.74rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-radius: 999px;
+            padding: 0.34rem 0.62rem;
+            border: 1px solid transparent;
+        }
+
+        .tb-status-pending {
+            color: #9a6700;
+            background: #fff4d6;
+            border-color: #f2d28b;
+        }
+
+        .tb-status-accepted {
+            color: #0f6b3e;
+            background: #dcf8e8;
+            border-color: #9ed8b7;
+        }
+
+        .tb-status-rejected {
+            color: #9e2f2f;
+            background: #fde4e4;
+            border-color: #efb0b0;
+        }
+
+        .tb-empty-state {
+            border: 1px dashed #bfd5fb;
+            border-radius: 12px;
+            background: #f8fbff;
+            color: #587193;
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 767.98px) {
+            .tb-candidate-hero {
+                border-radius: 14px;
+            }
+
+            .tb-overview-chip {
+                min-width: calc(50% - 0.4rem);
+            }
+        }
+    </style>
+
+    <section class="py-4 py-lg-5 tb-candidate-home">
         <div class="container-xl">
-            <div class="row align-items-center g-4">
-                <div class="col-lg-6">
-                    <h1 class="display-6 fw-bold mb-3">Candidate Portal</h1>
-                    <p class="lead mb-4">Welcome back! Use this workspace to track your progress and manage your recruitment profile.</p>
-<div class="d-flex gap-2 flex-wrap">
-    <a href="{{ path('app_candidate_skills') }}" class="btn btn-primary">
-        <i class="ti ti-star me-2"></i>My Skills
-    </a>
-    <a href="#" class="btn btn-outline-primary">Browse Jobs</a>
-</div>
+            <div class="tb-candidate-hero p-4 p-lg-5 mb-4">
+                <span class="badge bg-primary-lt text-primary mb-3">Candidate Workspace</span>
+                <h1 class="h2 mb-2">Welcome back, {{ candidateName }}</h1>
+                <p class="tb-candidate-intro mb-4">{{ introText }}</p>
+
+                <div class="d-flex flex-wrap gap-2 mb-4">
+                    <a href="{{ path('front_job_offers') }}" class="btn btn-primary">
+                        <i class="ti ti-briefcase-2 me-1"></i>Browse Jobs
+                    </a>
+                    <a href="{{ path('front_job_applications') }}" class="btn btn-outline-primary">
+                        <i class="ti ti-file-check me-1"></i>Track Applications
+                    </a>
+                    <a href="{{ path('front_profile') }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-user-circle me-1"></i>Update Profile
+                    </a>
                 </div>
-                <div class="col-lg-6 text-center">
-                    <img src="{{ asset('assets/team_uploads/logo.png') }}" class="img-fluid" alt="TalentBridge" style="max-width: 240px;">
+
+                <div class="d-flex flex-wrap gap-2">
+                    <div class="tb-overview-chip">
+                        <div class="tb-overview-value">{{ jobOffers|length }}</div>
+                        <div class="tb-overview-label">Open Roles</div>
+                    </div>
+                    <div class="tb-overview-chip">
+                        <div class="tb-overview-value">{{ applications|length }}</div>
+                        <div class="tb-overview-label">Recent Applications</div>
+                    </div>
+                    <div class="tb-overview-chip">
+                        <div class="tb-overview-value">{{ interviews|length }}</div>
+                        <div class="tb-overview-label">Upcoming Interviews</div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </section>
 
-    <section class="py-5">
-        <div class="container-xl">
-            <div class="row mb-4 text-center">
-                <div class="col-12">
-                    <h2 class="h3 mb-0">Your Dashboard</h2>
-                </div>
-            </div>
             <div class="row g-4">
-                {% for module in modules %}
-                    <div class="col-md-6 col-lg-4">
-                        <div class="card card-body border h-100 shadow-sm-hover">
-                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-blue-lt text-blue mb-3" style="width: 44px; height: 44px;">
-                                <i class="{{ module.icon }} fs-2"></i>
+                <div class="col-12 col-lg-6">
+                    <div class="card tb-section-card h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="tb-section-head mb-3">
+                                <h2 class="h5 tb-section-title">
+                                    <span class="tb-section-icon"><i class="ti ti-briefcase-2"></i></span>
+                                    Job Offers
+                                </h2>
+                                <a href="{{ path('front_job_offers') }}" class="btn btn-sm btn-outline-primary">View All Jobs</a>
                             </div>
-                            <h5>{{ module.title }}</h5>
-                            <p class="mb-3 text-muted">{{ module.description }}</p>
-                            <a href="{{ module.link }}" class="btn btn-sm btn-ghost-primary mt-auto">Manage</a>
+
+                            <div class="d-flex flex-column gap-2">
+                                {% for offer in jobOffers|slice(0, 4) %}
+                                    <div class="tb-list-item">
+                                        <p class="tb-list-title">{{ offer.title }}</p>
+                                        <p class="tb-list-meta">
+                                            <i class="ti ti-map-pin me-1"></i>{{ offer.location }}
+                                            <span class="mx-1">|</span>
+                                            <i class="ti ti-briefcase me-1"></i>{{ offer.contract_type }}
+                                            <span class="mx-1">|</span>
+                                            <i class="ti ti-calendar me-1"></i>Deadline {{ offer.deadline|date('M d, Y') }}
+                                        </p>
+                                    </div>
+                                {% else %}
+                                    <div class="tb-empty-state">
+                                        <i class="ti ti-search-off d-block mb-1"></i>
+                                        No open offers are available right now.
+                                    </div>
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
-                {% endfor %}
+                </div>
+
+                <div class="col-12 col-lg-6">
+                    <div class="card tb-section-card h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="tb-section-head mb-3">
+                                <h2 class="h5 tb-section-title">
+                                    <span class="tb-section-icon"><i class="ti ti-file-check"></i></span>
+                                    My Applications
+                                </h2>
+                                <a href="{{ path('front_job_applications') }}" class="btn btn-sm btn-outline-primary">Track Applications</a>
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <span class="badge bg-amber-lt text-amber">Pending: {{ applicationSummary.pending|default(0) }}</span>
+                                <span class="badge bg-green-lt text-green">Accepted: {{ applicationSummary.accepted|default(0) }}</span>
+                                <span class="badge bg-red-lt text-red">Rejected: {{ applicationSummary.rejected|default(0) }}</span>
+                            </div>
+
+                            <div class="d-flex flex-column gap-2">
+                                {% for application in applications|slice(0, 4) %}
+                                    <div class="tb-list-item d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <p class="tb-list-title">{{ application.offer_title }}</p>
+                                            <p class="tb-list-meta"><i class="ti ti-clock-hour-4 me-1"></i>Applied {{ application.applied_at|date('M d, Y') }}</p>
+                                        </div>
+                                        <span class="tb-status-badge tb-status-{{ application.status_key }}">{{ application.status_label }}</span>
+                                    </div>
+                                {% else %}
+                                    <div class="tb-empty-state">
+                                        <i class="ti ti-file-off d-block mb-1"></i>
+                                        You have not submitted any applications yet.
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card tb-section-card">
+                        <div class="card-body">
+                            <div class="tb-section-head mb-3">
+                                <h2 class="h5 tb-section-title">
+                                    <span class="tb-section-icon"><i class="ti ti-calendar-event"></i></span>
+                                    Interviews
+                                </h2>
+                                <a href="{{ path('front_interviews') }}" class="btn btn-sm btn-outline-primary">View Interview Schedule</a>
+                            </div>
+
+                            <div class="row g-2 g-lg-3">
+                                {% for interview in interviews|slice(0, 4) %}
+                                    <div class="col-12 col-md-6 col-xl-3">
+                                        <div class="tb-list-item h-100">
+                                            <p class="tb-list-title">{{ interview.title }}</p>
+                                            <p class="tb-list-meta mb-1"><i class="ti ti-calendar-time me-1"></i>{{ interview.scheduled_at|date('M d, Y') }}</p>
+                                            <p class="tb-list-meta mb-1"><i class="ti ti-clock me-1"></i>{{ interview.scheduled_at|date('H:i') }}</p>
+                                            <p class="tb-list-meta"><i class="ti ti-brand-abstract me-1"></i>{{ interview.mode }} | {{ interview.status }}</p>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="col-12">
+                                        <div class="tb-empty-state">
+                                            <i class="ti ti-calendar-off d-block mb-1"></i>
+                                            No upcoming interviews scheduled at the moment.
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>

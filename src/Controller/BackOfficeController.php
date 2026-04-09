@@ -3,8 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\Admin;
+use App\Entity\Interview;
+use App\Entity\Job_application;
+use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
+use App\Entity\Users;
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,9 +24,13 @@ class BackOfficeController extends AbstractController
 {
     #[Route('/admin', name: 'back_dashboard')]
     #[Route('/admin', name: 'app_admin')]
-    public function index(UsersRepository $userRepo): Response
+    public function index(UsersRepository $userRepo, EntityManagerInterface $entityManager): Response
     {
         $allUsers = $userRepo->findAll();
+        $allOffers = $entityManager->getRepository(Job_offer::class)->findAll();
+        $allApplications = $entityManager->getRepository(Job_application::class)->findAll();
+        $allInterviews = $entityManager->getRepository(Interview::class)->findAll();
+
         $admins = 0;
         $candidates = 0;
         $recruiters = 0;
@@ -43,21 +51,144 @@ class BackOfficeController extends AbstractController
             }
         }
 
+        $offersActive = 0;
+        $offersInactive = 0;
+        $now = new \DateTimeImmutable();
+        foreach ($allOffers as $offer) {
+            if (!$offer instanceof Job_offer) {
+                continue;
+            }
+
+            $status = strtolower(trim((string) $offer->getStatus()));
+            $deadline = $offer->getDeadline();
+            $isExpired = $deadline instanceof \DateTimeInterface && $deadline < $now;
+            $isActive = $status === 'open' && !$isExpired;
+
+            if ($isActive) {
+                $offersActive++;
+            } else {
+                $offersInactive++;
+            }
+        }
+
+        $recentUsers = $entityManager->getRepository(Users::class)->findBy([], ['createdAt' => 'DESC'], 5);
+        $recentOffers = $entityManager->getRepository(Job_offer::class)->findBy([], ['created_at' => 'DESC'], 5);
+        $recentApplications = $entityManager->getRepository(Job_application::class)->findBy([], ['applied_at' => 'DESC'], 5);
+
+        $recentActivity = [];
+
+        foreach ($recentUsers as $user) {
+            if (!$user instanceof Users) {
+                continue;
+            }
+
+            $recentActivity[] = [
+                'type' => 'user',
+                'icon' => 'ti ti-user-plus',
+                'label' => 'User created',
+                'description' => trim((string) $user->getFirstName() . ' ' . (string) $user->getLastName()) !== ''
+                    ? trim((string) $user->getFirstName() . ' ' . (string) $user->getLastName()) . ' joined the platform.'
+                    : (string) $user->getEmail(),
+                'created_at' => $user->getCreatedAt(),
+            ];
+        }
+
+        foreach ($recentOffers as $offer) {
+            if (!$offer instanceof Job_offer) {
+                continue;
+            }
+
+            $recentActivity[] = [
+                'type' => 'offer',
+                'icon' => 'ti ti-briefcase-2',
+                'label' => 'Job posted',
+                'description' => (string) $offer->getTitle(),
+                'created_at' => $offer->getCreated_at(),
+            ];
+        }
+
+        foreach ($recentApplications as $application) {
+            if (!$application instanceof Job_application) {
+                continue;
+            }
+
+            $offer = $application->getOffer_id();
+            $recentActivity[] = [
+                'type' => 'application',
+                'icon' => 'ti ti-file-check',
+                'label' => 'Application submitted',
+                'description' => $offer instanceof Job_offer ? (string) $offer->getTitle() : 'Job application submitted',
+                'created_at' => $application->getApplied_at(),
+            ];
+        }
+
+        usort($recentActivity, static function (array $a, array $b): int {
+            $aTime = $a['created_at'] instanceof \DateTimeInterface ? $a['created_at']->getTimestamp() : 0;
+            $bTime = $b['created_at'] instanceof \DateTimeInterface ? $b['created_at']->getTimestamp() : 0;
+
+            return $bTime <=> $aTime;
+        });
+
+        $recentActivity = array_slice($recentActivity, 0, 8);
+
+        $kpis = [
+            ['label' => 'Total Users', 'value' => (string) count($allUsers), 'icon' => 'ti ti-users', 'tone' => 'primary'],
+            ['label' => 'Total Job Offers', 'value' => (string) count($allOffers), 'icon' => 'ti ti-briefcase-2', 'tone' => 'warning'],
+            ['label' => 'Total Applications', 'value' => (string) count($allApplications), 'icon' => 'ti ti-file-check', 'tone' => 'azure'],
+            ['label' => 'Total Interviews', 'value' => (string) count($allInterviews), 'icon' => 'ti ti-message-2', 'tone' => 'success'],
+        ];
+
         return $this->render('admin/index.html.twig', [
             'authUser' => ['role' => 'admin'],
-            'kpis' => [
-                ['label' => 'Total Users', 'value' => (string) count($allUsers), 'icon' => 'ti ti-users'],
-                ['label' => 'Open Offers', 'value' => '32', 'icon' => 'ti ti-briefcase-2'],
-                ['label' => 'Applications', 'value' => '3,580', 'icon' => 'ti ti-file-check'],
-                ['label' => 'Interviews', 'value' => '482', 'icon' => 'ti ti-message-2'],
-            ],
+            'kpis' => $kpis,
             'stats' => [
                 'admins' => $admins,
                 'candidates' => $candidates,
                 'recruiters' => $recruiters,
-                'interviews' => 482,
+                'interviews' => count($allInterviews),
             ],
-            'usersPreview' => array_slice($allUsers, 0, 5),
+            'usersPreview' => $recentUsers,
+            'recentActivity' => $recentActivity,
+            'offersOverview' => [
+                'active' => $offersActive,
+                'inactive' => $offersInactive,
+            ],
+            'systemControls' => [
+                ['label' => 'Role & Permission Matrix', 'enabled' => true],
+                ['label' => 'Candidate Self-Registration', 'enabled' => true],
+                ['label' => 'Recruiter Offer Publishing', 'enabled' => true],
+                ['label' => 'Automated Notifications', 'enabled' => false],
+            ],
+        ]);
+    }
+
+    #[Route('/admin/profile', name: 'app_admin_profile')]
+    public function profile(Request $request, UsersRepository $userRepo): Response
+    {
+        $userId = (string) $request->getSession()->get('user_id', '');
+        if ($userId === '') {
+            return $this->redirectToRoute('app_login');
+        }
+
+        $user = $userRepo->find($userId);
+        if (!$user instanceof Users) {
+            $this->addFlash('error', 'Profile not found.');
+
+            return $this->redirectToRoute('app_admin');
+        }
+
+        $roles = $user->getRoles();
+        $roleLabel = 'Candidate';
+        if (in_array('ROLE_ADMIN', $roles, true)) {
+            $roleLabel = 'Administrator';
+        } elseif (in_array('ROLE_RECRUITER', $roles, true)) {
+            $roleLabel = 'Recruiter';
+        }
+
+        return $this->render('admin/profile.html.twig', [
+            'authUser' => ['role' => 'admin'],
+            'user' => $user,
+            'roleLabel' => $roleLabel,
         ]);
     }
 

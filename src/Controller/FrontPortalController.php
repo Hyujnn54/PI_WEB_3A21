@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Candidate;
+use App\Entity\Candidate_skill;
 use App\Entity\Event_registration;
 use App\Entity\Interview;
 use App\Entity\Interview_feedback;
@@ -1626,12 +1627,114 @@ class FrontPortalController extends AbstractController
     #[Route('/front/profile', name: 'front_profile')]
     public function profile(Request $request, UsersRepository $userRepo, EntityManagerInterface $entityManager, UserPasswordHasherInterface $passwordHasher): Response
     {
+        $role = $this->resolveSessionRole($request);
         $userId = $request->getSession()->get('user_id');
         $user = $userRepo->find($userId);
 
         if (!$user) {
             $this->addFlash('error', 'Please log in to access your profile.');
             return $this->redirectToRoute('app_login');
+        }
+
+        $candidateSkills = [];
+        if ($role === 'candidate') {
+            $candidate = $this->resolveCurrentCandidate($request);
+
+            if ($request->isMethod('POST') && $request->request->get('profile_action') === 'skill_add') {
+                if (!$candidate instanceof Candidate) {
+                    $this->addFlash('warning', 'Only candidates can manage skills.');
+                    return $this->redirectToRoute('front_profile');
+                }
+
+                $skillName = trim((string) $request->request->get('skill_name', ''));
+                $skillLevel = trim((string) $request->request->get('skill_level', ''));
+                $allowedLevels = ['beginner', 'intermediate', 'advanced'];
+
+                if ($skillName === '') {
+                    $this->addFlash('warning', 'Skill name is required.');
+                } elseif (mb_strlen($skillName) > 100) {
+                    $this->addFlash('warning', 'Skill name must not exceed 100 characters.');
+                } elseif (!in_array($skillLevel, $allowedLevels, true)) {
+                    $this->addFlash('warning', 'Please select a valid skill level.');
+                } else {
+                    $skill = new Candidate_skill();
+                    $skill->setSkillName($skillName);
+                    $skill->setLevel($skillLevel);
+                    $skill->setCandidate($candidate);
+
+                    $entityManager->persist($skill);
+                    $entityManager->flush();
+                    $this->addFlash('success', 'Skill added successfully.');
+                }
+
+                return $this->redirectToRoute('front_profile');
+            }
+
+            if ($request->isMethod('POST') && $request->request->get('profile_action') === 'skill_delete') {
+                if (!$candidate instanceof Candidate) {
+                    $this->addFlash('warning', 'Only candidates can manage skills.');
+                    return $this->redirectToRoute('front_profile');
+                }
+
+                $skillId = (int) $request->request->get('skill_id', 0);
+                $skill = $entityManager->getRepository(Candidate_skill::class)->find($skillId);
+
+                if (!$skill instanceof Candidate_skill || !$skill->getCandidate() instanceof Candidate || (string) $skill->getCandidate()->getId() !== (string) $candidate->getId()) {
+                    $this->addFlash('warning', 'Skill not found or not allowed.');
+                } else {
+                    $entityManager->remove($skill);
+                    $entityManager->flush();
+                    $this->addFlash('success', 'Skill removed successfully.');
+                }
+
+                return $this->redirectToRoute('front_profile');
+            }
+
+            if ($request->isMethod('POST') && $request->request->get('profile_action') === 'skill_update') {
+                if (!$candidate instanceof Candidate) {
+                    $this->addFlash('warning', 'Only candidates can manage skills.');
+                    return $this->redirectToRoute('front_profile');
+                }
+
+                $skillId = (int) $request->request->get('skill_id', 0);
+                $skillName = trim((string) $request->request->get('skill_name', ''));
+                $skillLevel = trim((string) $request->request->get('skill_level', ''));
+                $allowedLevels = ['beginner', 'intermediate', 'advanced'];
+
+                $skill = $entityManager->getRepository(Candidate_skill::class)->find($skillId);
+                if (!$skill instanceof Candidate_skill || !$skill->getCandidate() instanceof Candidate || (string) $skill->getCandidate()->getId() !== (string) $candidate->getId()) {
+                    $this->addFlash('warning', 'Skill not found or not allowed.');
+                    return $this->redirectToRoute('front_profile');
+                }
+
+                if ($skillName === '') {
+                    $this->addFlash('warning', 'Skill name is required.');
+                    return $this->redirectToRoute('front_profile');
+                }
+
+                if (mb_strlen($skillName) > 100) {
+                    $this->addFlash('warning', 'Skill name must not exceed 100 characters.');
+                    return $this->redirectToRoute('front_profile');
+                }
+
+                if (!in_array($skillLevel, $allowedLevels, true)) {
+                    $this->addFlash('warning', 'Please select a valid skill level.');
+                    return $this->redirectToRoute('front_profile');
+                }
+
+                $skill->setSkillName($skillName);
+                $skill->setLevel($skillLevel);
+                $entityManager->flush();
+
+                $this->addFlash('success', 'Skill updated successfully.');
+                return $this->redirectToRoute('front_profile');
+            }
+
+            if ($candidate instanceof Candidate) {
+                $candidateSkills = $entityManager->getRepository(Candidate_skill::class)->findBy([
+                    'candidate' => $candidate,
+                ], ['id' => 'DESC']);
+            }
         }
 
         $form = $this->createForm(ProfileType::class, $user);
@@ -1652,7 +1755,8 @@ class FrontPortalController extends AbstractController
 
         return $this->render('front/profile.html.twig', [
             'form' => $form->createView(),
-            'authUser' => ['role' => 'candidate'],
+            'authUser' => ['role' => $role],
+            'candidateSkills' => $candidateSkills,
         ]);
     }
 

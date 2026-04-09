@@ -4,7 +4,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{% block title %}Talent Bridge{% endblock %}</title>
-        <link rel="icon" type="image/png" href="{{ asset('assets/team_uploads/logo.png') }}">
+        <link rel="icon" type="image/png" href="{{ asset('assets/team_upload/logo.png') }}">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -43,7 +43,7 @@
                         <span class="navbar-toggler-icon"></span>
                     </button>
                     <h1 class="navbar-brand navbar-brand-autodark mb-0 d-flex align-items-center">
-                        <img src="{{ asset('assets/team_uploads/logo.png') }}" alt="Talent Bridge logo" class="tb-logo me-2" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.classList.remove('d-none');">
+                        <img src="{{ asset('assets/team_upload/logo.png') }}" alt="Talent Bridge logo" class="tb-logo me-2" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.classList.remove('d-none');">
                         <i class="ti ti-briefcase-2 text-primary me-2 d-none" style="font-size: 1.5rem;"></i>
                         <span class="tb-brand-text">Talent Bridge</span>
                     </h1>
@@ -59,9 +59,6 @@
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_events') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ 'ROLE_RECRUITER' in userRoles ? path('recruiter_event_registrations') : ('ROLE_ADMIN' in userRoles ? path('admin_event_registrations') : path('front_event_registrations')) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-check"></i></span><span class="nav-link-title">Registrations</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-message-2"></i></span><span class="nav-link-title">Interviews</span></a></li>
-                                {% if 'ROLE_CANDIDATE' in userRoles %}
-                                    <li class="nav-item"><a class="nav-link" href="{{ path('app_candidate_skills') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-stars"></i></span><span class="nav-link-title">Skills</span></a></li>
-                                {% endif %}
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_profile') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-user-circle"></i></span><span class="nav-link-title">Profile</span></a></li>
                             {% endif %}
                         </ul>
@@ -381,3 +378,4 @@
         </script>
     </body>
 </html>
+

@@ -28,8 +28,12 @@ class FrontOfficeController extends AbstractController
 
         // =============== RECRUITER ===============
         if (in_array('ROLE_RECRUITER', $roles)) {
-            // TODO: Create recruiter_home later
-            return $this->render('front/index.html.twig');
+            return $this->redirectToRoute('recruiter_home');
+        }
+
+        // =============== ADMIN ===============
+        if (in_array('ROLE_ADMIN', $roles)) {
+            return $this->redirectToRoute('admin_front_home');
         }
 
         // =============== AUTHENTICATED DEFAULT ===============

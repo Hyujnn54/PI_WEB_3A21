@@ -530,11 +530,119 @@
     min-height: calc(100vh - 140px);
     display: flex;
     align-items: center;
+    justify-content: center;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
 }
 
 .auth-card {
     border: 1px solid #cfe0ff;
     box-shadow: 0 20px 38px rgba(16, 36, 62, 0.11);
+}
+
+.tb-auth-shell {
+    width: min(520px, 100%);
+}
+
+.tb-auth-shell-wide {
+    width: min(760px, 100%);
+}
+
+.tb-auth-logo {
+    height: 72px;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 14px rgba(13, 91, 215, 0.15));
+}
+
+.tb-auth-card {
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(2px);
+}
+
+.tb-auth-alert {
+    border-radius: 10px;
+    border-width: 1px;
+    display: flex;
+    align-items: center;
+    font-size: 0.92rem;
+}
+
+.tb-auth-input {
+    border-radius: 10px;
+    border: 1.5px solid #c8daf7;
+    min-height: 42px;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+}
+
+.tb-auth-input:focus {
+    border-color: #0d5bd7;
+    box-shadow: 0 0 0 0.2rem rgba(13, 91, 215, 0.14);
+}
+
+.tb-auth-card .input-icon .input-icon-addon {
+    color: #5a7296;
+}
+
+.tb-auth-btn {
+    border-radius: 10px;
+    min-height: 44px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.tb-auth-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(13, 91, 215, 0.22);
+}
+
+.tb-auth-link {
+    font-weight: 600;
+    color: #0d5bd7;
+    text-decoration: none;
+}
+
+.tb-auth-link:hover {
+    text-decoration: underline;
+}
+
+.tb-auth-subsection {
+    border: 1px solid #dbe8ff;
+    border-radius: 12px;
+    padding: 0.85rem 0.85rem 0.2rem;
+    margin-bottom: 1rem;
+    background: #f9fbff;
+}
+
+.tb-auth-subtitle {
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #234770;
+    margin-bottom: 0.7rem;
+}
+
+@media (max-width: 767.98px) {
+    .auth-body {
+        min-height: calc(100vh - 120px);
+    }
+
+    .tb-auth-shell,
+    .tb-auth-shell-wide {
+        width: 100%;
+    }
+
+    .tb-auth-card {
+        border-radius: 13px;
+    }
+
+    .tb-auth-logo {
+        height: 64px;
+    }
 }
 
 .tb-admin-list .list-group-item {

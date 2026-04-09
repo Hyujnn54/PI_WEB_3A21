@@ -1,7 +1,7 @@
 <nav class="navbar sidebar navbar-expand-xl navbar-dark">
     <div class="sidebar-brand-wrapper">
         <a class="navbar-brand" href="{{ path('app_admin') }}">
-            <img class="navbar-brand-item" src="{{ asset('assets/team_uploads/logo.png') }}" alt="Talent Bridge" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%230d5bd7%22><path d=%22M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4z%22/></svg>';">
+            <img class="navbar-brand-item" src="{{ asset('assets/team_upload/logo.png') }}" alt="Talent Bridge" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%230d5bd7%22><path d=%22M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4z%22/></svg>';">
             <span class="tb-brand-label">Talent Bridge</span>
         </a>
     </div>
@@ -13,16 +13,15 @@
                     <span>Dashboard</span>
                 </a>
             </li>
+
+            <div class="sidebar-section-title">
+                <i class="ti ti-users"></i>
+                Users
+            </div>
             <li class="nav-item">
                 <a class="nav-link {{ app.request.attributes.get('_route') == 'app_admin_users' ? 'active' : '' }}" href="{{ path('app_admin_users') }}">
                     <i class="ti ti-users"></i>
-                    <span>User List</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ app.request.attributes.get('_route') == 'app_admin_stats' ? 'active' : '' }}" href="{{ path('app_admin_stats') }}">
-                    <i class="ti ti-chart-bar"></i>
-                    <span>User Statistics</span>
+                    <span>Manage Users</span>
                 </a>
             </li>
             <li class="nav-item">
@@ -82,13 +81,32 @@
                     <span>Statistics</span>
                 </a>
             </li>
+
+            <div class="sidebar-section-title">
+                <i class="ti ti-chart-bar"></i>
+                Reports
+            </div>
+            <li class="nav-item">
+                <a class="nav-link {{ app.request.attributes.get('_route') == 'app_admin_stats' ? 'active' : '' }}" href="{{ path('app_admin_stats') }}">
+                    <i class="ti ti-report-analytics"></i>
+                    <span>Reports</span>
+                </a>
+            </li>
+
+            <div class="sidebar-section-title">
+                <i class="ti ti-user-circle"></i>
+                Profile
+            </div>
+            <li class="nav-item">
+                <a class="nav-link {{ app.request.attributes.get('_route') == 'app_admin_profile' ? 'active' : '' }}" href="{{ path('app_admin_profile') }}">
+                    <i class="ti ti-user-circle"></i>
+                    <span>Profile</span>
+                </a>
+            </li>
         </ul>
     </div>
 
     <div class="sidebar-footer">
-        <a class="btn btn-sm w-100 mb-2" href="{{ path('front_profile') }}">
-            <i class="ti ti-user-circle me-2"></i>Profile
-        </a>
         <a class="btn btn-sm w-100 mb-2" href="{{ path('front_home') }}" data-turbo="false">
             <i class="ti ti-home me-2"></i>Back to Front Office
         </a>
@@ -99,3 +117,4 @@
         </form>
     </div>
 </nav>
+
