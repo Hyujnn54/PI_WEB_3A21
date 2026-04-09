@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Talent Bridge | Create Event{% endblock %}
+{% block title %}Talent Bridge | {{ isEdit|default(false) ? 'Edit Event' : 'Create Event' }}{% endblock %}
 
 {% block body %}
 <div class="page-wrapper">
@@ -8,8 +8,8 @@
         <div class="container-xl">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title"><i class="ti ti-calendar-plus me-1"></i>Create Recruitment Event</h2>
-                    <div class="text-secondary">Create a new recruitment event for candidates.</div>
+                    <h2 class="page-title"><i class="ti ti-calendar-plus me-1"></i>{{ isEdit|default(false) ? 'Edit Recruitment Event' : 'Create Recruitment Event' }}</h2>
+                    <div class="text-secondary">{{ isEdit|default(false) ? 'Update your recruitment event details.' : 'Create a new recruitment event for candidates.' }}</div>
                 </div>
             </div>
         </div>
@@ -37,47 +37,47 @@
                         <div class="card-body">
                             <div class="mb-3">
                                 <label class="form-label">Title <span class="text-danger">*</span></label>
-                                <input type="text" name="title" id="title" class="form-control" minlength="3" maxlength="255">
+                                <input type="text" name="title" id="title" class="form-control" minlength="3" maxlength="255" value="{{ formData.title|default('') }}">
                                 <small class="text-danger d-none" id="titleError"></small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Description <span class="text-danger">*</span></label>
-                                <textarea name="description" id="description" class="form-control" rows="3" minlength="10"></textarea>
+                                <textarea name="description" id="description" class="form-control" rows="3" minlength="10">{{ formData.description|default('') }}</textarea>
                                 <small class="text-danger d-none" id="descriptionError"></small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Event Type <span class="text-danger">*</span></label>
                                 <select name="event_type" id="event_type" class="form-select">
                                     <option value="">-- Select Type --</option>
-                                    <option value="Workshop">Workshop</option>
-                                    <option value="Hiring Day">Hiring Day</option>
-                                    <option value="Webinar">Webinar</option>
+                                    <option value="Workshop" {{ formData.event_type|default('') == 'Workshop' ? 'selected' : '' }}>Workshop</option>
+                                    <option value="Hiring Day" {{ formData.event_type|default('') == 'Hiring Day' ? 'selected' : '' }}>Hiring Day</option>
+                                    <option value="Webinar" {{ formData.event_type|default('') == 'Webinar' ? 'selected' : '' }}>Webinar</option>
                                 </select>
                                 <small class="text-danger d-none" id="event_typeError"></small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Location <span class="text-danger">*</span></label>
-                                <input type="text" name="location" id="location" class="form-control" minlength="2">
+                                <input type="text" name="location" id="location" class="form-control" minlength="2" value="{{ formData.location|default('') }}">
                                 <small class="text-danger d-none" id="locationError"></small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Event Date <span class="text-danger">*</span></label>
-                                <input type="datetime-local" name="event_date" id="event_date" class="form-control">
+                                <input type="datetime-local" name="event_date" id="event_date" class="form-control" value="{{ formData.event_date|default('') }}">
                                 <small class="text-danger d-none" id="event_dateError"></small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Capacity <span class="text-danger">*</span></label>
-                                <input type="number" name="capacity" id="capacity" class="form-control" min="1" max="1000" value="50">
+                                <input type="number" name="capacity" id="capacity" class="form-control" min="1" max="1000" value="{{ formData.capacity|default('50') }}">
                                 <small class="text-danger d-none" id="capacityError"></small>
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-3 {{ formData.event_type|default('') == 'Webinar' ? '' : 'd-none' }}" id="meetLinkContainer">
                                 <label class="form-label">Meet Link</label>
-                                <input type="url" name="meet_link" id="meet_link" class="form-control" placeholder="https://meet.google.com/xyz">
+                                <input type="url" name="meet_link" id="meet_link" class="form-control" placeholder="https://meet.google.com/xyz" value="{{ formData.meet_link|default('') }}">
                                 <small class="text-danger d-none" id="meet_linkError"></small>
                             </div>
                         </div>
                         <div class="card-footer">
-                            <button type="submit" class="btn btn-primary">Create Event</button>
+                            <button type="submit" class="btn btn-primary">{{ isEdit|default(false) ? 'Save Changes' : 'Create Event' }}</button>
                         </div>
                     </form>
                 </div>
@@ -87,6 +87,17 @@
 
     <script>
         const createEventForm = document.getElementById('createEventForm');
+        const eventTypeSelect = document.getElementById('event_type');
+        const meetLinkContainer = document.getElementById('meetLinkContainer');
+
+        function toggleMeetLinkVisibility() {
+            if (!eventTypeSelect || !meetLinkContainer) {
+                return;
+            }
+
+            const isWebinar = eventTypeSelect.value === 'Webinar';
+            meetLinkContainer.classList.toggle('d-none', !isWebinar);
+        }
 
         function validateForm() {
             const errors = {};
@@ -153,7 +164,7 @@
             }
 
             // Validate meet link
-            if (meetLink && !isValidUrl(meetLink)) {
+            if (eventType === 'Webinar' && meetLink && !isValidUrl(meetLink)) {
                 errors.meet_link = 'Please enter a valid URL.';
             }
 
@@ -185,6 +196,12 @@
                 e.preventDefault();
             }
         });
+
+        if (eventTypeSelect) {
+            eventTypeSelect.addEventListener('change', toggleMeetLinkVisibility);
+        }
+
+        toggleMeetLinkVisibility();
     </script>
 </div>
 {% endblock %}

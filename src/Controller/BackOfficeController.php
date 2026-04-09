@@ -611,6 +611,12 @@ SQL;
     #[Route('/recruiter/create-event', name: 'recruiter_create_event', methods: ['GET', 'POST'])]
     public function createEvent(Request $request, EntityManagerInterface $entityManager): Response
     {
+        $currentRecruiter = $this->resolveCurrentRecruiter($request, $entityManager);
+        if (!$currentRecruiter instanceof Recruiter) {
+            $this->addFlash('error', 'No recruiter account is linked to your current session.');
+            return $this->redirectToRoute('front_events', ['role' => 'recruiter']);
+        }
+
         $errors = [];
 
         if ($request->isMethod('POST')) {
@@ -678,15 +684,8 @@ SQL;
             }
 
             if ($errors === []) {
-                $recruiter = $entityManager->getRepository(Recruiter::class)->findOneBy([]);
-                if (!$recruiter) {
-                    $this->addFlash('error', 'No recruiter account was found. Please create a recruiter record first.');
-                    return $this->redirectToRoute('recruiter_create_event');
-                }
-
                 $event = new Recruitment_event();
-                $event->setId((string) mt_rand(10000000, 99999999));
-                $event->setRecruiter_id($recruiter);
+                $event->setRecruiter_id($currentRecruiter);
                 $event->setTitle($title);
                 $event->setDescription($description);
                 $event->setEvent_type($eventType);
@@ -707,15 +706,36 @@ SQL;
         return $this->render('back/create_event.html.twig', [
             'authUser' => ['role' => 'recruiter'],
             'errors' => $errors,
+            'isEdit' => false,
+            'formData' => [
+                'title' => '',
+                'description' => '',
+                'event_type' => '',
+                'location' => '',
+                'event_date' => '',
+                'capacity' => '50',
+                'meet_link' => '',
+            ],
         ]);
     }
 
     #[Route('/recruiter/delete-event/{id}', name: 'recruiter_delete_event', methods: ['POST'])]
-    public function deleteEvent(int $id, EntityManagerInterface $entityManager): Response
+    public function deleteEvent(int $id, Request $request, EntityManagerInterface $entityManager): Response
     {
+        $currentRecruiter = $this->resolveCurrentRecruiter($request, $entityManager);
+        if (!$currentRecruiter instanceof Recruiter) {
+            $this->addFlash('error', 'No recruiter account is linked to your current session.');
+            return $this->redirectToRoute('front_events', ['role' => 'recruiter']);
+        }
+
         $event = $entityManager->getRepository(Recruitment_event::class)->find($id);
         if (!$event) {
             throw $this->createNotFoundException('Event not found');
+        }
+
+        if ((string) $event->getRecruiter_id()->getId() !== (string) $currentRecruiter->getId()) {
+            $this->addFlash('warning', 'You can only delete events created by your account.');
+            return $this->redirectToRoute('front_events', ['role' => 'recruiter']);
         }
 
         $entityManager->remove($event);
@@ -725,12 +745,41 @@ SQL;
         return $this->redirectToRoute('front_events');
     }
 
-    #[Route('/recruiter/update-event/{id}', name: 'recruiter_update_event', methods: ['POST'])]
+    #[Route('/recruiter/update-event/{id}', name: 'recruiter_update_event', methods: ['GET', 'POST'])]
     public function updateEvent(int $id, Request $request, EntityManagerInterface $entityManager): Response
     {
+        $currentRecruiter = $this->resolveCurrentRecruiter($request, $entityManager);
+        if (!$currentRecruiter instanceof Recruiter) {
+            $this->addFlash('error', 'No recruiter account is linked to your current session.');
+            return $this->redirectToRoute('front_events', ['role' => 'recruiter']);
+        }
+
         $event = $entityManager->getRepository(Recruitment_event::class)->find($id);
         if (!$event) {
             throw $this->createNotFoundException('Event not found');
+        }
+
+        if ((string) $event->getRecruiter_id()->getId() !== (string) $currentRecruiter->getId()) {
+            $this->addFlash('warning', 'You can only update events created by your account.');
+            return $this->redirectToRoute('front_events', ['role' => 'recruiter']);
+        }
+
+        if ($request->isMethod('GET')) {
+            return $this->render('back/create_event.html.twig', [
+                'authUser' => ['role' => 'recruiter'],
+                'errors' => [],
+                'isEdit' => true,
+                'eventId' => $event->getId(),
+                'formData' => [
+                    'title' => (string) $event->getTitle(),
+                    'description' => (string) $event->getDescription(),
+                    'event_type' => (string) $event->getEvent_type(),
+                    'location' => (string) $event->getLocation(),
+                    'event_date' => $event->getEvent_date()->format('Y-m-d\TH:i'),
+                    'capacity' => (string) $event->getCapacity(),
+                    'meet_link' => (string) $event->getMeet_link(),
+                ],
+            ]);
         }
 
         $errors = [];
@@ -798,8 +847,21 @@ SQL;
         }
 
         if ($errors !== []) {
-            $this->addFlash('warning', 'Event could not be updated. Please fix the errors.');
-            return $this->redirectToRoute('front_events', ['role' => 'recruiter']);
+            return $this->render('back/create_event.html.twig', [
+                'authUser' => ['role' => 'recruiter'],
+                'errors' => $errors,
+                'isEdit' => true,
+                'eventId' => $event->getId(),
+                'formData' => [
+                    'title' => $title,
+                    'description' => $description,
+                    'event_type' => $eventType,
+                    'location' => $location,
+                    'event_date' => $eventDate,
+                    'capacity' => $capacity,
+                    'meet_link' => $meetLink,
+                ],
+            ]);
         }
 
         $event->setTitle($title);
@@ -814,5 +876,35 @@ SQL;
 
         $this->addFlash('success', 'Event updated successfully!');
         return $this->redirectToRoute('front_events');
+    }
+
+    private function resolveCurrentRecruiter(Request $request, EntityManagerInterface $entityManager): ?Recruiter
+    {
+        $userId = (string) $request->getSession()->get('user_id', '');
+        if ($userId === '') {
+            return null;
+        }
+
+        $recruiterById = $entityManager->getRepository(Recruiter::class)->find($userId);
+        if ($recruiterById instanceof Recruiter) {
+            return $recruiterById;
+        }
+
+        try {
+            $legacyRecruiterId = $entityManager->getConnection()->fetchOne(
+                'SELECT id FROM recruiter WHERE user_id = :user_id LIMIT 1',
+                ['user_id' => $userId]
+            );
+            if ($legacyRecruiterId !== false && $legacyRecruiterId !== null && (string) $legacyRecruiterId !== '') {
+                $legacyRecruiter = $entityManager->getRepository(Recruiter::class)->find((string) $legacyRecruiterId);
+                if ($legacyRecruiter instanceof Recruiter) {
+                    return $legacyRecruiter;
+                }
+            }
+        } catch (\Throwable) {
+            // Keep backward compatibility when legacy column is unavailable.
+        }
+
+        return null;
     }
 }

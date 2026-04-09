@@ -9,7 +9,7 @@
         <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h2 class="page-title"><i class="ti ti-users-group me-1"></i>Event Registrations</h2>
-                <p class="text-secondary mb-0">View and manage candidate registrations for your events.</p>
+                <p class="text-secondary mb-0">{{ role == 'admin' ? 'View candidate registrations across all events.' : 'View and manage candidate registrations for your events.' }}</p>
             </div>
             <div class="d-flex gap-2">
                 <a href="{{ path('front_events', {'role': 'recruiter'}) }}" class="btn btn-outline-primary">Back to Events</a>
@@ -60,7 +60,9 @@
                                             <th>Email</th>
                                             <th>Registration Date</th>
                                             <th>Status</th>
-                                            <th>Actions</th>
+                                            {% if role == 'recruiter' %}
+                                                <th>Actions</th>
+                                            {% endif %}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -79,23 +81,25 @@
                                                             <span class="badge bg-warning">Under Review</span>
                                                         {% endif %}
                                                     </td>
-                                                    <td>
-                                                        <div class="btn-list flex-nowrap">
-                                                            <form method="post" action="{{ path('recruiter_update_registration_status', {'id': candidate.registration_id}) }}" class="d-inline">
-                                                                <input type="hidden" name="status" value="confirmed">
-                                                                <button type="submit" class="btn btn-icon btn-outline-success btn-sm" title="Confirm Attendance"><i class="ti ti-check"></i></button>
-                                                            </form>
-                                                            <form method="post" action="{{ path('recruiter_update_registration_status', {'id': candidate.registration_id}) }}" class="d-inline">
-                                                                <input type="hidden" name="status" value="rejected">
-                                                                <button type="submit" class="btn btn-icon btn-outline-danger btn-sm" title="Reject"><i class="ti ti-x"></i></button>
-                                                            </form>
-                                                        </div>
-                                                    </td>
+                                                    {% if role == 'recruiter' %}
+                                                        <td>
+                                                            <div class="btn-list flex-nowrap">
+                                                                <form method="post" action="{{ path('recruiter_update_registration_status', {'id': candidate.registration_id}) }}" class="d-inline">
+                                                                    <input type="hidden" name="status" value="confirmed">
+                                                                    <button type="submit" class="btn btn-icon btn-outline-success btn-sm" title="Confirm Attendance"><i class="ti ti-check"></i></button>
+                                                                </form>
+                                                                <form method="post" action="{{ path('recruiter_update_registration_status', {'id': candidate.registration_id}) }}" class="d-inline">
+                                                                    <input type="hidden" name="status" value="rejected">
+                                                                    <button type="submit" class="btn btn-icon btn-outline-danger btn-sm" title="Reject"><i class="ti ti-x"></i></button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    {% endif %}
                                                 </tr>
                                             {% endfor %}
                                         {% else %}
                                             <tr class="text-muted">
-                                                <td colspan="5" class="text-center py-3">No candidates registered for this event yet.</td>
+                                                <td colspan="{{ role == 'recruiter' ? 5 : 4 }}" class="text-center py-3">No candidates registered for this event yet.</td>
                                             </tr>
                                         {% endif %}
                                     </tbody>
@@ -107,7 +111,7 @@
             {% else %}
                 <div class="card">
                     <div class="card-body text-center text-secondary">
-                        You haven't created any events yet. Create an event to start receiving candidate registrations.
+                        {{ role == 'admin' ? 'No event registrations found yet.' : 'You haven\'t created any events yet. Create an event to start receiving candidate registrations.' }}
                     </div>
                 </div>
             {% endif %}
