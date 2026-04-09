@@ -108,10 +108,10 @@ class BackOfficeController extends AbstractController
 
             // If no errors, save the event
             if (empty($errors)) {
-                $recruiterId = 1;
-                $recruiter = $entityManager->getRepository(Recruiter::class)->find($recruiterId);
+                $recruiter = $entityManager->getRepository(Recruiter::class)->findOneBy([]);
                 if (!$recruiter) {
-                    throw $this->createNotFoundException('Recruiter not found');
+                    $this->addFlash('error', 'No recruiter account was found. Please create a recruiter record first.');
+                    return $this->redirectToRoute('recruiter_create_event');
                 }
 
                 $event = new Recruitment_event();

@@ -40,7 +40,7 @@ class Recruitment_event
     private int $capacity;
 
     #[ORM\Column(type: "string", length: 255)]
-    private string $meet_link;
+    private string $meet_link = '';
 
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $created_at;
@@ -127,7 +127,7 @@ class Recruitment_event
 
     public function getMeet_link()
     {
-        return $this->meet_link;
+        return isset($this->meet_link) ? $this->meet_link : '';
     }
 
     public function setMeet_link($value)
