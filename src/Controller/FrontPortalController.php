@@ -19,6 +19,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
 
@@ -30,7 +31,6 @@ class FrontPortalController extends AbstractController
     private const LOCATION_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,120}$/u';
     private const TEXTAREA_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{0,1000}$/u';
     private const REVIEW_COMMENT_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,1000}$/u';
-    private const STATIC_RECRUITER_ID = '4';
     private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
@@ -42,7 +42,9 @@ class FrontPortalController extends AbstractController
     #[Route('/front/job-offers', name: 'front_job_offers')]
     public function jobOffers(Request $request, Connection $connection): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
+        $currentUserId = $this->resolveCurrentUserId($request);
+        $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
         $warnings = [];
         $warningStatuses = [];
         $expiredOffers = [];
@@ -51,8 +53,7 @@ class FrontPortalController extends AbstractController
 
         $appliedOfferIds = [];
         if ($role === 'candidate') {
-            $candidateId = 3;
-            $candidate = $this->doctrine->getRepository(Candidate::class)->find($candidateId);
+            $candidate = $this->resolveCurrentCandidate($request);
             if ($candidate instanceof Candidate) {
                 $activeApplications = $this->doctrine->getRepository(Job_application::class)->findBy([
                     'candidate_id' => $candidate,
@@ -75,7 +76,7 @@ class FrontPortalController extends AbstractController
                 $connection->executeStatement(
                     'UPDATE job_offer SET status = :closed_status WHERE recruiter_id = :recruiter_id AND deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
                     [
-                        'recruiter_id' => self::STATIC_RECRUITER_ID,
+                        'recruiter_id' => $currentRecruiterId,
                         'closed_status' => 'closed',
                         'now' => $now->format('Y-m-d H:i:s'),
                     ]
@@ -86,13 +87,13 @@ class FrontPortalController extends AbstractController
             $rowsParams = [];
             if ($role === 'recruiter') {
                 $rowsSql .= ' WHERE recruiter_id = :recruiter_id';
-                $rowsParams['recruiter_id'] = self::STATIC_RECRUITER_ID;
+                $rowsParams['recruiter_id'] = $currentRecruiterId;
             }
             $rowsSql .= ' ORDER BY created_at DESC LIMIT 25';
 
             $rows = $connection->fetchAllAssociative($rowsSql, $rowsParams);
 
-            $dbCards = array_map(function (array $row) use ($connection, $now): array {
+            $dbCards = array_map(function (array $row) use ($connection, $now, $appliedOfferIds, $currentRecruiterId): array {
                 $formattedDeadline = '';
                 $isExpired = false;
                 try {
@@ -134,7 +135,8 @@ class FrontPortalController extends AbstractController
                     'title' => (string) $row['title'],
                     'text' => (string) $row['description'],
                     'already_applied' => isset($appliedOfferIds[(string) $row['id']]),
-                    'can_delete' => (string) $row['recruiter_id'] === self::STATIC_RECRUITER_ID,
+                    'can_apply' => strtolower((string) $row['status']) === 'open' && !$isExpired && !isset($appliedOfferIds[(string) $row['id']]),
+                    'can_delete' => (string) $row['recruiter_id'] === $currentRecruiterId,
                     'detail_extra' => $detailExtra,
                     'recruiter_id' => (string) $row['recruiter_id'],
                     'location' => (string) $row['location'],
@@ -148,11 +150,6 @@ class FrontPortalController extends AbstractController
             foreach ($dbCards as $dbCard) {
                 if (($dbCard['is_expired'] ?? false) === true) {
                     $expiredOffers[] = $dbCard;
-                }
-
-                // Candidates should not see expired offers.
-                if ($role === 'candidate' && ($dbCard['is_expired'] ?? false) === true) {
-                    continue;
                 }
 
                 $cards[] = $dbCard;
@@ -169,7 +166,7 @@ class FrontPortalController extends AbstractController
                      INNER JOIN job_offer jo ON jo.id = w.job_offer_id
                      WHERE w.recruiter_id = :recruiter_id AND w.status = :status
                      ORDER BY w.created_at DESC',
-                    ['recruiter_id' => self::STATIC_RECRUITER_ID, 'status' => 'SENT']
+                    ['recruiter_id' => $currentRecruiterId, 'status' => 'SENT']
                 );
             } catch (\Throwable $exception) {
                 $warnings = [];
@@ -179,7 +176,7 @@ class FrontPortalController extends AbstractController
             try {
                 $resolvedWarnings = $connection->fetchAllAssociative(
                     'SELECT job_offer_id FROM job_offer_warning WHERE recruiter_id = :recruiter_id AND status = :status',
-                    ['recruiter_id' => self::STATIC_RECRUITER_ID, 'status' => 'RESOLVED']
+                    ['recruiter_id' => $currentRecruiterId, 'status' => 'RESOLVED']
                 );
                 
                 foreach ($resolvedWarnings as $row) {
@@ -207,7 +204,8 @@ class FrontPortalController extends AbstractController
     #[Route('/front/job-offers/statistics', name: 'front_job_offers_statistics')]
     public function jobOffersStatistics(Request $request, Connection $connection): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
+        $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
         if ($role !== 'recruiter') {
             $this->addFlash('warning', 'Only recruiters can access offer statistics.');
             return $this->redirectToRoute('front_job_offers', ['role' => $role]);
@@ -219,7 +217,7 @@ class FrontPortalController extends AbstractController
         try {
             $rows = $connection->fetchAllAssociative(
                 'SELECT id, recruiter_id, title, location, contract_type, status, deadline FROM job_offer WHERE recruiter_id = :recruiter_id ORDER BY created_at DESC LIMIT 50',
-                ['recruiter_id' => self::STATIC_RECRUITER_ID]
+                ['recruiter_id' => $currentRecruiterId]
             );
             $offerStats = $this->buildOfferStats($rows);
         } catch (\Throwable) {
@@ -235,7 +233,8 @@ class FrontPortalController extends AbstractController
     #[Route('/front/job-offers/new', name: 'front_job_offer_new', methods: ['GET', 'POST'])]
     public function createJobOffer(Request $request, Connection $connection): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
+        $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
         if ($role !== 'recruiter') {
             $this->addFlash('error', 'Only recruiters can create job offers.');
             return $this->redirectToRoute('front_job_offers', ['role' => $role]);
@@ -322,7 +321,7 @@ class FrontPortalController extends AbstractController
 
                         $connection->insert('job_offer', [
                             'id' => $newId,
-                            'recruiter_id' => self::STATIC_RECRUITER_ID,
+                            'recruiter_id' => $currentRecruiterId,
                             'title' => $formData['title'],
                             'description' => $formData['description'],
                             'location' => $formData['location'],
@@ -374,7 +373,8 @@ class FrontPortalController extends AbstractController
     #[Route('/front/job-offers/{id}/edit', name: 'front_job_offer_edit', requirements: ['id' => '\\d+'], methods: ['GET', 'POST'])]
     public function editJobOffer(string $id, Request $request, Connection $connection): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
+        $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
         if ($role !== 'recruiter') {
             $this->addFlash('error', 'Only recruiters can update job offers.');
             return $this->redirectToRoute('front_job_offers', ['role' => $role]);
@@ -384,7 +384,7 @@ class FrontPortalController extends AbstractController
             'SELECT id, recruiter_id, title, description, location, contract_type, deadline FROM job_offer WHERE id = :id AND recruiter_id = :recruiter_id LIMIT 1',
             [
                 'id' => $id,
-                'recruiter_id' => self::STATIC_RECRUITER_ID,
+                'recruiter_id' => $currentRecruiterId,
             ]
         );
         $skills = $connection->fetchAllAssociative(
@@ -492,7 +492,7 @@ class FrontPortalController extends AbstractController
                             'longitude' => 0,
                         ], [
                             'id' => $id,
-                            'recruiter_id' => self::STATIC_RECRUITER_ID,
+                            'recruiter_id' => $currentRecruiterId,
                         ]);
 
                         $connection->delete('offer_skill', ['offer_id' => $id]);
@@ -553,7 +553,8 @@ class FrontPortalController extends AbstractController
     #[Route('/front/job-offers/{id}/delete', name: 'front_job_offer_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function deleteJobOffer(string $id, Request $request, Connection $connection): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
+        $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
         if ($role !== 'recruiter') {
             $this->addFlash('error', 'Only recruiters can delete job offers.');
             return $this->redirectToRoute('front_job_offers', ['role' => $role]);
@@ -562,7 +563,7 @@ class FrontPortalController extends AbstractController
         try {
             $deletedRows = $connection->delete('job_offer', [
                 'id' => $id,
-                'recruiter_id' => self::STATIC_RECRUITER_ID,
+                'recruiter_id' => $currentRecruiterId,
             ]);
 
             if ($deletedRows > 0) {
@@ -580,13 +581,12 @@ class FrontPortalController extends AbstractController
     #[Route('/front/job-applications', name: 'front_job_applications')]
     public function jobApplications(Request $request): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
         $cards = [];
 
         if ($role === 'recruiter') {
             // RECRUITER VIEW: Show applications for their job offers with interview creation capability
-            $recruiterId = 4; // Hardcoded for development
-            $recruiter = $this->doctrine->getRepository(Recruiter::class)->find($recruiterId);
+            $recruiter = $this->resolveCurrentRecruiter($request);
 
             if ($recruiter instanceof Recruiter) {
                 $ownedOffers = $this->doctrine->getRepository(Job_offer::class)->findBy(['recruiter_id' => $recruiter]);
@@ -599,13 +599,9 @@ class FrontPortalController extends AbstractController
                     foreach ($applications as $application) {
                         $offer = $application->getOffer_id();
                         $candidate = $application->getCandidate_id();
-                        $candidateUser = $candidate ? $candidate->getId() : null;
                         $candidateName = 'Candidate';
-
-                        if ($candidateUser) {
-                            $firstName = method_exists($candidateUser, 'getFirst_name') ? (string) $candidateUser->getFirst_name() : '';
-                            $lastName = method_exists($candidateUser, 'getLast_name') ? (string) $candidateUser->getLast_name() : '';
-                            $fullName = trim($firstName . ' ' . $lastName);
+                        if ($candidate instanceof Candidate) {
+                            $fullName = trim((string) $candidate->getFirstName() . ' ' . (string) $candidate->getLastName());
                             if ($fullName !== '') {
                                 $candidateName = $fullName;
                             }
@@ -653,10 +649,41 @@ class FrontPortalController extends AbstractController
                     }
                 }
             }
+        } elseif ($role === 'admin') {
+            // ADMIN VIEW: read-only access to all applications with full inspection link
+            $applications = $this->doctrine->getRepository(Job_application::class)->findBy(
+                ['is_archived' => false],
+                ['applied_at' => 'DESC']
+            );
+
+            foreach ($applications as $application) {
+                $offer = $application->getOffer_id();
+                $candidate = $application->getCandidate_id();
+                $candidateName = 'Candidate';
+
+                if ($candidate instanceof Candidate) {
+                    $fullName = trim((string) $candidate->getFirstName() . ' ' . (string) $candidate->getLastName());
+                    if ($fullName !== '') {
+                        $candidateName = $fullName;
+                    }
+                }
+
+                $offerTitle = $offer ? (string) $offer->getTitle() : 'Unknown Offer';
+                $status = (string) $application->getCurrent_status();
+                $appliedAt = $application->getApplied_at();
+
+                $cards[] = [
+                    'id' => (string) $application->getId(),
+                    'meta' => $status,
+                    'title' => 'Offer: ' . $offerTitle,
+                    'text' => $candidateName . ' | Applied on ' . $appliedAt->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
+                    'status' => $status,
+                    'details_url' => $this->generateUrl('management_job_applications_details', ['applicationId' => $application->getId()]),
+                ];
+            }
         } else {
             // CANDIDATE VIEW: Show their own applications with edit/withdraw options
-            $candidateId = 3; // Hardcoded for development
-            $candidate = $this->doctrine->getRepository(Candidate::class)->find($candidateId);
+            $candidate = $this->resolveCurrentCandidate($request);
 
             if ($candidate instanceof Candidate) {
                 $applications = $this->doctrine->getRepository(Job_application::class)->findBy(
@@ -703,7 +730,7 @@ class FrontPortalController extends AbstractController
     #[Route('/front/events', name: 'front_events')]
     public function events(Request $request): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
         $events = $this->doctrine->getRepository(Recruitment_event::class)->findBy([], ['id' => 'DESC']);
 
         $cards = array_map(static function (Recruitment_event $event): array {
@@ -725,7 +752,7 @@ class FrontPortalController extends AbstractController
     #[Route('/front/interviews', name: 'front_interviews')]
     public function interviews(Request $request): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
         $interviews = $this->doctrine->getRepository(Interview::class)->findBy([], ['id' => 'DESC']);
 
         $cards = [];
@@ -759,10 +786,17 @@ class FrontPortalController extends AbstractController
                     [$displayStatus, $statusClass, $statusKey] = $this->computeRecruiterInterviewStatus($interview, $normalizedStatus, $latestFeedback);
                 }
 
-                $canModify = $this->canModifyInterview($interview);
-                $editUrl = $this->generateUrl('front_interview_edit', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all());
-                $deleteUrl = $this->generateUrl('front_interview_delete', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all());
-                $feedbackUrl = $this->generateUrl('front_interview_feedback', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all());
+                $canModify = $role === 'recruiter' && $this->canModifyInterview($interview);
+                $canFeedback = $role === 'recruiter' && $this->canSubmitFeedback($interview);
+                $editUrl = $canModify
+                    ? $this->generateUrl('front_interview_edit', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all())
+                    : '#';
+                $deleteUrl = $canModify
+                    ? $this->generateUrl('front_interview_delete', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all())
+                    : '#';
+                $feedbackUrl = $canFeedback
+                    ? $this->generateUrl('front_interview_feedback', ['id' => (string) $interview->getId(), 'role' => $role] + $request->query->all())
+                    : '#';
 
                 $detailExtra = [
                     'Date & Time: ' . $scheduledAt->format('d M Y H:i'),
@@ -797,7 +831,7 @@ class FrontPortalController extends AbstractController
                     'review_decision' => $hasFeedback ? (string) $latestFeedback->getDecision() : 'accepted',
                     'review_comment' => $hasFeedback ? (string) $latestFeedback->getComment() : '',
                     'can_modify' => $canModify,
-                    'can_feedback' => $this->canSubmitFeedback($interview),
+                    'can_feedback' => $canFeedback,
                     'review_label' => $hasFeedback ? 'Update Review' : 'Create Review',
                     'edit_url' => $editUrl,
                     'delete_url' => $deleteUrl,
@@ -832,7 +866,7 @@ class FrontPortalController extends AbstractController
     #[Route('/front/job-applications/{applicationId}/status/{status}', name: 'front_application_set_status', methods: ['POST'])]
     public function setApplicationStatus(string $applicationId, string $status, Request $request): RedirectResponse
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
         if ($role !== 'recruiter') {
             $this->addFlash('warning', 'Only recruiters can update application status.');
             return $this->redirectToRoute('front_job_applications', $request->query->all());
@@ -860,7 +894,7 @@ class FrontPortalController extends AbstractController
     #[Route('/front/job-applications/{applicationId}/interview-availability', name: 'front_application_interview_availability', methods: ['GET'])]
     public function applicationInterviewAvailability(string $applicationId, Request $request): JsonResponse
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
         $application = $this->doctrine->getRepository(Job_application::class)->find($applicationId);
         if (!$application instanceof Job_application) {
             return new JsonResponse(['ok' => false, 'error' => 'Application not found.'], 404);
@@ -891,7 +925,7 @@ class FrontPortalController extends AbstractController
     #[Route('/front/interviews/create/{applicationId}', name: 'front_interview_create', methods: ['GET', 'POST'])]
     public function createInterview(string $applicationId, Request $request): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
         $application = $this->doctrine->getRepository(Job_application::class)->find($applicationId);
         if (!$application instanceof Job_application) {
             throw $this->createNotFoundException('Application not found.');
@@ -974,7 +1008,7 @@ class FrontPortalController extends AbstractController
     #[Route('/front/interviews/{id}/edit', name: 'front_interview_edit', methods: ['GET', 'POST'])]
     public function editInterview(string $id, Request $request): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
         $interview = $this->doctrine->getRepository(Interview::class)->find($id);
         if (!$interview instanceof Interview) {
             throw $this->createNotFoundException('Interview not found.');
@@ -1038,7 +1072,7 @@ class FrontPortalController extends AbstractController
     #[Route('/front/interviews/{id}/delete', name: 'front_interview_delete', methods: ['POST'])]
     public function deleteInterview(string $id, Request $request): RedirectResponse
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
         $interview = $this->doctrine->getRepository(Interview::class)->find($id);
         if (!$interview instanceof Interview) {
             $this->addFlash('warning', 'Interview not found.');
@@ -1073,7 +1107,7 @@ class FrontPortalController extends AbstractController
     #[Route('/front/interviews/{id}/feedback', name: 'front_interview_feedback', methods: ['GET', 'POST'])]
     public function feedbackInterview(string $id, Request $request): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
+        $role = $this->resolveSessionRole($request);
         $interview = $this->doctrine->getRepository(Interview::class)->find($id);
         if (!$interview instanceof Interview) {
             throw $this->createNotFoundException('Interview not found.');
@@ -1150,7 +1184,7 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/profile', name: 'front_profile')]
-    public function profile(Request $request, UsersRepository $userRepo, EntityManagerInterface $entityManager): Response
+    public function profile(Request $request, UsersRepository $userRepo, EntityManagerInterface $entityManager, UserPasswordHasherInterface $passwordHasher): Response
     {
         $userId = $request->getSession()->get('user_id');
         $user = $userRepo->find($userId);
@@ -1164,6 +1198,11 @@ class FrontPortalController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $plainPassword = (string) $form->get('plainPassword')->getData();
+            if ($plainPassword !== '') {
+                $user->setPassword($passwordHasher->hashPassword($user, $plainPassword));
+            }
+
             $entityManager->flush();
             $request->getSession()->set('user_name', $user->getFirstName());
 
@@ -1175,6 +1214,74 @@ class FrontPortalController extends AbstractController
             'form' => $form->createView(),
             'authUser' => ['role' => 'candidate'],
         ]);
+    }
+
+    private function resolveCurrentUserId(Request $request): string
+    {
+        return (string) $request->getSession()->get('user_id', '');
+    }
+
+    private function resolveSessionRole(Request $request): string
+    {
+        $roles = (array) $request->getSession()->get('user_roles', []);
+        if (in_array('ROLE_RECRUITER', $roles, true)) {
+            return 'recruiter';
+        }
+
+        if (in_array('ROLE_ADMIN', $roles, true)) {
+            return 'admin';
+        }
+
+        return 'candidate';
+    }
+
+    private function resolveCurrentCandidate(Request $request): ?Candidate
+    {
+        $userId = $this->resolveCurrentUserId($request);
+        if ($userId === '') {
+            return null;
+        }
+
+        $candidate = $this->doctrine->getRepository(Candidate::class)->find($userId);
+        return $candidate instanceof Candidate ? $candidate : null;
+    }
+
+    private function resolveCurrentRecruiter(Request $request): ?Recruiter
+    {
+        $recruiterId = $this->resolveCurrentRecruiterId($request);
+        if ($recruiterId === '') {
+            return null;
+        }
+
+        $recruiter = $this->doctrine->getRepository(Recruiter::class)->find($recruiterId);
+        return $recruiter instanceof Recruiter ? $recruiter : null;
+    }
+
+    private function resolveCurrentRecruiterId(Request $request): string
+    {
+        $userId = $this->resolveCurrentUserId($request);
+        if ($userId === '') {
+            return '';
+        }
+
+        $recruiterById = $this->doctrine->getRepository(Recruiter::class)->find($userId);
+        if ($recruiterById instanceof Recruiter) {
+            return (string) $recruiterById->getId();
+        }
+
+        try {
+            $legacyRecruiterId = $this->doctrine->getManager()->getConnection()->fetchOne(
+                'SELECT id FROM recruiter WHERE user_id = :user_id LIMIT 1',
+                ['user_id' => $userId]
+            );
+            if ($legacyRecruiterId !== false && $legacyRecruiterId !== null && (string) $legacyRecruiterId !== '') {
+                return (string) $legacyRecruiterId;
+            }
+        } catch (\Throwable) {
+            // Keep fallback behavior when legacy column is absent.
+        }
+
+        return $userId;
     }
 
     private function validateInterviewPayload(array $data): array
@@ -1514,3 +1621,5 @@ class FrontPortalController extends AbstractController
         ];
     }
 }
+
+

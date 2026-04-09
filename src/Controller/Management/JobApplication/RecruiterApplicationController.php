@@ -23,9 +23,9 @@ class RecruiterApplicationController extends AbstractController
     ];
 
     #[Route('/applicationmanagement/recruiter/applications/{applicationId}/details', name: 'app_recruiter_application_details')]
-    public function details(int $applicationId, EntityManagerInterface $em): Response
+    public function details(int $applicationId, Request $request, EntityManagerInterface $em): Response
     {
-        $recruiterId = 4;
+        $recruiterId = (string) $request->getSession()->get('user_id', '');
         $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
 
         if (!$recruiter) {
@@ -73,7 +73,7 @@ class RecruiterApplicationController extends AbstractController
     #[Route('/applicationmanagement/recruiter/applications/{applicationId}/status', name: 'app_recruiter_application_update_status', methods: ['POST'])]
     public function updateStatus(int $applicationId, Request $request, EntityManagerInterface $em): Response
     {
-        $recruiterId = 4;
+        $recruiterId = (string) $request->getSession()->get('user_id', '');
         $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
 
         if (!$recruiter) {
@@ -115,7 +115,7 @@ class RecruiterApplicationController extends AbstractController
         $history->setApplication_id($application);
         $history->setStatus($newStatus);
         $history->setChanged_at(new \DateTime());
-        $history->setChanged_by($recruiter->getId());
+        $history->setChanged_by($recruiter);
         $history->setNote($note);
 
         $em->persist($history);
@@ -138,7 +138,7 @@ class RecruiterApplicationController extends AbstractController
         Request $request,
         EntityManagerInterface $em
     ): Response {
-        $recruiterId = 4;
+        $recruiterId = (string) $request->getSession()->get('user_id', '');
         $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
 
         if (!$recruiter) {
@@ -202,14 +202,13 @@ class RecruiterApplicationController extends AbstractController
             return false;
         }
 
-        return (string) $offerRecruiter->getUser_id() === (string) $recruiter->getUser_id();
+        return (string) $offerRecruiter->getId() === (string) $recruiter->getId();
     }
 
     private function resolveRecruiterDisplayName(Recruiter $recruiter): string
     {
-        $user = $recruiter->getId();
-        $firstName = method_exists($user, 'getFirst_name') ? (string) $user->getFirst_name() : '';
-        $lastName = method_exists($user, 'getLast_name') ? (string) $user->getLast_name() : '';
+        $firstName = (string) $recruiter->getFirstName();
+        $lastName = (string) $recruiter->getLastName();
         $fullName = trim($firstName . ' ' . $lastName);
 
         return $fullName !== '' ? $fullName : 'Recruiter';
@@ -262,12 +261,12 @@ class RecruiterApplicationController extends AbstractController
         }
 
         $historyAuthor = $history->getChanged_by();
-        $recruiterUser = $recruiter->getId();
+        $recruiterId = $recruiter->getId();
 
-        if (!$historyAuthor || !$recruiterUser) {
+        if (!$historyAuthor || !$recruiterId) {
             return false;
         }
 
-        return (string) $historyAuthor->getId() === (string) $recruiterUser->getId();
+        return (string) $historyAuthor->getId() === (string) $recruiterId;
     }
 }

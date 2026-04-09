@@ -105,10 +105,10 @@ class InterviewManagementController extends AbstractController
                 }
 
                 $offerTitle = $offer ? trim((string) $offer->getTitle()) : '';
-                $candidateName = $candidate ? $this->buildUserLabel($candidate->getId(), 'Unknown candidate') : 'Unknown candidate';
-                $recruiterFallback = $recruiter ? trim((string) $recruiter->getCompany_name()) : '';
+                $candidateName = $candidate ? $this->buildUserLabel($candidate, 'Unknown candidate') : 'Unknown candidate';
+                $recruiterFallback = $recruiter ? trim((string) $recruiter->getCompanyName()) : '';
                 $recruiterName = $recruiter
-                    ? $this->buildUserLabel($recruiter->getId(), $recruiterFallback !== '' ? $recruiterFallback : 'Unknown recruiter')
+                    ? $this->buildUserLabel($recruiter, $recruiterFallback !== '' ? $recruiterFallback : 'Unknown recruiter')
                     : 'Unknown recruiter';
                 $notes = trim((string) $interview->getNotes());
 
@@ -291,14 +291,14 @@ class InterviewManagementController extends AbstractController
         ]);
     }
 
-    private function buildUserLabel(mixed $user, string $fallback): string
+    private function buildUserLabel(?Users $user, string $fallback): string
     {
         if (!$user instanceof Users) {
             return $fallback;
         }
 
-        $firstName = trim((string) $user->getFirst_name());
-        $lastName = trim((string) $user->getLast_name());
+        $firstName = trim((string) $user->getFirstName());
+        $lastName = trim((string) $user->getLastName());
         $fullName = trim($firstName . ' ' . $lastName);
         if ($fullName !== '') {
             return $fullName;

@@ -217,7 +217,7 @@ class JobApplicationManagementController extends AbstractController
             $history->setApplication_id($application);
             $history->setStatus('ARCHIVED');
             $history->setChanged_at(new \DateTime());
-            $history->setChanged_by($admin->getId());
+            $history->setChanged_by($admin);
             $history->setNote('Admin archived this application.');
             $em->persist($history);
         }
@@ -257,7 +257,7 @@ class JobApplicationManagementController extends AbstractController
             $history->setApplication_id($application);
             $history->setStatus('UNARCHIVED');
             $history->setChanged_at(new \DateTime());
-            $history->setChanged_by($admin->getId());
+            $history->setChanged_by($admin);
             $history->setNote('Admin unarchived this application.');
             $em->persist($history);
         }
@@ -306,7 +306,7 @@ class JobApplicationManagementController extends AbstractController
             $history->setApplication_id($application);
             $history->setStatus($newStatus);
             $history->setChanged_at(new \DateTime());
-            $history->setChanged_by($admin->getId());
+            $history->setChanged_by($admin);
             $history->setNote($note);
             $em->persist($history);
         }

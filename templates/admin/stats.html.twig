@@ -2,37 +2,190 @@
 
 {% block admin_content %}
 <div class="container-xl">
+    {% set safeTotal = totalUsers > 0 ? totalUsers : 1 %}
+    {% set adminsPct = ((admins / safeTotal) * 100)|round(1) %}
+    {% set recruitersPct = ((recruiters / safeTotal) * 100)|round(1) %}
+    {% set candidatesPct = ((candidates / safeTotal) * 100)|round(1) %}
+
+    <style>
+        .tb-stats-hero {
+            background: linear-gradient(135deg, #15335b 0%, #0d5bd7 100%);
+            border-radius: 14px;
+            color: #fff;
+            box-shadow: 0 10px 30px rgba(13, 91, 215, 0.18);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .tb-stats-hero::after {
+            content: '';
+            position: absolute;
+            inset: auto -70px -70px auto;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            pointer-events: none;
+        }
+
+        .tb-stat-card {
+            border: 1px solid #e9eef4;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+        }
+
+        .tb-stat-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .tb-chart-shell {
+            min-height: 340px;
+            position: relative;
+        }
+
+        .tb-kpi-big {
+            font-size: clamp(1.9rem, 3vw, 2.35rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1;
+        }
+
+        .tb-role-pill {
+            border-radius: 999px;
+            padding: 0.35rem 0.7rem;
+            font-size: 0.73rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+    </style>
+
     <div class="page-header d-print-none mb-4">
-        <div class="row align-items-center">
-            <div class="col">
-                <h2 class="page-title text-white">Platform Statistics</h2>
-                <div class="text-muted small mt-1">Visual overview of user distribution</div>
+        <div class="tb-stats-hero p-4 p-lg-5">
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <h1 class="h3 mb-1 text-white">User Statistics</h1>
+                    <p class="mb-0 text-white-50">A clear snapshot of platform user distribution by role.</p>
+                </div>
+                <a href="{{ path('app_admin_users') }}" class="btn btn-light btn-sm">
+                    <i class="ti ti-users me-1"></i>Manage Users
+                </a>
             </div>
         </div>
     </div>
 
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-lg-3">
-            <div class="card bg-primary text-primary-fg shadow-sm border-0">
+            <div class="card tb-stat-card h-100">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-2">
-                        <div class="subheader text-white-50">Total Users</div>
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="subheader">Total Users</span>
+                        <span class="tb-stat-icon bg-primary-lt text-primary"><i class="ti ti-users"></i></span>
                     </div>
-                    <div class="h1 mb-0">{{ totalUsers }}</div>
+                    <div class="tb-kpi-big text-primary">{{ totalUsers }}</div>
+                    <div class="small text-muted mt-2">All active accounts in the platform.</div>
                 </div>
             </div>
         </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card tb-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="subheader">Admins</span>
+                        <span class="tb-stat-icon bg-blue-lt text-blue"><i class="ti ti-shield-check"></i></span>
+                    </div>
+                    <div class="tb-kpi-big text-blue">{{ admins }}</div>
+                    <div class="small text-muted mt-2">{{ adminsPct }}% of total users</div>
+                </div>
+            </div>
         </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card tb-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="subheader">Recruiters</span>
+                        <span class="tb-stat-icon bg-orange-lt text-orange"><i class="ti ti-briefcase"></i></span>
+                    </div>
+                    <div class="tb-kpi-big text-orange">{{ recruiters }}</div>
+                    <div class="small text-muted mt-2">{{ recruitersPct }}% of total users</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card tb-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="subheader">Candidates</span>
+                        <span class="tb-stat-icon bg-green-lt text-green"><i class="ti ti-user-search"></i></span>
+                    </div>
+                    <div class="tb-kpi-big text-green">{{ candidates }}</div>
+                    <div class="small text-muted mt-2">{{ candidatesPct }}% of total users</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <div class="row">
-        <div class="col-lg-6">
-            <div class="card bg-dark border-secondary shadow-sm">
-                <div class="card-header border-secondary">
-                    <h3 class="card-title text-white">User Role Distribution</h3>
+    <div class="row g-4">
+        <div class="col-12 col-xl-7">
+            <div class="card tb-stat-card h-100">
+                <div class="card-header">
+                    <h3 class="card-title mb-0"><i class="ti ti-chart-donut-3 me-2 text-primary"></i>User Role Distribution</h3>
                 </div>
                 <div class="card-body">
-                    <div id="chart-container" style="min-height: 350px;">
-                         <canvas id="userPieChart"></canvas>
+                    <div class="tb-chart-shell">
+                        <canvas id="userPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-5">
+            <div class="card tb-stat-card h-100">
+                <div class="card-header">
+                    <h3 class="card-title mb-0"><i class="ti ti-list-details me-2 text-primary"></i>Role Breakdown</h3>
+                </div>
+                <div class="card-body d-flex flex-column gap-3">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="tb-role-pill bg-blue-lt text-blue"><i class="ti ti-shield-check"></i>Admin</span>
+                            <strong>{{ admins }} users</strong>
+                        </div>
+                        <div class="progress" style="height: 9px;">
+                            <div class="progress-bar bg-blue" role="progressbar" style="width: {{ adminsPct }}%" aria-valuenow="{{ adminsPct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="tb-role-pill bg-orange-lt text-orange"><i class="ti ti-briefcase"></i>Recruiter</span>
+                            <strong>{{ recruiters }} users</strong>
+                        </div>
+                        <div class="progress" style="height: 9px;">
+                            <div class="progress-bar bg-orange" role="progressbar" style="width: {{ recruitersPct }}%" aria-valuenow="{{ recruitersPct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="tb-role-pill bg-green-lt text-green"><i class="ti ti-user-search"></i>Candidate</span>
+                            <strong>{{ candidates }} users</strong>
+                        </div>
+                        <div class="progress" style="height: 9px;">
+                            <div class="progress-bar bg-green" role="progressbar" style="width: {{ candidatesPct }}%" aria-valuenow="{{ candidatesPct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-primary mb-0 mt-1" role="alert">
+                        <i class="ti ti-info-circle me-1"></i>
+                        Maintain balanced recruiter and candidate growth to keep the pipeline healthy.
                     </div>
                 </div>
             </div>
@@ -42,43 +195,77 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // This replaces the DOMContentLoaded listener
-    document.addEventListener('turbo:load', function() {
+    const initUserStatsChart = function (retryCount) {
         const canvas = document.getElementById('userPieChart');
-        
-        // Safety check to ensure we only run this on the stats page
         if (!canvas) return;
 
+        if (typeof Chart === 'undefined') {
+            if ((retryCount || 0) < 12) {
+                window.setTimeout(function () {
+                    initUserStatsChart((retryCount || 0) + 1);
+                }, 120);
+            }
+            return;
+        }
+
         const ctx = canvas.getContext('2d');
-        
-        // Optional: Destroy existing chart instance to prevent memory leaks if navigating back/forth
+        if (!ctx) return;
+
         let existingChart = Chart.getChart("userPieChart");
         if (existingChart) {
             existingChart.destroy();
         }
 
         new Chart(ctx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
                 labels: ['Admins', 'Recruiters', 'Candidates'],
                 datasets: [{
                     data: {{ chartData|json_encode }},
                     backgroundColor: ['#206bc4', '#f59f00', '#2fb344'],
-                    borderColor: '#1b2431',
-                    borderWidth: 3
+                    borderColor: '#ffffff',
+                    borderWidth: 4,
+                    hoverOffset: 8
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                cutout: '56%',
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: { color: '#ffffff' }
+                        labels: {
+                            color: '#334155',
+                            usePointStyle: true,
+                            boxWidth: 10,
+                            padding: 18,
+                            font: {
+                                size: 12,
+                                weight: '600'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#f8fafc',
+                        padding: 12,
+                        displayColors: true
                     }
                 }
             }
         });
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initUserStatsChart(0);
     });
+
+    document.addEventListener('turbo:load', function () {
+        initUserStatsChart(0);
+    });
+
+    initUserStatsChart(0);
 </script>
 {% endblock %}

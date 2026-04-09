@@ -25,8 +25,13 @@ class CandidateApplicationController extends AbstractController
         EntityManagerInterface $em,
         SluggerInterface $slugger
     ): Response {
-        // As requested, hardcoding Candidate ID = 3
-        $candidateId = 3;
+        $roles = (array) $request->getSession()->get('user_roles', []);
+        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+            $this->addFlash('warning', 'Only candidates can apply for job offers.');
+            return $this->redirectToRoute('front_job_offers');
+        }
+
+        $candidateId = (string) $request->getSession()->get('user_id', '');
 
         // Fetch the candidate and the job offer
         $candidate = $em->getRepository(Candidate::class)->find($candidateId);
@@ -34,6 +39,14 @@ class CandidateApplicationController extends AbstractController
 
         if (!$candidate || !$jobOffer) {
             return new Response('Candidate or Job Offer not found!', Response::HTTP_NOT_FOUND);
+        }
+
+        $offerStatus = strtolower(trim((string) $jobOffer->getStatus()));
+        $offerDeadline = $jobOffer->getDeadline();
+        $isExpired = $offerDeadline instanceof \DateTimeInterface && $offerDeadline < new \DateTimeImmutable();
+        if ($offerStatus !== 'open' || $isExpired) {
+            $this->addFlash('warning', 'This offer is closed and no longer accepts applications.');
+            return $this->redirectToRoute('front_job_offers', ['role' => 'candidate']);
         }
 
         $existingApplication = $em->getRepository(Job_application::class)->findOneBy([
@@ -137,9 +150,16 @@ class CandidateApplicationController extends AbstractController
     #[Route('/applicationmanagement/candidate/applications/{applicationId}/withdraw', name: 'app_candidate_application_withdraw', methods: ['POST'])]
     public function withdraw(
         int $applicationId,
+        Request $request,
         EntityManagerInterface $em
     ): Response {
-        $candidateId = 3;
+        $roles = (array) $request->getSession()->get('user_roles', []);
+        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+            $this->addFlash('warning', 'Only candidates can manage candidate applications.');
+            return $this->redirectToRoute('front_job_offers');
+        }
+
+        $candidateId = (string) $request->getSession()->get('user_id', '');
 
         $candidate = $em->getRepository(Candidate::class)->find($candidateId);
         if (!$candidate) {
@@ -173,9 +193,16 @@ class CandidateApplicationController extends AbstractController
     #[Route('/applicationmanagement/candidate/applications/{applicationId}/details', name: 'app_candidate_application_details')]
     public function details(
         int $applicationId,
+        Request $request,
         EntityManagerInterface $em
     ): Response {
-        $candidateId = 3;
+        $roles = (array) $request->getSession()->get('user_roles', []);
+        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+            $this->addFlash('warning', 'Only candidates can access candidate application details.');
+            return $this->redirectToRoute('front_job_offers');
+        }
+
+        $candidateId = (string) $request->getSession()->get('user_id', '');
 
         $candidate = $em->getRepository(Candidate::class)->find($candidateId);
         if (!$candidate) {
@@ -211,7 +238,13 @@ class CandidateApplicationController extends AbstractController
         EntityManagerInterface $em,
         SluggerInterface $slugger
     ): Response {
-        $candidateId = 3;
+        $roles = (array) $request->getSession()->get('user_roles', []);
+        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+            $this->addFlash('warning', 'Only candidates can edit candidate applications.');
+            return $this->redirectToRoute('front_job_offers');
+        }
+
+        $candidateId = (string) $request->getSession()->get('user_id', '');
 
         $candidate = $em->getRepository(Candidate::class)->find($candidateId);
         if (!$candidate) {
@@ -323,10 +356,7 @@ class CandidateApplicationController extends AbstractController
         $history->setApplication_id($application);
         $history->setStatus((string) $application->getCurrent_status());
         $history->setChanged_at(new \DateTime());
-
-        if (method_exists($candidate, 'getId') && $candidate->getId()) {
-            $history->setChanged_by($candidate->getId());
-        }
+        $history->setChanged_by($candidate);
 
         $history->setNote($note);
         $em->persist($history);
@@ -334,13 +364,8 @@ class CandidateApplicationController extends AbstractController
 
     private function resolveCandidateDisplayName(Candidate $candidate): string
     {
-        if (!method_exists($candidate, 'getId') || !$candidate->getId()) {
-            return 'Candidate';
-        }
-
-        $user = $candidate->getId();
-        $firstName = method_exists($user, 'getFirst_name') ? (string) $user->getFirst_name() : '';
-        $lastName = method_exists($user, 'getLast_name') ? (string) $user->getLast_name() : '';
+        $firstName = (string) $candidate->getFirstName();
+        $lastName = (string) $candidate->getLastName();
         $fullName = trim($firstName . ' ' . $lastName);
 
         return $fullName !== '' ? $fullName : 'Candidate';

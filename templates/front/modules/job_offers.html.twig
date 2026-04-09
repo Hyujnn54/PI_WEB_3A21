@@ -4,12 +4,13 @@
 
 {% block body %}
 {% set role = authUser.role|default('candidate') %}
+{% set isAdminReadOnly = role == 'admin' %}
 <div class="page-wrapper">
     <div class="page-header d-print-none">
         <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2 tb-front-page-head">
             <div>
                 <h2 class="page-title"><i class="ti ti-briefcase-2 me-1"></i>Job Offers</h2>
-                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Manage your offers and monitor candidate interest.' : 'Browse the list of available job offers.' }}</p>
+                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Manage your offers and monitor candidate interest.' : (isAdminReadOnly ? 'Read-only view of all published job offers.' : 'Browse the list of available job offers.') }}</p>
             </div>
             {% if role == 'recruiter' %}
                 <div class="d-flex gap-2">
@@ -107,7 +108,7 @@
                 {% for card in cards %}
                     {% set isPendingReview = card.warning_status|default(null) == 'RESOLVED' %}
                     <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-filter-location="{{ card.location|default('')|lower }}" data-filter-contract-type="{{ card.contract_type|default('')|lower }}" data-filter-status="{{ card.status|default('')|lower }}" data-filter-deadline="{{ card.deadline|default('') }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : (card.already_applied ? 'Already Applied' : 'Apply') }}" data-action-primary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) : (card.already_applied ? '#' : path('app_candidate_apply', {'offerId': card.id})) }}" data-action-primary-disabled="{{ role == 'recruiter' and not card.can_delete|default(false) ? '1' : (role == 'candidate' and card.already_applied ? '1' : '0') }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete Offer' : 'Save Offer' }}" data-action-secondary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) : '#' }}" data-action-secondary-disabled="{{ role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0' }}" data-action-tertiary="{{ role == 'recruiter' ? 'View Applicants' : 'Compare Offer' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ card.meta|split(' | ')|last ~ '||Location: ' ~ card.meta|split(' | ')|first) }}">
+                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : (isAdminReadOnly ? 'Read Only' : (card.already_applied ? 'Already Applied' : (card.can_apply|default(false) ? 'Apply' : 'Offer Unavailable'))) }}" data-action-primary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) : (isAdminReadOnly ? '#' : (card.can_apply|default(false) ? path('app_candidate_apply', {'offerId': card.id}) : '#')) }}" data-action-primary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : (role == 'candidate' and (card.already_applied or not card.can_apply|default(false)) ? '1' : '0')) }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete Offer' : (isAdminReadOnly ? '' : 'Save Offer') }}" data-action-secondary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) : '#' }}" data-action-secondary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0') }}" data-action-tertiary="{{ role == 'recruiter' ? 'View Applicants' : (isAdminReadOnly ? '' : 'Compare Offer') }}" data-action-tertiary-href="#" data-action-tertiary-disabled="{{ isAdminReadOnly ? '1' : '0' }}" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ card.meta|split(' | ')|last ~ '||Location: ' ~ card.meta|split(' | ')|first) }}">
                             {% if isPendingReview %}
                                 <div class="badge bg-info mb-2" style="position: absolute; top: 8px; right: 8px;">Pending Review</div>
                             {% endif %}
@@ -118,8 +119,10 @@
                                 <div class="d-flex flex-wrap gap-2 mt-3">
                                     {% if card.already_applied %}
                                         <span class="btn btn-sm btn-secondary disabled"><i class="ti ti-check me-1"></i>Already Applied</span>
-                                    {% else %}
+                                    {% elseif card.can_apply|default(false) %}
                                         <a href="{{ path('app_candidate_apply', {'offerId': card.id}) }}" class="btn btn-sm btn-primary"><i class="ti ti-send me-1"></i>Apply Now</a>
+                                    {% else %}
+                                        <span class="btn btn-sm btn-secondary disabled"><i class="ti ti-lock me-1"></i>Closed / Expired</span>
                                     {% endif %}
                                 </div>
                             {% endif %}

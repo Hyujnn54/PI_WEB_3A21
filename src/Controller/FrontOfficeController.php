@@ -14,7 +14,12 @@ class FrontOfficeController extends AbstractController
     public function index(Request $request): Response
     {
         $session = $request->getSession();
+        $userId = $session->get('user_id');
         $roles = $session->get('user_roles', []);
+
+        if (!$userId) {
+            return $this->redirectToRoute('app_login');
+        }
 
         // =============== CANDIDATE ===============
         if (in_array('ROLE_CANDIDATE', $roles)) {
@@ -27,7 +32,7 @@ class FrontOfficeController extends AbstractController
             return $this->render('front/index.html.twig');
         }
 
-        // =============== GUEST / DEFAULT ===============
+        // =============== AUTHENTICATED DEFAULT ===============
         return $this->render('front/index.html.twig');
     }
 }

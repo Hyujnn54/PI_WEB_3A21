@@ -25,7 +25,7 @@ class Application_status_history
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $changed_at;
 
-        #[ORM\ManyToOne(targetEntity: Users::class, inversedBy: "application_status_historys")]
+        #[ORM\ManyToOne(targetEntity: Users::class)]
     #[ORM\JoinColumn(name: 'changed_by', referencedColumnName: 'id', onDelete: 'CASCADE')]
     private Users $changed_by;
 

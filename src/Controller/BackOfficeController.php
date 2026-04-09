@@ -16,8 +16,6 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/offermanagement')]
 class BackOfficeController extends AbstractController
 {
-    private const STATIC_ADMIN_ID = '1';
-
     #[Route('/admin', name: 'back_dashboard')]
     #[Route('/admin', name: 'app_admin')]
     public function index(UsersRepository $userRepo): Response
@@ -255,6 +253,12 @@ class BackOfficeController extends AbstractController
     #[Route('/admin/job-offers/{id}/warning', name: 'app_admin_job_offer_warning', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function sendJobOfferWarning(string $id, Request $request, Connection $connection): Response
     {
+        $currentAdminId = (string) $request->getSession()->get('user_id', '');
+        if ($currentAdminId === '') {
+            $this->addFlash('error', 'You must be logged in as admin to send warnings.');
+            return $this->redirectToRoute('app_login');
+        }
+
         $warningType = trim((string) $request->request->get('warning_type', ''));
         $warningText = trim((string) $request->request->get('warning_text', ''));
         if ($warningType === '' || $warningText === '') {
@@ -314,7 +318,7 @@ class BackOfficeController extends AbstractController
                     'id' => $warningId,
                     'job_offer_id' => (string) $offer['id'],
                     'recruiter_id' => (string) $offer['recruiter_id'],
-                    'admin_id' => self::STATIC_ADMIN_ID,
+                    'admin_id' => $currentAdminId,
                     'reason' => $reason,
                     'message' => $reason,
                     'status' => 'SENT',

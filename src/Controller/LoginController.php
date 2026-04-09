@@ -18,7 +18,7 @@ class LoginController extends AbstractController
             $email = $request->request->get('email');
             $password = $request->request->get('password');
 
-            $user = $userRepo->findOneBy(['email' => $email]);
+            $user = $userRepo->findOneValidByEmail((string) $email);
 
             if ($user && $hasher->isPasswordValid($user, $password)) {
                 
@@ -41,11 +41,11 @@ class LoginController extends AbstractController
                 
                 if (in_array('ROLE_RECRUITER', $roles)) {
                     // Redirect to the Recruiter home/portal
-                    return $this->redirectToRoute('front_home', ['role' => 'recruiter']);
+                    return $this->redirectToRoute('front_home');
                 }
 
                 // Default: Redirect Candidates to the main home or job offers
-                return $this->redirectToRoute('front_home', ['role' => 'candidate']);
+                return $this->redirectToRoute('front_home');
             }
 
             $this->addFlash('error', 'Invalid email or password.');

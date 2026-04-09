@@ -2,6 +2,9 @@
 
 namespace App\Repository;
 
+use App\Entity\Admin;
+use App\Entity\Candidate;
+use App\Entity\Recruiter;
 use App\Entity\Users;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -74,6 +77,39 @@ public function countByRole(string $role): int
         ->setParameter('role', '%' . $role . '%')
         ->getQuery()
         ->getSingleScalarResult();
+}
+
+public function findOneValidByEmail(string $email): ?Users
+{
+    $row = $this->getEntityManager()->getConnection()->fetchAssociative(
+        'SELECT id, discr FROM users WHERE email = :email LIMIT 1',
+        ['email' => $email]
+    );
+
+    if (!$row) {
+        return null;
+    }
+
+    $id = (string) ($row['id'] ?? '');
+    $discr = strtolower(trim((string) ($row['discr'] ?? '')));
+
+    try {
+        $user = match ($discr) {
+            'admin' => $this->getEntityManager()->getRepository(Admin::class)->find($id),
+            'candidate' => $this->getEntityManager()->getRepository(Candidate::class)->find($id),
+            'recruiter' => $this->getEntityManager()->getRepository(Recruiter::class)->find($id),
+            default => null,
+        };
+
+        if ($user instanceof Users) {
+            return $user;
+        }
+
+        // Fallback for legacy rows where discriminator exists but subtype row is inconsistent.
+        return $this->findOneBy(['email' => $email]);
+    } catch (\Throwable) {
+        return null;
+    }
 }
 
 

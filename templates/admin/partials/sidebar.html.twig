@@ -86,8 +86,16 @@
     </div>
 
     <div class="sidebar-footer">
-        <a class="btn btn-sm w-100" href="{{ path('front_home', {role: 'candidate'}) }}" data-turbo="false">
+        <a class="btn btn-sm w-100 mb-2" href="{{ path('front_profile') }}">
+            <i class="ti ti-user-circle me-2"></i>Profile
+        </a>
+        <a class="btn btn-sm w-100 mb-2" href="{{ path('front_home') }}" data-turbo="false">
             <i class="ti ti-home me-2"></i>Back to Front Office
         </a>
+        <form method="post" action="{{ path('app_logout') }}">
+            <button class="btn btn-sm btn-outline-secondary w-100" type="submit">
+                <i class="ti ti-logout me-2"></i>Logout
+            </button>
+        </form>
     </div>
 </nav>

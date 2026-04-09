@@ -31,12 +31,45 @@
                         </div>
                         <div class="col-md-6">
                             <div class="small text-muted">Candidate</div>
-                            {% set candidateUser = candidate ? candidate.id : null %}
-                            <div class="fw-semibold">{{ candidateUser ? (candidateUser.first_name ~ ' ' ~ candidateUser.last_name) : 'Candidate' }}</div>
+                            {% set candidateName = 'Candidate' %}
+                            {% if candidate %}
+                                {% set candidateName = (candidate.firstName|default('') ~ ' ' ~ candidate.lastName|default(''))|trim %}
+                                {% if candidateName == '' %}
+                                    {% set candidateName = candidate.email|default('Candidate') %}
+                                {% endif %}
+                            {% endif %}
+                            <div class="fw-semibold">{{ candidateName }}</div>
                         </div>
                         <div class="col-md-6">
                             <div class="small text-muted">Phone</div>
                             <div class="fw-semibold">{{ application.phone }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted">CV File</div>
+                            {% set cvPath = (application.cv_path|default('')|trim) %}
+                            {% set cvPathNormalized = cvPath|replace({'\\': '/'}) %}
+                            {% set cvUrl = '' %}
+                            {% if cvPathNormalized != '' %}
+                                {% if cvPathNormalized starts with 'http://' or cvPathNormalized starts with 'https://' %}
+                                    {% set cvUrl = cvPathNormalized %}
+                                {% elseif cvPathNormalized starts with '/' %}
+                                    {% set cvUrl = cvPathNormalized %}
+                                {% elseif cvPathNormalized starts with 'public/' %}
+                                    {% set cvUrl = asset(cvPathNormalized|slice(7)) %}
+                                {% elseif cvPathNormalized starts with 'uploads/' %}
+                                    {% set cvUrl = asset(cvPathNormalized) %}
+                                {% else %}
+                                    {% set cvUrl = asset('uploads/applications/' ~ cvPathNormalized) %}
+                                {% endif %}
+                            {% endif %}
+
+                            {% if cvUrl != '' %}
+                                <a class="btn btn-outline-primary btn-sm" href="{{ cvUrl }}" target="_blank" rel="noopener">
+                                    <i class="ti ti-file-cv me-1"></i>Open CV
+                                </a>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis">CV unavailable</span>
+                            {% endif %}
                         </div>
                         <div class="col-12">
                             <div class="small text-muted mb-1">Cover Letter</div>
