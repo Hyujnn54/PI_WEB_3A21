@@ -236,10 +236,15 @@
 
 <script>
     const initInterviewsPage = function () {
-        if (document.body.dataset.tbInterviewsInitialized === '1') {
+        const pageRoot = document.querySelector('.tb-interviews-page');
+        if (!pageRoot) {
             return;
         }
-        document.body.dataset.tbInterviewsInitialized = '1';
+
+        if (pageRoot.dataset.tbInterviewsInitialized === '1') {
+            return;
+        }
+        pageRoot.dataset.tbInterviewsInitialized = '1';
 
         const params = new URLSearchParams(window.location.search);
         const calendarRoot = document.getElementById('tbInterviewCalendar');

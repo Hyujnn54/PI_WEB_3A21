@@ -340,6 +340,43 @@
                     }
                 });
             });
+
+            // Disable client-side HTML5 validation across the app and rely on server-side checks.
+            const disableClientValidation = function (root) {
+                const scope = root || document;
+
+                scope.querySelectorAll('form').forEach(function (form) {
+                    form.noValidate = true;
+                    form.setAttribute('novalidate', 'novalidate');
+                });
+
+                scope.querySelectorAll('input, select, textarea').forEach(function (field) {
+                    field.removeAttribute('required');
+                    field.removeAttribute('pattern');
+                    field.removeAttribute('min');
+                    field.removeAttribute('max');
+                    field.removeAttribute('minlength');
+                    field.removeAttribute('maxlength');
+
+                    if (typeof field.setCustomValidity === 'function') {
+                        field.setCustomValidity('');
+                    }
+                });
+            };
+
+            document.addEventListener('submit', function () {
+                disableClientValidation(document);
+            }, true);
+
+            document.addEventListener('DOMContentLoaded', function () {
+                disableClientValidation(document);
+            });
+
+            document.addEventListener('turbo:load', function () {
+                disableClientValidation(document);
+            });
+
+            disableClientValidation(document);
         </script>
     </body>
 </html>
