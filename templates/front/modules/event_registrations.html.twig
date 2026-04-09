@@ -1,0 +1,120 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | My Registrations{% endblock %}
+
+{% block body %}
+{% set role = authUser.role|default('candidate') %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="page-title"><i class="ti ti-calendar-check me-1"></i>My Registrations</h2>
+                <p class="text-secondary mb-0">Review the events you have registered for and manage your participation.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ path('front_events', {'role': 'candidate'}) }}" class="btn btn-outline-primary">Back to Events</a>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            {% if app.flashes('success') %}
+                {% for message in app.flashes('success') %}
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <div class="d-flex">
+                            <div>
+                                <i class="ti ti-check me-2"></i>
+                                {{ message }}
+                            </div>
+                        </div>
+                        <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            {% if app.flashes('warning') %}
+                {% for message in app.flashes('warning') %}
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        <div class="d-flex">
+                            <div>
+                                <i class="ti ti-alert-triangle me-2"></i>
+                                {{ message }}
+                            </div>
+                        </div>
+                        <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% if cards is not empty %}
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-1">Event Registrations Summary</h5>
+                                <p class="text-muted mb-0">You are registered for {{ cards|length }} event{{ cards|length > 1 ? 's' : '' }}.</p>
+                            </div>
+                            <form method="post" action="{{ path('front_event_unregister_all') }}" onsubmit="return confirm('Cancel registration for all events?');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('front_event_unregister_all') }}" />
+                                <button type="submit" class="btn btn-danger">Unregister from All</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="row row-cards">
+                    {% for card in cards %}
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <h3 class="card-title mb-1">{{ card.title }}</h3>
+                                            <p class="text-muted mb-0">{{ card.meta }}</p>
+                                        </div>
+                                        <span class="badge bg-light text-dark border">{{ card.event_type }}</span>
+                                    </div>
+                                    <dl class="row small text-secondary mb-0">
+                                        <dt class="col-5">Location</dt>
+                                        <dd class="col-7">{{ card.location }}</dd>
+                                        <dt class="col-5">Capacity</dt>
+                                        <dd class="col-7">{{ card.capacity }}</dd>
+                                        <dt class="col-5">Status</dt>
+                                        <dd class="col-7">
+                                            {% if card.status == 'confirmed' %}
+                                                <span class="badge bg-success">Confirmed</span>
+                                            {% elseif card.status == 'rejected' %}
+                                                <span class="badge bg-danger">Rejected</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Pending Review</span>
+                                            {% endif %}
+                                        </dd>
+                                        {% if card.event_type|lower == 'webinar' %}
+                                            <dt class="col-5">Meeting link</dt>
+                                            <dd class="col-7">
+                                                {% if card.meet_link %}
+                                                    <a href="{{ card.meet_link }}" target="_blank">View link</a>
+                                                {% else %}
+                                                    <span class="text-muted">None</span>
+                                                {% endif %}
+                                            </dd>
+                                        {% endif %}
+                                    </dl>
+                                    <hr>
+                                    <form method="post" action="{{ path('front_event_unregister', {'id': card.id}) }}" onsubmit="return confirm('Cancel registration for this event?');">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">Cancel Registration</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="card">
+                    <div class="card-body text-center text-secondary">
+                        You have not registered for any events yet. Browse the events page to sign up.
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
