@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 14, 2026 at 07:02 PM
+-- Generation Time: Apr 14, 2026 at 07:13 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -31,6 +31,13 @@ CREATE TABLE `admin` (
   `id` bigint(20) NOT NULL,
   `assigned_area` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `admin`
+--
+
+INSERT INTO `admin` (`id`, `assigned_area`) VALUES
+(11, 'General Management');
 
 -- --------------------------------------------------------
 
@@ -67,7 +74,7 @@ CREATE TABLE `candidate` (
 --
 
 INSERT INTO `candidate` (`id`, `user_id`, `location`, `education_level`, `experience_years`, `cv_path`) VALUES
-(8, NULL, 'tunis', 'bachlor', 1, '69de70843c188.pdf');
+(12, NULL, 'Ariana', 'Uni', 5, NULL);
 
 -- --------------------------------------------------------
 
@@ -241,7 +248,7 @@ CREATE TABLE `recruiter` (
 --
 
 INSERT INTO `recruiter` (`id`, `user_id`, `company_name`, `company_location`, `company_description`) VALUES
-(7, NULL, 'google', 'tunis', NULL);
+(13, NULL, 'Google', 'Tunis', NULL);
 
 -- --------------------------------------------------------
 
@@ -290,9 +297,9 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `email`, `roles`, `password`, `first_name`, `last_name`, `phone`, `is_active`, `created_at`, `forget_code`, `forget_code_expires`, `face_person_id`, `face_enabled`, `discr`) VALUES
-(7, 'test@gmail.com', '[\"ROLE_RECRUITER\"]', '$2y$13$bs4fWmWcvLn/.bhg.TyaWefLlRUXJX/fdsXNHKgGOdxdyM1/0j8Fm', 'test', 'test', '58913065', 1, '2026-04-14 18:49:38', NULL, NULL, NULL, 0, 'recruiter'),
-(8, 'aziz@gmail.com', '[\"ROLE_CANDIDATE\"]', '$2y$13$Wz8dQKiK3vPlS5jOaYMvRO3hfLBGN9YkUyiscD0SU0G2E5WOZTkyy', 'aziz', 'abidi', '50299765', 1, '2026-04-14 18:51:15', NULL, NULL, NULL, 0, 'candidate'),
-(9, 'admin@gmail.com', '[\"ROLE_ADMIN\"]', '$2y$13$HKwVVRObPRQhSVrytmvtHujoqJoT3lrpL5YBbZ5SxmE.z6yA3qJmG', 'Admin', 'User', '12345678', 1, '2026-04-14 17:53:40', NULL, NULL, NULL, 0, 'admin');
+(11, 'admin@gmail.com', '[\"ROLE_ADMIN\"]', '$2y$13$CkoFplROsEf3/C62Cty17O5sHbPI1dE66rLjLhVZ/k1TsPJYf0/3W', 'admin', 'admin', '12345678', 1, '2026-04-14 19:09:08', NULL, NULL, NULL, 0, 'admin'),
+(12, 'candidate@gmail.com', '[\"ROLE_CANDIDATE\"]', '$2y$13$h7GT0L1U0etLYCQ96/ZWSuGL2VjSUkmQEZ3LbUDvWotvOvN0OoIn6', 'candidate', 'user', '58999875', 1, '2026-04-14 19:10:35', NULL, NULL, NULL, 0, 'candidate'),
+(13, 'recruiter@gmail.com', '[\"ROLE_RECRUITER\"]', '$2y$13$aQb681RV8f2CUrdj9l7PsukA9angwYHo9NSaR7E.LHNwmJ/8gzSxW', 'recruiter', 'user', '50555675', 1, '2026-04-14 19:11:31', NULL, NULL, NULL, 0, 'recruiter');
 
 -- --------------------------------------------------------
 
@@ -512,7 +519,7 @@ ALTER TABLE `recruitment_event`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `warning_correction`
