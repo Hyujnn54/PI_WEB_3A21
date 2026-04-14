@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 09, 2026 at 02:07 PM
+-- Generation Time: Apr 14, 2026 at 07:02 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -32,15 +32,6 @@ CREATE TABLE `admin` (
   `assigned_area` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `admin`
---
-
-INSERT INTO `admin` (`id`, `assigned_area`) VALUES
-(1, 'SUPER ADMIN'),
-(2, 'NORMAL ADMIN'),
-(5, 'NORMAL ADMIN');
-
 -- --------------------------------------------------------
 
 --
@@ -55,13 +46,6 @@ CREATE TABLE `application_status_history` (
   `changed_by` bigint(20) NOT NULL,
   `note` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `application_status_history`
---
-
-INSERT INTO `application_status_history` (`id`, `application_id`, `status`, `changed_at`, `changed_by`, `note`) VALUES
-(89, 25, 'SUBMITTED', '2026-04-08 00:45:32', 3, 'Application submitted');
 
 -- --------------------------------------------------------
 
@@ -83,7 +67,7 @@ CREATE TABLE `candidate` (
 --
 
 INSERT INTO `candidate` (`id`, `user_id`, `location`, `education_level`, `experience_years`, `cv_path`) VALUES
-(3, 3, 'ben arous', 'college', 4, 'uploads\\cvs\\96a99fad-99ff-405e-a55f-7975254b9521_Aziz_Abidi_CV.pdf');
+(8, NULL, 'tunis', 'bachlor', 1, '69de70843c188.pdf');
 
 -- --------------------------------------------------------
 
@@ -97,21 +81,6 @@ CREATE TABLE `candidate_skill` (
   `skill_name` varchar(100) NOT NULL,
   `level` enum('BEGINNER','INTERMEDIATE','ADVANCED') NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `candidate_skill`
---
-
-INSERT INTO `candidate_skill` (`id`, `candidate_id`, `skill_name`, `level`) VALUES
-(20, 3, 'Java', 'ADVANCED'),
-(21, 3, 'Spring Boot', 'INTERMEDIATE'),
-(22, 3, 'SQL', 'ADVANCED'),
-(23, 3, 'Angular', 'BEGINNER'),
-(24, 3, 'Docker', 'INTERMEDIATE'),
-(25, 3, 'CSS', 'INTERMEDIATE'),
-(26, 3, 'React', 'ADVANCED'),
-(27, 3, 'Type script', 'INTERMEDIATE'),
-(28, 3, 'Java (computer programming)', 'INTERMEDIATE');
 
 -- --------------------------------------------------------
 
@@ -127,18 +96,6 @@ CREATE TABLE `event_registration` (
   `attendance_status` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `event_registration`
---
-
-INSERT INTO `event_registration` (`id`, `event_id`, `candidate_id`, `registered_at`, `attendance_status`) VALUES
-(1, 1, 3, '2026-03-02 13:00:00', 'CONFIRMED'),
-(2, 2, 3, '2026-02-10 10:00:00', 'CONFIRMED'),
-(3, 3, 3, '2026-03-02 02:26:38', 'REJECTED'),
-(4, 4, 3, '2026-03-02 11:39:41', 'CANCELLED'),
-(7, 8, 3, '2026-03-02 11:41:55', 'CONFIRMED'),
-(8, 9, 3, '2026-03-02 11:47:16', 'CANCELLED');
-
 -- --------------------------------------------------------
 
 --
@@ -153,13 +110,6 @@ CREATE TABLE `event_review` (
   `comment` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `event_review`
---
-
-INSERT INTO `event_review` (`id`, `event_id`, `candidate_id`, `rating`, `comment`, `created_at`) VALUES
-(2, 2, 3, 5, '3malet barcha jawww', '2026-03-02 10:43:51');
 
 -- --------------------------------------------------------
 
@@ -181,13 +131,6 @@ CREATE TABLE `interview` (
   `created_at` datetime DEFAULT current_timestamp(),
   `reminder_sent` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `interview`
---
-
-INSERT INTO `interview` (`id`, `application_id`, `recruiter_id`, `scheduled_at`, `duration_minutes`, `mode`, `meeting_link`, `location`, `status`, `notes`, `created_at`, `reminder_sent`) VALUES
-(1, 25, 4, '2026-04-25 01:00:00', 60, 'ON_SITE', '', 'tunisdd', 'SCHEDULED', 'qsdqsdqsd', '2026-04-08 02:00:37', 0);
 
 -- --------------------------------------------------------
 
@@ -223,13 +166,6 @@ CREATE TABLE `job_application` (
   `is_archived` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `job_application`
---
-
-INSERT INTO `job_application` (`id`, `offer_id`, `candidate_id`, `phone`, `cover_letter`, `cv_path`, `applied_at`, `current_status`, `is_archived`) VALUES
-(25, 1775601948423129, 3, '50232355', 'April 08, 2026\n\nDear Hiring Manager,\n\nI am writing to express my strong interest in the taw ta5rali fih position at Actia. With my background in college and 4 ans d\'expérience, I am confident that I can make a significant contribution to your team.\n\nThroughout my career, I have developed strong expertise in the following areas:\n• Java (ADVANCED)\n• React (ADVANCED)\n• SQL (ADVANCED)\n• CSS (INTERMEDIATE)\n• Docker (INTERMEDIATE)\n• Java (computer programming) (INTERMEDIATE)\n• Spring Boot (INTERMEDIATE)\n• Type script (INTERMEDIATE)\n• Angular (BEGINNER)\n\nThese skills have enabled me to consistently deliver high-quality results and exceed expectations in my professional roles.\n\nI am particularly drawn to Actia because of your commitment to excellence and innovation in the industry. I am excited about the opportunity to contribute my expertise and grow professionally within your esteemed organization. I am confident that my skills, experience, and dedication make me an ideal candidate for this position.\n\nI would welcome the opportunity to discuss how my qualifications align with your team\'s needs. Please feel free to contact me at 58222333 or aziz15abidi@gmail.com at your earliest convenience.\n\nThank you for considering my application. I look forward to the possibility of contributing to Actia and making a positive impact on your organization.\n\nSincerely,\n\nmohamed aziz abidi', 'uploads\\applications\\05e9a8d6-f83a-41ae-9821-fc6f11820b4e_Aziz_Abidi_CV.pdf', '2026-04-08 00:45:32', '', 0);
-
 -- --------------------------------------------------------
 
 --
@@ -254,15 +190,6 @@ CREATE TABLE `job_offer` (
   `flagged_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `job_offer`
---
-
-INSERT INTO `job_offer` (`id`, `recruiter_id`, `title`, `description`, `location`, `latitude`, `longitude`, `contract_type`, `created_at`, `deadline`, `status`, `quality_score`, `ai_suggestions`, `is_flagged`, `flagged_at`) VALUES
-(2, 4, 'Data Analyst Junior', 'Visualizing complex datasets with PowerBI.', 'Ariana', NULL, NULL, 'INTERNSHIP', '2026-01-10 09:00:00', '2026-02-28 23:59:59', 'CLOSED', NULL, NULL, 0, NULL),
-(3, 4, 'DevOps Engineerdd', 'Cloud infrastructure and CI/CD pipelines.', 'Ariana', 0, 0, 'CDI', '2026-01-20 08:30:00', '2026-04-30 17:00:00', 'CLOSED', NULL, NULL, 0, NULL),
-(1775601948423129, 4, 'taw ta5rali fih', 'sqdqsdqsdqsdqsdqsd', 'tunis', 0, 0, 'CDI', '2026-04-08 00:45:48', '2026-04-16 23:45:00', 'OPEN', 100, '', 0, '2026-04-08 00:45:48');
-
 -- --------------------------------------------------------
 
 --
@@ -282,16 +209,6 @@ CREATE TABLE `job_offer_warning` (
   `resolved_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `job_offer_warning`
---
-
-INSERT INTO `job_offer_warning` (`id`, `job_offer_id`, `recruiter_id`, `admin_id`, `reason`, `message`, `status`, `created_at`, `seen_at`, `resolved_at`) VALUES
-(1775602935557576, 3, 4, 1, 'sdqsdq', 'sdqsdq', 'DISMISSED', '2026-04-08 01:02:15', '2026-04-08 01:02:15', '2026-04-08 01:02:15'),
-(1775604203929371, 1775601948423129, 4, 1, '[Incorrect information] sdqsdqs', '[Incorrect information] sdqsdqs', 'DISMISSED', '2026-04-08 01:23:23', '2026-04-08 01:23:23', '2026-04-08 01:23:23'),
-(1775604517343478, 1775601948423129, 4, 1, '[Incorrect information] qsdqsdqsd', '[Incorrect information] qsdqsdqsd', 'DISMISSED', '2026-04-08 01:28:37', '2026-04-08 01:28:37', '2026-04-08 01:28:37'),
-(1775604867459712, 1775601948423129, 4, 1, '[Policy violation] change the title', '[Policy violation] change the title', 'DISMISSED', '2026-04-08 01:34:27', '2026-04-08 01:34:27', '2026-04-08 01:34:27');
-
 -- --------------------------------------------------------
 
 --
@@ -304,15 +221,6 @@ CREATE TABLE `offer_skill` (
   `skill_name` varchar(100) NOT NULL,
   `level_required` enum('BEGINNER','INTERMEDIATE','ADVANCED') NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `offer_skill`
---
-
-INSERT INTO `offer_skill` (`id`, `offer_id`, `skill_name`, `level_required`) VALUES
-(1775604885169515, 1775601948423129, 'bil5ifa', 'BEGINNER'),
-(1775605597466839, 3, 'Kubernetes', 'INTERMEDIATE'),
-(1775605597468391, 3, 'Docker', 'BEGINNER');
 
 -- --------------------------------------------------------
 
@@ -333,8 +241,7 @@ CREATE TABLE `recruiter` (
 --
 
 INSERT INTO `recruiter` (`id`, `user_id`, `company_name`, `company_location`, `company_description`) VALUES
-(4, 4, 'Actia', 'Ghazela centre, نهج الأنصار, المدينة الفاضلة, معتمدية رواد, ولاية أريانة, 2083, تونس', NULL),
-(6, 6, 'esprit', 'الجوف الشرقية, معتمدية الزريبة, ولاية زغوان, 1152, تونس', NULL);
+(7, NULL, 'google', 'tunis', NULL);
 
 -- --------------------------------------------------------
 
@@ -354,19 +261,6 @@ CREATE TABLE `recruitment_event` (
   `meet_link` varchar(255) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `recruitment_event`
---
-
-INSERT INTO `recruitment_event` (`id`, `recruiter_id`, `title`, `description`, `event_type`, `location`, `event_date`, `capacity`, `meet_link`, `created_at`) VALUES
-(1, 4, 'Actia Tech Day', 'Discover our ECU projects.', 'Open Day', 'Ghazela centre', '2026-04-10 14:00:00', 50, NULL, '2026-03-02 02:00:33'),
-(2, 4, 'Java Workshop', 'Hands-on Spring session.', 'Workshop', 'Online', '2026-02-15 18:00:00', 100, NULL, '2026-03-02 02:00:33'),
-(3, 4, 'Career Fair 2026', 'Recruitment drive.', 'Fair', 'Palais des Congrès', '2026-05-20 09:00:00', 500, NULL, '2026-03-02 02:00:33'),
-(4, 4, 'java', 'Rejoignez notre équipe de talents pour un événement exceptionnel consacré à Java, où vous découvrirez les dernières tendances et innovations dans le domaine. Vous aurez l\'opportunité de rencontrer nos experts et de discuter des possibilités de carrière dans un environnement dynamique et stimulant. Nous sommes à la recherche de candidats passionnés et motivés pour rejoindre notre équipe et contribuer à la création de solutions innovantes. Vous pourrez présenter vos compétences, vos expériences et vos projets, et découvrir comment vous pouvez grandir professionnellement avec nous. Nous offrons un environnement de travail collaboratif et une chance de travailler sur des projets passionnants et stimulants.', 'WEBINAIRE', 'ماطر, تونس', '2026-03-18 23:00:00', 200, 'google.com', '2026-03-02 02:31:43'),
-(7, 4, '3IMED DHAYA', 'Rejoignez-nous pour un webinaire exceptionnel à الغرابة, معتمدية باجة الشمالية, ولاية باجة, en Tunisie, où vous pourrez découvrir de nouvelles opportunités de carrière et rencontrer notre équipe dédiée. Vous aurez l\'occasion de vous informer sur les dernières tendances du marché du travail et de présenter vos compétences et expériences aux entreprises leaders de notre secteur. Cet événement est une chance unique de se connecter avec des professionnels passionnés et de prendre un nouveau départ dans votre carrière. Nous vous attendons pour partager nos expériences et nos connaissances, et pour explorer les possibilités de collaboration et de croissance mutuelle.', 'WEBINAIRE', 'الغرابة, معتمدية باجة الشمالية, ولاية باجة, تونس', '2026-03-03 23:00:00', 23, 'google.com', '2026-03-02 11:36:19'),
-(8, 4, 'popular test', 'description test', 'Interview day', 'سيدي محرصي, نيابوليس, معتمدية نابل, ولاية نابل, 8000, تونس', '2026-03-11 23:00:00', 1, NULL, '2026-03-02 11:41:26'),
-(9, 4, 'urgencyy', 'Rejoignez-nous à تونس pour découvrir des opportunités de carrière exceptionnelles et rencontrer des employeurs de premier plan. Vous aurez l\'occasion de présenter votre candidature, de discuter avec des professionnels du secteur et de découvrir les dernières tendances du marché du travail. Nous vous offrons un espace unique pour vous connecter avec des entreprises innovantes et des leaders de l\'industrie, tout en bénéficiant de conseils d\'experts pour booster votre carrière. Participez à cet événement incontournable pour accélérer votre recherche d\'emploi et atteindre vos objectifs professionnels. Vous pourrez également bénéficier de séances de coaching et de développement personnel pour améliorer vos compétences et augmenter vos chances de réussite.', 'Job_Faire', 'تونس', '2026-03-02 23:00:00', 1, NULL, '2026-03-02 11:46:25');
 
 -- --------------------------------------------------------
 
@@ -396,12 +290,9 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `email`, `roles`, `password`, `first_name`, `last_name`, `phone`, `is_active`, `created_at`, `forget_code`, `forget_code_expires`, `face_person_id`, `face_enabled`, `discr`) VALUES
-(1, 'mohamedmkaouem@gmail.com', '', '$2a$12$wlTJMvbbsiwyoquTSeumfugPrzNGvezC90kl0NDItmeT4cMfsZkUK', 'Amine', 'mkaouem', '50638321', 1, '2026-03-02 01:49:15', NULL, NULL, '34eab4c9-1616-11f1-b6c8-0242ac120003', 1, ''),
-(2, 'zex54lol@gmail.com', '', '$2a$12$wlTJMvbbsiwyoquTSeumfugPrzNGvezC90kl0NDItmeT4cMfsZkUK', 'mohamed', 'ben moussa', '53757969', 1, '2026-03-02 01:50:38', NULL, NULL, NULL, 0, ''),
-(3, 'aziz15abidi@gmail.com', '', '$2a$12$tE5Rcp/JdYcMfj2mKyLIXuEENpKKrfuh/4TbQ9Hpm.FPTo5LwA7hu', 'mohamed aziz', 'abidi', '58222333', 1, '2026-03-02 01:53:17', NULL, NULL, '170f1cab-15d9-11f1-b6c8-0242ac120003', 1, ''),
-(4, 'ammounazaidi9@gmail.com', '', '$2a$12$tuWch2NHVu2Tv1U.rkT8luOCnFMrDchyempYoTVRKjde7DJS9qu3q', 'emna', 'zaidi', '53752303', 1, '2026-03-02 01:55:29', NULL, NULL, NULL, 0, ''),
-(5, 'azizgamercr7@gmail.com', '', '$2a$12$d3EhFUSBwSpvXeiKxNYc1udP4HkcrA4zCh/8SNxNIjptnA75pko6i', 'Rayan', 'Ben Amor', '90513331', 1, '2026-03-02 03:35:23', NULL, NULL, NULL, 0, ''),
-(6, 'facebokmohamedamine@gmail.com', '', '$2a$12$ww67roSl6ajmK.g3FZJQ2epgM/27F5Uv1CjaqIaj6lHe3bojGl2Zi', 'examen', 'examen', '90513331', 1, '2026-03-02 12:10:14', NULL, NULL, NULL, 0, '');
+(7, 'test@gmail.com', '[\"ROLE_RECRUITER\"]', '$2y$13$bs4fWmWcvLn/.bhg.TyaWefLlRUXJX/fdsXNHKgGOdxdyM1/0j8Fm', 'test', 'test', '58913065', 1, '2026-04-14 18:49:38', NULL, NULL, NULL, 0, 'recruiter'),
+(8, 'aziz@gmail.com', '[\"ROLE_CANDIDATE\"]', '$2y$13$Wz8dQKiK3vPlS5jOaYMvRO3hfLBGN9YkUyiscD0SU0G2E5WOZTkyy', 'aziz', 'abidi', '50299765', 1, '2026-04-14 18:51:15', NULL, NULL, NULL, 0, 'candidate'),
+(9, 'admin@gmail.com', '[\"ROLE_ADMIN\"]', '$2y$13$HKwVVRObPRQhSVrytmvtHujoqJoT3lrpL5YBbZ5SxmE.z6yA3qJmG', 'Admin', 'User', '12345678', 1, '2026-04-14 17:53:40', NULL, NULL, NULL, 0, 'admin');
 
 -- --------------------------------------------------------
 
@@ -621,7 +512,7 @@ ALTER TABLE `recruitment_event`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `warning_correction`
