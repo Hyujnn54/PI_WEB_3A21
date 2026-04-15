@@ -123,7 +123,7 @@
                             <h5 class="modal-title"><i class="ti ti-calendar-plus me-1"></i>Create Interview</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form id="createInterviewForm" method="post">
+                        <form id="createInterviewForm" method="post" data-generate-link-url="{{ path('front_interview_generate_meeting_link', app.request.query.all|merge({role: role})) }}">
                             <div class="modal-body row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label">Scheduled At</label>
@@ -142,8 +142,12 @@
                                 </div>
                                 <div class="col-md-6" data-online-field>
                                     <label class="form-label">Meeting Link (online)</label>
-                                    <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" maxlength="500">
+                                    <div class="input-group">
+                                        <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" maxlength="500">
+                                        <button type="button" class="btn btn-outline-primary" data-create-generate-meeting-link>Generate Jitsi Link</button>
+                                    </div>
                                     <div class="form-hint">Use a complete http(s) URL.</div>
+                                    <div class="form-hint" data-create-meeting-link-feedback></div>
                                 </div>
                                 <div class="col-md-6" data-onsite-field>
                                     <label class="form-label">Room (onsite)</label>
@@ -190,6 +194,8 @@
         const modeSelect = formEl.querySelector('select[name="mode"]');
         const scheduleInput = formEl.querySelector('input[name="scheduled_at"]');
         const meetingInput = formEl.querySelector('input[name="meeting_link"]');
+        const generateMeetingButton = formEl.querySelector('[data-create-generate-meeting-link]');
+        const generateMeetingFeedback = formEl.querySelector('[data-create-meeting-link-feedback]');
         const locationInput = formEl.querySelector('input[name="location"]');
         const onlineField = formEl.querySelector('[data-online-field]');
         const onsiteField = formEl.querySelector('[data-onsite-field]');
@@ -210,6 +216,19 @@
             scheduleInput.min = minValue;
         }
 
+        const setGenerateFeedback = function (message, type) {
+            if (!generateMeetingFeedback) return;
+            generateMeetingFeedback.textContent = message || '';
+            generateMeetingFeedback.classList.remove('text-success', 'text-danger', 'text-secondary');
+            if (type === 'success') {
+                generateMeetingFeedback.classList.add('text-success');
+            } else if (type === 'error') {
+                generateMeetingFeedback.classList.add('text-danger');
+            } else {
+                generateMeetingFeedback.classList.add('text-secondary');
+            }
+        };
+
         const applyModeFields = function () {
             const mode = modeSelect ? modeSelect.value : 'online';
             if (mode === 'onsite') {
@@ -220,6 +239,7 @@
                     meetingInput.required = false;
                     meetingInput.setCustomValidity('');
                 }
+                setGenerateFeedback('', 'info');
                 if (locationInput) locationInput.required = true;
             } else {
                 if (onsiteField) onsiteField.classList.add('d-none');
@@ -255,14 +275,71 @@
             syncNotesCount();
         }
 
-        const openCreateModal = function (createUrl) {
+        const openCreateModal = function (createUrl, card) {
             if (!createUrl || createUrl === '#' || !modal) return;
             formEl.setAttribute('action', createUrl);
+            formEl.setAttribute('data-application-id', card ? (card.getAttribute('data-application-id') || '') : '');
+            formEl.setAttribute('data-interview-id', '');
             if (modeSelect) modeSelect.value = 'online';
             if (scheduleInput) scheduleInput.min = minValue;
+            if (meetingInput) meetingInput.value = '';
+            if (locationInput) locationInput.value = '';
+            if (notesInput) notesInput.value = '';
+            if (notesCount && notesInput) notesCount.textContent = String(notesInput.value.length);
+            setGenerateFeedback('', 'info');
             applyModeFields();
             modal.show();
         };
+
+        if (generateMeetingButton) {
+            generateMeetingButton.addEventListener('click', async function () {
+                if (!meetingInput) return;
+
+                const mode = modeSelect ? modeSelect.value : 'online';
+                if (mode !== 'online') {
+                    setGenerateFeedback('Switch mode to Online to generate a meeting link.', 'error');
+                    return;
+                }
+
+                const endpoint = formEl.getAttribute('data-generate-link-url') || '';
+                if (endpoint === '') {
+                    setGenerateFeedback('Meeting link endpoint is missing.', 'error');
+                    return;
+                }
+
+                generateMeetingButton.disabled = true;
+                setGenerateFeedback('Generating Jitsi link...', 'info');
+
+                const payload = new URLSearchParams();
+                payload.set('mode', mode);
+                payload.set('application_id', formEl.getAttribute('data-application-id') || '');
+                payload.set('interview_id', formEl.getAttribute('data-interview-id') || '');
+
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: payload.toString(),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok || !data.ok || !data.meetingLink) {
+                        setGenerateFeedback(data.error || 'Unable to generate a meeting link.', 'error');
+                        return;
+                    }
+
+                    meetingInput.value = data.meetingLink;
+                    setGenerateFeedback('Jitsi meeting link generated.', 'success');
+                } catch (error) {
+                    setGenerateFeedback('Unable to generate a meeting link right now.', 'error');
+                } finally {
+                    generateMeetingButton.disabled = false;
+                }
+            });
+        }
 
         const syncDockFromCard = function (card) {
             if (!card || !actionDock) return;
@@ -347,7 +424,7 @@
                     const canCreate = await refreshCreateAvailability(selectedCard);
                     if (!canCreate) return;
                 }
-                openCreateModal(createBtn.getAttribute('data-create-url') || '#');
+                openCreateModal(createBtn.getAttribute('data-create-url') || '#', selectedCard);
             });
         }
 
@@ -359,7 +436,7 @@
                 selectedCard = card;
                 refreshCreateAvailability(card).then(function () {
                     if (card.getAttribute('data-create-disabled') !== '1') {
-                        openCreateModal(card.getAttribute('data-create-url') || '#');
+                        openCreateModal(card.getAttribute('data-create-url') || '#', card);
                     }
                 });
             }

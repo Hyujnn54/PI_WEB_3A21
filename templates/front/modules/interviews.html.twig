@@ -56,7 +56,7 @@
                             {% set statusKey = card.status_key|default('pending') %}
                             {% set detailExtra = card.detail_extra|default([]) %}
                             <div class="{{ role == 'candidate' ? 'col-12' : 'col-md-6 col-xl-4' }} tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text ~ ' ' ~ statusLabel)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-filter-status="{{ statusLabel|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}" data-sort-status="{{ card.status_sort|default(statusLabel|lower) }}" data-sort-date="{{ card.scheduled_ts|default('0') }}">
-                                <div class="tb-module-card h-100 {{ role == 'candidate' ? 'tb-candidate-card tb-status-' ~ statusKey : '' }}" data-interview-id="{{ card.id|default(0) }}" data-edit-url="{{ card.edit_url|default('#') }}" data-edit-scheduled-at="{{ card.form_scheduled_at|default('') }}" data-edit-duration="{{ card.form_duration_minutes|default('60') }}" data-edit-mode="{{ card.form_mode|default('online') }}" data-edit-meeting-link="{{ card.form_meeting_link|default('')|e('html_attr') }}" data-edit-location="{{ card.form_location|default('')|e('html_attr') }}" data-edit-notes="{{ card.full_notes|default('')|e('html_attr') }}" data-review-score="{{ card.review_score|default('80') }}" data-review-decision="{{ card.review_decision|default('accepted') }}" data-review-comment="{{ card.review_comment|default('')|e('html_attr') }}" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-detail-extra="{{ detailExtra|join('||')|e('html_attr') }}" data-action-primary="Modify" data-action-primary-href="#" data-action-primary-disabled="{{ card.can_modify|default(false) ? '0' : '1' }}" data-action-secondary="Delete" data-action-secondary-href="{{ card.delete_url|default('#') }}" data-action-secondary-disabled="{{ card.can_modify|default(false) ? '0' : '1' }}" data-action-tertiary="{{ card.review_label|default('Review') }}" data-action-tertiary-href="{{ card.feedback_url|default('#') }}" data-action-tertiary-disabled="{{ card.can_feedback|default(false) ? '0' : '1' }}">
+                                <div class="tb-module-card h-100 {{ role == 'candidate' ? 'tb-candidate-card tb-status-' ~ statusKey : '' }}" data-interview-id="{{ card.id|default(0) }}" data-application-id="{{ card.application_id|default('') }}" data-edit-url="{{ card.edit_url|default('#') }}" data-edit-scheduled-at="{{ card.form_scheduled_at|default('') }}" data-edit-duration="{{ card.form_duration_minutes|default('60') }}" data-edit-mode="{{ card.form_mode|default('online') }}" data-edit-meeting-link="{{ card.form_meeting_link|default('')|e('html_attr') }}" data-edit-location="{{ card.form_location|default('')|e('html_attr') }}" data-edit-notes="{{ card.full_notes|default('')|e('html_attr') }}" data-review-score="{{ card.review_score|default('80') }}" data-review-decision="{{ card.review_decision|default('accepted') }}" data-review-comment="{{ card.review_comment|default('')|e('html_attr') }}" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-detail-extra="{{ detailExtra|join('||')|e('html_attr') }}" data-action-primary="Modify" data-action-primary-href="#" data-action-primary-disabled="{{ card.can_modify|default(false) ? '0' : '1' }}" data-action-secondary="Delete" data-action-secondary-href="{{ card.delete_url|default('#') }}" data-action-secondary-disabled="{{ card.can_modify|default(false) ? '0' : '1' }}" data-action-tertiary="{{ card.review_label|default('Review') }}" data-action-tertiary-href="{{ card.feedback_url|default('#') }}" data-action-tertiary-disabled="{{ card.can_feedback|default(false) ? '0' : '1' }}">
                                     <div class="d-flex align-items-start justify-content-between gap-2">
                                         <div class="tb-module-meta mb-0">{{ card.meta }}</div>
                                         <span class="badge tb-interview-status tb-status-anchor {{ card.status_class|default('bg-blue-lt') }}">{{ statusLabel }}</span>
@@ -135,7 +135,7 @@
                                 <h5 class="modal-title"><i class="ti ti-edit me-1"></i>Modify Interview</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <form id="editInterviewForm" method="post">
+                            <form id="editInterviewForm" method="post" data-generate-link-url="{{ path('front_interview_generate_meeting_link', app.request.query.all|merge({role: role})) }}">
                                 <div class="modal-body row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label">Scheduled At</label>
@@ -154,8 +154,12 @@
                                     </div>
                                     <div class="col-md-6" data-online-field>
                                         <label class="form-label">Meeting Link (online)</label>
-                                        <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" maxlength="500">
+                                        <div class="input-group">
+                                            <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" maxlength="500">
+                                            <button type="button" class="btn btn-outline-primary" data-edit-generate-meeting-link>Generate Jitsi Link</button>
+                                        </div>
                                         <div class="form-hint">Use a complete http(s) URL.</div>
+                                        <div class="form-hint" data-edit-meeting-link-feedback></div>
                                     </div>
                                     <div class="col-md-6" data-onsite-field>
                                         <label class="form-label">Room (onsite)</label>
@@ -320,6 +324,8 @@
             const modeSelect = editForm.querySelector('select[name="mode"]');
             const scheduleInput = editForm.querySelector('input[name="scheduled_at"]');
             const meetingInput = editForm.querySelector('input[name="meeting_link"]');
+            const generateMeetingButton = editForm.querySelector('[data-edit-generate-meeting-link]');
+            const generateMeetingFeedback = editForm.querySelector('[data-edit-meeting-link-feedback]');
             const locationInput = editForm.querySelector('input[name="location"]');
             const notesInput = editForm.querySelector('textarea[name="notes"]');
             const notesCount = editForm.querySelector('[data-edit-notes-count]');
@@ -327,6 +333,19 @@
             const onsiteField = editForm.querySelector('[data-onsite-field]');
 
             if (scheduleInput) scheduleInput.min = minValue;
+
+            const setGenerateFeedback = function (message, type) {
+                if (!generateMeetingFeedback) return;
+                generateMeetingFeedback.textContent = message || '';
+                generateMeetingFeedback.classList.remove('text-success', 'text-danger', 'text-secondary');
+                if (type === 'success') {
+                    generateMeetingFeedback.classList.add('text-success');
+                } else if (type === 'error') {
+                    generateMeetingFeedback.classList.add('text-danger');
+                } else {
+                    generateMeetingFeedback.classList.add('text-secondary');
+                }
+            };
 
             const applyModeFields = function () {
                 const mode = modeSelect ? modeSelect.value : 'online';
@@ -337,6 +356,7 @@
                         meetingInput.required = false;
                         meetingInput.setCustomValidity('');
                     }
+                    setGenerateFeedback('', 'info');
                     if (locationInput) { locationInput.required = true; }
                 } else {
                     if (onsiteField) onsiteField.classList.add('d-none');
@@ -378,6 +398,8 @@
                 const meetingLink = card.getAttribute('data-edit-meeting-link') || '';
                 const location = card.getAttribute('data-edit-location') || '';
                 const notes = card.getAttribute('data-edit-notes') || '';
+                const applicationId = card.getAttribute('data-application-id') || '';
+                const interviewId = card.getAttribute('data-interview-id') || '';
 
                 const durationInput = editForm.querySelector('input[name="duration_minutes"]');
                 const notesInput = editForm.querySelector('textarea[name="notes"]');
@@ -388,10 +410,63 @@
                 if (meetingInput) meetingInput.value = meetingLink;
                 if (locationInput) locationInput.value = location;
                 if (notesInput) notesInput.value = notes;
+                editForm.setAttribute('data-application-id', applicationId);
+                editForm.setAttribute('data-interview-id', interviewId);
+                setGenerateFeedback('', 'info');
                 applyModeFields();
                 if (notesCount && notesInput) notesCount.textContent = String(notesInput.value.length);
                 editModal.show();
             };
+
+            if (generateMeetingButton) {
+                generateMeetingButton.addEventListener('click', async function () {
+                    if (!meetingInput) return;
+
+                    const mode = modeSelect ? modeSelect.value : 'online';
+                    if (mode !== 'online') {
+                        setGenerateFeedback('Switch mode to Online to generate a meeting link.', 'error');
+                        return;
+                    }
+
+                    const endpoint = editForm.getAttribute('data-generate-link-url') || '';
+                    if (endpoint === '') {
+                        setGenerateFeedback('Meeting link endpoint is missing.', 'error');
+                        return;
+                    }
+
+                    generateMeetingButton.disabled = true;
+                    setGenerateFeedback('Generating Jitsi link...', 'info');
+
+                    const payload = new URLSearchParams();
+                    payload.set('mode', mode);
+                    payload.set('application_id', editForm.getAttribute('data-application-id') || '');
+                    payload.set('interview_id', editForm.getAttribute('data-interview-id') || '');
+
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: payload.toString(),
+                        });
+
+                        const data = await response.json();
+                        if (!response.ok || !data.ok || !data.meetingLink) {
+                            setGenerateFeedback(data.error || 'Unable to generate a meeting link.', 'error');
+                            return;
+                        }
+
+                        meetingInput.value = data.meetingLink;
+                        setGenerateFeedback('Jitsi meeting link generated.', 'success');
+                    } catch (error) {
+                        setGenerateFeedback('Unable to generate a meeting link right now.', 'error');
+                    } finally {
+                        generateMeetingButton.disabled = false;
+                    }
+                });
+            }
 
             const modifyBtn = document.querySelector('.tb-detail-primary');
             if (modifyBtn) {

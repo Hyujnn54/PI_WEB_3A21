@@ -7,6 +7,7 @@ use App\Entity\Interview_feedback;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use App\Entity\Recruitment_event;
+use App\Service\Interview\JitsiMeetingLinkGenerator;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -163,6 +164,7 @@ class FrontPortalController extends AbstractController
 
                 $cards[] = [
                     'id' => (string) $interview->getId(),
+                    'application_id' => (string) $application->getId(),
                     'meta' => sprintf('%s | %s', $scheduledAt->format('d M Y | H:i'), $displayStatus),
                     'title' => sprintf('Interview: %s', $title === '' ? 'Untitled offer' : $title),
                     'text' => $notes === '' ? 'No interview notes available yet.' : substr($notes, 0, 190),
@@ -270,6 +272,39 @@ class FrontPortalController extends AbstractController
             'reason' => $hasActiveInterview
                 ? 'Interview already created for this application.'
                 : '',
+        ]);
+    }
+
+    #[Route('/front/interviews/generate-meeting-link', name: 'front_interview_generate_meeting_link', methods: ['POST'])]
+    public function generateInterviewMeetingLink(Request $request, JitsiMeetingLinkGenerator $jitsiMeetingLinkGenerator): JsonResponse
+    {
+        $role = (string) $request->query->get('role', 'candidate');
+        if ($role !== 'recruiter') {
+            return new JsonResponse([
+                'ok' => false,
+                'error' => 'Only recruiters can generate meeting links.',
+            ], 403);
+        }
+
+        $mode = strtolower(trim((string) $request->request->get('mode', 'online')));
+        if ($mode !== 'online') {
+            return new JsonResponse([
+                'ok' => false,
+                'error' => 'Meeting links can only be generated for online interviews.',
+            ], 400);
+        }
+
+        $applicationId = trim((string) $request->request->get('application_id', ''));
+        $interviewId = trim((string) $request->request->get('interview_id', ''));
+
+        $meetingLink = $jitsiMeetingLinkGenerator->generate(
+            $applicationId !== '' ? $applicationId : null,
+            $interviewId !== '' ? $interviewId : null,
+        );
+
+        return new JsonResponse([
+            'ok' => true,
+            'meetingLink' => $meetingLink,
         ]);
     }
 
@@ -396,12 +431,18 @@ class FrontPortalController extends AbstractController
 
             $validation = $this->validateInterviewPayload($formData);
             if ($validation['ok']) {
+                $previousScheduledAt = $interview->getScheduled_at();
                 $interview->setScheduled_at($validation['scheduledAt']);
                 $interview->setDuration_minutes($validation['duration']);
                 $interview->setMode($validation['mode']);
                 $interview->setMeeting_link($validation['meetingLink']);
                 $interview->setLocation($validation['location']);
                 $interview->setNotes($validation['notes']);
+
+                if ($previousScheduledAt->format('Y-m-d H:i:s') !== $validation['scheduledAt']->format('Y-m-d H:i:s')) {
+                    $interview->setReminder_sent(false);
+                }
+
                 $this->doctrine->getManager()->flush();
 
                 $this->addFlash('success', 'Interview updated successfully.');
@@ -416,6 +457,7 @@ class FrontPortalController extends AbstractController
             'authUser' => ['role' => $role],
             'mode' => 'edit',
             'interviewId' => $id,
+            'applicationId' => (string) $interview->getApplication_id()->getId(),
             'formData' => $formData,
         ]);
     }
