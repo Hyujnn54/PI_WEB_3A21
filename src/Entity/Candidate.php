@@ -2,132 +2,38 @@
 
 namespace App\Entity;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use App\Entity\Users;
 use Doctrine\ORM\Mapping as ORM;
 
-use App\Entity\Users;
-use Doctrine\Common\Collections\Collection;
-use App\Entity\Job_application;
-
 #[ORM\Entity]
-class Candidate
+#[ORM\Table(name: 'candidate')]
+class Candidate extends Users
 {
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $location = null;
 
-    #[ORM\Id]
-        #[ORM\ManyToOne(targetEntity: Users::class, inversedBy: "candidates")]
-    #[ORM\JoinColumn(name: 'id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    private Users $id;
+    #[ORM\Column(name: "education_level", length: 100, nullable: true)]
+    private ?string $educationLevel = null;
 
-    #[ORM\Column(type: "bigint")]
-    private string $user_id;
+    #[ORM\Column(name: "experience_years", nullable: true)]
+    private ?int $experienceYears = null;
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $location;
+    #[ORM\Column(name: "cv_path", length: 255, nullable: true)]
+    private ?string $cvPath = null;
 
-    #[ORM\Column(type: "string", length: 100)]
-    private string $education_level;
+    public function getLocation(): ?string { return $this->location; }
+    public function setLocation(?string $location): self { $this->location = $location; return $this; }
 
-    #[ORM\Column(type: "integer")]
-    private int $experience_years;
+    public function getEducationLevel(): ?string { return $this->educationLevel; }
+    public function setEducationLevel(?string $educationLevel): self { $this->educationLevel = $educationLevel; return $this; }
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $cv_path;
+    public function getExperienceYears(): ?int { return $this->experienceYears; }
+    public function setExperienceYears(?int $experienceYears): self { $this->experienceYears = $experienceYears; return $this; }
 
-    public function getId()
-    {
-        return $this->id;
-    }
+    public function getCvPath(): ?string { return $this->cvPath; }
+    public function setCvPath(?string $cvPath): self { $this->cvPath = $cvPath; return $this; }
 
-    public function setId($value)
-    {
-        $this->id = $value;
-    }
-
-    public function getUser_id()
-    {
-        return $this->user_id;
-    }
-
-    public function setUser_id($value)
-    {
-        $this->user_id = $value;
-    }
-
-    public function getLocation()
-    {
-        return $this->location;
-    }
-
-    public function setLocation($value)
-    {
-        $this->location = $value;
-    }
-
-    public function getEducation_level()
-    {
-        return $this->education_level;
-    }
-
-    public function setEducation_level($value)
-    {
-        $this->education_level = $value;
-    }
-
-    public function getExperience_years()
-    {
-        return $this->experience_years;
-    }
-
-    public function setExperience_years($value)
-    {
-        $this->experience_years = $value;
-    }
-
-    public function getCv_path()
-    {
-        return $this->cv_path;
-    }
-
-    public function setCv_path($value)
-    {
-        $this->cv_path = $value;
-    }
-
-    #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Candidate_skill::class)]
-    private Collection $candidate_skills;
-
-        public function getCandidate_skills(): Collection
-        {
-            return $this->candidate_skills;
-        }
-    
-        public function addCandidate_skill(Candidate_skill $candidate_skill): self
-        {
-            if (!$this->candidate_skills->contains($candidate_skill)) {
-                $this->candidate_skills[] = $candidate_skill;
-                $candidate_skill->setCandidate_id($this);
-            }
-    
-            return $this;
-        }
-    
-        public function removeCandidate_skill(Candidate_skill $candidate_skill): self
-        {
-            if ($this->candidate_skills->removeElement($candidate_skill)) {
-                // set the owning side to null (unless already changed)
-                if ($candidate_skill->getCandidate_id() === $this) {
-                    $candidate_skill->setCandidate_id(null);
-                }
-            }
-    
-            return $this;
-        }
-
-    #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Event_registration::class)]
-    private Collection $event_registrations;
-
-    #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Event_review::class)]
-    private Collection $event_reviews;
-
-    #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Job_application::class)]
-    private Collection $job_applications;
+    public function getRoles(): array { return ['ROLE_CANDIDATE']; }
 }

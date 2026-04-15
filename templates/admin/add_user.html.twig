@@ -1,47 +1,54 @@
 {% extends 'admin/base_admin.html.twig' %}
 
-{% block title %}TalentBridge | Add User{% endblock %}
+{% block title %}TalentBridge | Add Admin{% endblock %}
 
 {% block admin_content %}
-    <div class="row mb-4">
-        <div class="col-12 d-flex justify-content-between align-items-center">
-            <div>
-                <h1 class="h3 mb-1">Add User</h1>
-                <p class="mb-0">Reusable admin page prepared using workshop inheritance flow.</p>
-            </div>
-            <a href="{{ path('app_admin') }}" class="btn btn-outline-primary">Back to Dashboard</a>
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h3 mb-1">Create New Admin</h1>
+            <p class="text-muted mb-0">Fill in the details to grant administrative access.</p>
         </div>
+        <a href="{{ path('app_admin_users') }}" class="btn btn-outline-secondary">Back to List</a>
     </div>
+</div>
 
-    <div class="card border">
-        <div class="card-body">
-            <form>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">First Name</label>
-                        <input type="text" class="form-control" placeholder="Enter first name">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Last Name</label>
-                        <input type="text" class="form-control" placeholder="Enter last name">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Email</label>
-                        <input type="email" class="form-control" placeholder="user@example.com">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Role</label>
-                        <select class="form-select">
-                            <option>Candidate</option>
-                            <option>Recruiter</option>
-                            <option>Admin</option>
-                        </select>
-                    </div>
-                    <div class="col-12">
-                        <button type="submit" class="btn btn-primary">Create User</button>
-                    </div>
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form action="{{ path('app_admin_add_user') }}" method="POST">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">First Name</label>
+                    <input type="text" name="first_name" class="form-control" placeholder="Enter first name" required>
                 </div>
-            </form>
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label">Last Name</label>
+                    <input type="text" name="last_name" class="form-control" placeholder="Enter last name" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" name="email" class="form-control" placeholder="admin@talentbridge.tn" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Phone Number</label>
+                    <input type="text" name="phone" class="form-control" placeholder="+216 ...">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Temporary Password</label>
+                    <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Role Assignment</label>
+                    <input type="text" class="form-control" value="ROLE_ADMIN" readonly disabled>
+                    <small class="text-muted">This form is specifically for Administrative accounts.</small>
+                </div>
+                <div class="col-12 mt-4 text-end">
+                    <button type="submit" class="btn btn-primary px-5">
+                        <i class="ti ti-shield-check me-1"></i>Create Admin Account
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
+</div>
 {% endblock %}

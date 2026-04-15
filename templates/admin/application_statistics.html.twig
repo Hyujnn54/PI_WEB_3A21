@@ -10,70 +10,113 @@
     {% set interviewPct = total > 0 ? (global.interview * 100 / total) : 0 %}
     {% set hiredPct = total > 0 ? (global.hired * 100 / total) : 0 %}
 
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <style>
+        .tb-stats-hero {
+            background: linear-gradient(135deg, #15335b 0%, #0d5bd7 100%);
+            border-radius: 14px;
+            color: #fff;
+            box-shadow: 0 10px 30px rgba(13, 91, 215, 0.18);
+        }
+
+        .tb-stat-card {
+            border: 1px solid #e9eef4;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+        }
+
+        .tb-stat-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05rem;
+        }
+    </style>
+
+    <div class="mb-4 tb-stats-hero p-4 p-lg-5 d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
-            <h1 class="h3 mb-1">Applications Statistics</h1>
-            <p class="text-muted mb-0">Global and per-offer application performance overview.</p>
+            <h1 class="h3 mb-1 text-white">Applications Statistics</h1>
+            <p class="mb-0 text-white-50">Global and per-offer application performance overview.</p>
         </div>
-        <a href="{{ path('management_job_applications_statistics') }}" class="btn btn-outline-primary">
+        <a href="{{ path('management_job_applications_statistics') }}" class="btn btn-light btn-sm">
             <i class="ti ti-refresh me-1"></i>Refresh
         </a>
     </div>
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-4 col-xl-2">
-            <div class="card border h-100">
+            <div class="card tb-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Total</div>
-                    <div class="h4 mb-0">{{ global.total }}</div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small">Total</div>
+                        <span class="tb-stat-icon bg-primary-lt text-primary"><i class="ti ti-stack-2"></i></span>
+                    </div>
+                    <div class="h4 mb-0 text-primary">{{ global.total }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <div class="card border h-100">
+            <div class="card tb-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Submitted</div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small">Submitted</div>
+                        <span class="tb-stat-icon bg-secondary-lt text-secondary"><i class="ti ti-send"></i></span>
+                    </div>
                     <div class="h4 mb-0">{{ global.submitted }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <div class="card border h-100">
+            <div class="card tb-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Shortlisted</div>
-                    <div class="h4 mb-0">{{ global.shortlisted }}</div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small">Shortlisted</div>
+                        <span class="tb-stat-icon bg-orange-lt text-orange"><i class="ti ti-star"></i></span>
+                    </div>
+                    <div class="h4 mb-0 text-orange">{{ global.shortlisted }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <div class="card border h-100">
+            <div class="card tb-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Rejected</div>
-                    <div class="h4 mb-0">{{ global.rejected }}</div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small">Rejected</div>
+                        <span class="tb-stat-icon bg-red-lt text-danger"><i class="ti ti-x"></i></span>
+                    </div>
+                    <div class="h4 mb-0 text-danger">{{ global.rejected }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <div class="card border h-100">
+            <div class="card tb-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Interview</div>
-                    <div class="h4 mb-0">{{ global.interview }}</div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small">Interview</div>
+                        <span class="tb-stat-icon bg-blue-lt text-blue"><i class="ti ti-message-2"></i></span>
+                    </div>
+                    <div class="h4 mb-0 text-blue">{{ global.interview }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <div class="card border h-100">
+            <div class="card tb-stat-card h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Hired</div>
-                    <div class="h4 mb-0">{{ global.hired }}</div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small">Hired</div>
+                        <span class="tb-stat-icon bg-green-lt text-green"><i class="ti ti-circle-check"></i></span>
+                    </div>
+                    <div class="h4 mb-0 text-green">{{ global.hired }}</div>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-12 col-xl-8">
-            <div class="card border h-100">
+        <div class="col-12 col-xl-6">
+            <div class="card tb-stat-card h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h2 class="h6 mb-0">Global Acceptance Rate</h2>
@@ -86,33 +129,17 @@
                 </div>
             </div>
         </div>
-        <div class="col-12 col-xl-4">
-            <div class="card border h-100">
+        <div class="col-12 col-xl-6">
+            <div class="card tb-stat-card h-100">
                 <div class="card-body">
                     <h2 class="h6 mb-3">Status Distribution</h2>
-                    <div class="d-flex justify-content-center mb-3">
-                        <div
-                            class="js-admin-status-distribution"
-                            data-submitted="{{ submittedPct }}"
-                            data-shortlisted="{{ shortlistedPct }}"
-                            data-rejected="{{ rejectedPct }}"
-                            data-interview="{{ interviewPct }}"
-                            style="width: 180px; height: 180px; border-radius: 50%;"
-                        ></div>
-                    </div>
-                    <div class="small d-grid gap-1">
-                        <div><span class="badge" style="background:#6c757d">&nbsp;</span> Submitted: {{ global.submitted }}</div>
-                        <div><span class="badge" style="background:#f39c12">&nbsp;</span> Shortlisted: {{ global.shortlisted }}</div>
-                        <div><span class="badge" style="background:#e74c3c">&nbsp;</span> Rejected: {{ global.rejected }}</div>
-                        <div><span class="badge" style="background:#9b59b6">&nbsp;</span> Interview: {{ global.interview }}</div>
-                        <div><span class="badge" style="background:#2ecc71">&nbsp;</span> Hired: {{ global.hired }}</div>
-                    </div>
+                    <div id="applicationStatusChart" style="min-height: 280px;"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card border">
+    <div class="card tb-stat-card">
         <div class="card-body pb-0">
             <h2 class="h6 mb-3">Per-Offer Statistics</h2>
         </div>
@@ -160,28 +187,68 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.js-stat-progress').forEach(function (bar) {
-                const rate = Number(bar.getAttribute('data-rate') || 0);
-                bar.style.width = Math.max(0, Math.min(100, rate)) + '%';
-            });
+        (function () {
+            const initKey = '__tbAdminApplicationStatsInit';
 
-            const donut = document.querySelector('.js-admin-status-distribution');
-            if (!donut) {
-                return;
+            const initApplicationStats = function (retryCount) {
+                const chartEl = document.getElementById('applicationStatusChart');
+                if (!chartEl) {
+                    return;
+                }
+
+                document.querySelectorAll('.js-stat-progress').forEach(function (bar) {
+                    const rate = Number(bar.getAttribute('data-rate') || 0);
+                    bar.style.width = Math.max(0, Math.min(100, rate)) + '%';
+                });
+
+                if (typeof ApexCharts === 'undefined') {
+                    if ((retryCount || 0) < 15) {
+                        window.setTimeout(function () {
+                            initApplicationStats((retryCount || 0) + 1);
+                        }, 120);
+                    }
+                    return;
+                }
+
+                if (chartEl._tbApexInstance) {
+                    chartEl._tbApexInstance.destroy();
+                }
+                chartEl.innerHTML = '';
+
+                var statusOptions = {
+                    series: [{{ global.submitted }}, {{ global.shortlisted }}, {{ global.rejected }}, {{ global.interview }}, {{ global.hired }}],
+                    chart: { type: 'donut', height: 280 },
+                    labels: ['Submitted', 'Shortlisted', 'Rejected', 'Interview', 'Hired'],
+                    colors: ['#6c757d', '#f39c12', '#e74c3c', '#9b59b6', '#2ecc71'],
+                    legend: { position: 'bottom' },
+                    plotOptions: {
+                        pie: {
+                            donut: {
+                                size: '55%',
+                                labels: {
+                                    show: true,
+                                    total: {
+                                        show: true,
+                                        label: 'Total',
+                                        formatter: function () { return '{{ global.total }}'; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                };
+
+                chartEl._tbApexInstance = new ApexCharts(chartEl, statusOptions);
+                chartEl._tbApexInstance.render();
+            };
+
+            if (!window[initKey]) {
+                window[initKey] = true;
+                document.addEventListener('DOMContentLoaded', function () { initApplicationStats(0); });
+                document.addEventListener('turbo:load', function () { initApplicationStats(0); });
             }
 
-            const submitted = Number(donut.getAttribute('data-submitted') || 0);
-            const shortlisted = Number(donut.getAttribute('data-shortlisted') || 0);
-            const rejected = Number(donut.getAttribute('data-rejected') || 0);
-            const interview = Number(donut.getAttribute('data-interview') || 0);
-
-            const p1 = submitted;
-            const p2 = submitted + shortlisted;
-            const p3 = p2 + rejected;
-            const p4 = p3 + interview;
-
-            donut.style.background = 'conic-gradient(#6c757d 0% ' + p1 + '%, #f39c12 ' + p1 + '% ' + p2 + '%, #e74c3c ' + p2 + '% ' + p3 + '%, #9b59b6 ' + p3 + '% ' + p4 + '%, #2ecc71 ' + p4 + '% 100%)';
-        });
+            initApplicationStats(0);
+        })();
     </script>
 {% endblock %}

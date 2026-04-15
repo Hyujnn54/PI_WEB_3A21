@@ -4,56 +4,134 @@
 
 {% block body %}
 {% set role = authUser.role|default('candidate') %}
+{% set isAdminReadOnly = role == 'admin' %}
 <div class="page-wrapper">
     <div class="page-header d-print-none">
-        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2 tb-front-page-head">
             <div>
                 <h2 class="page-title"><i class="ti ti-briefcase-2 me-1"></i>Job Offers</h2>
-                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Manage your offers and monitor candidate interest.' : 'Explore detailed roles and apply directly.' }}</p>
+                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Manage your offers and monitor candidate interest.' : (isAdminReadOnly ? 'Read-only view of all published job offers.' : 'Browse the list of available job offers.') }}</p>
             </div>
-            <div class="d-flex gap-2">
-                <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Create Offer' : 'Recommended For You' }}</a>
-                <a href="#" class="btn btn-outline-primary">{{ role == 'recruiter' ? 'Offer Analytics' : 'Saved Jobs' }}</a>
-            </div>
+            {% if role == 'recruiter' %}
+                <div class="d-flex gap-2">
+                    <a href="{{ path('front_job_offer_new', {role: 'recruiter'}) }}" class="btn btn-primary">Create Offer</a>
+                    <a href="{{ path('front_job_offers_statistics', {role: 'recruiter'}) }}" class="btn btn-outline-primary">Offer Statistics</a>
+                </div>
+            {% endif %}
         </div>
     </div>
 
     <div class="page-body">
         <div class="container-xl tb-interviews-page">
+            {% if role == 'recruiter' and expiredOffers|default([])|length > 0 %}
+                <div class="card border-danger mb-3">
+                    <div class="card-header">
+                        <h3 class="card-title text-danger mb-0"><i class="ti ti-clock-exclamation me-1"></i>Expired Offers (Auto-Closed)</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Location</th>
+                                        <th>Contract</th>
+                                        <th>Status</th>
+                                        <th>Deadline</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for expired in expiredOffers %}
+                                        <tr>
+                                            <td>{{ expired.title }}</td>
+                                            <td>{{ expired.location|default('-') }}</td>
+                                            <td>{{ expired.contract_type|default('-') }}</td>
+                                            <td><span class="badge bg-danger">{{ expired.status|default('closed')|capitalize }}</span></td>
+                                            <td>{{ expired.deadline|default('-') }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if role == 'recruiter' and warnings|default([])|length > 0 %}
+                <div class="card tb-admin-card border-warning mb-3">
+                    <div class="card-header">
+                        <h3 class="card-title text-warning-emphasis mb-0"><i class="ti ti-alert-triangle me-1"></i>Warnings from Admin</h3>
+                    </div>
+                    <div class="card-body d-flex flex-column gap-2">
+                        {% for warning in warnings %}
+                            <div class="border rounded p-2 bg-warning-subtle">
+                                <div class="fw-semibold">{{ warning.title }}</div>
+                                <div class="small text-secondary mb-2">Reason: {{ warning.reason }}</div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <a href="{{ path('front_job_offer_edit', {id: warning.job_offer_id, role: 'recruiter'}) }}" class="btn btn-sm btn-outline-primary">Modify Job</a>
+                                    <form method="post" action="{{ path('front_job_offer_delete', {id: warning.job_offer_id, role: 'recruiter'}) }}" onsubmit="return confirm('Delete this warned job offer?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete Job</button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
             <div class="row g-3 tb-interviews-layout">
                 <div class="col-12 col-xl-8">
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
-                    <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#offerCardsGrid">
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                            <input type="text" class="form-control" placeholder="Search offers by title, location, contract..." data-filter-search>
-                        </div>
-                        <select class="form-select" style="max-width: 220px;" data-filter-criteria>
-                            <option value="all">Search In: All</option>
-                            <option value="title">Title</option>
-                            <option value="meta">Meta</option>
-                            <option value="description">Description</option>
+                    <div class="d-flex flex-wrap align-items-center gap-2" id="offerMultiFilter">
+                        <input type="text" class="form-control" style="max-width: 190px;" placeholder="Location" id="filterLocation">
+                        <select class="form-select" style="max-width: 190px;" id="filterContractType">
+                            <option value="">All contract types</option>
+                            {% for contractType in contractTypes|default([]) %}
+                                <option value="{{ contractType }}">{{ contractType }}</option>
+                            {% endfor %}
                         </select>
-                        <select class="form-select" style="max-width: 230px;" data-filter-sort>
-                            <option value="default">Default Order</option>
-                            <option value="title_asc">Title A-Z</option>
-                            <option value="title_desc">Title Z-A</option>
-                            <option value="meta_asc">Meta A-Z</option>
-                            <option value="meta_desc">Meta Z-A</option>
+                        <select class="form-select" style="max-width: 170px;" id="filterStatus">
+                            <option value="">All status</option>
+                            <option value="open">Open</option>
+                            <option value="paused">Paused</option>
+                            <option value="closed">Closed</option>
                         </select>
-                        <div class="small text-secondary ms-auto" data-filter-results></div>
+                        <input type="date" class="form-control" style="max-width: 180px;" id="filterDeadline">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="clearOfferFilters">Reset</button>
+                        <div class="small text-secondary ms-auto" id="offerFilterResults"></div>
                     </div>
                 </div>
             </div>
 
             <div id="offerCardsGrid" class="row row-cards">
                 {% for card in cards %}
-                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : (card.already_applied ? 'Already Applied' : 'Apply') }}" data-action-primary-href="{{ role == 'recruiter' ? '#' : (card.already_applied ? '#' : path('app_candidate_apply', {'offerId': card.id})) }}" data-action-primary-disabled="{{ role == 'recruiter' ? '0' : (card.already_applied ? '1' : '0') }}" data-action-secondary="{{ role == 'recruiter' ? 'View Applicants' : 'Save Offer' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Add Interview' : 'Compare Offer' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Type: {{ card.meta|split(' | ')|last }}||Location: {{ card.meta|split(' | ')|first }}">
+                    {% set isPendingReview = card.warning_status|default(null) == 'RESOLVED' %}
+                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-filter-location="{{ card.location|default('')|lower }}" data-filter-contract-type="{{ card.contract_type|default('')|lower }}" data-filter-status="{{ card.status|default('')|lower }}" data-filter-deadline="{{ card.deadline|default('') }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
+                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : (isAdminReadOnly ? 'Read Only' : (card.already_applied ? 'Already Applied' : (card.can_apply|default(false) ? 'Apply' : 'Offer Unavailable'))) }}" data-action-primary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) : (isAdminReadOnly ? '#' : (card.can_apply|default(false) ? path('app_candidate_apply', {'offerId': card.id}) : '#')) }}" data-action-primary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : (role == 'candidate' and (card.already_applied or not card.can_apply|default(false)) ? '1' : '0')) }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete Offer' : (isAdminReadOnly ? '' : 'Save Offer') }}" data-action-secondary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) : '#' }}" data-action-secondary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0') }}" data-action-tertiary="{{ role == 'recruiter' ? 'View Applicants' : (isAdminReadOnly ? '' : 'Compare Offer') }}" data-action-tertiary-href="#" data-action-tertiary-disabled="{{ isAdminReadOnly ? '1' : '0' }}" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ card.meta|split(' | ')|last ~ '||Location: ' ~ card.meta|split(' | ')|first) }}">
+                            {% if isPendingReview %}
+                                <div class="badge bg-info mb-2" style="position: absolute; top: 8px; right: 8px;">Pending Review</div>
+                            {% endif %}
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
+                            {% if role == 'candidate' %}
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    {% if card.already_applied %}
+                                        <span class="btn btn-sm btn-secondary disabled"><i class="ti ti-check me-1"></i>Already Applied</span>
+                                    {% elseif card.can_apply|default(false) %}
+                                        <a href="{{ path('app_candidate_apply', {'offerId': card.id}) }}" class="btn btn-sm btn-primary"><i class="ti ti-send me-1"></i>Apply Now</a>
+                                    {% else %}
+                                        <span class="btn btn-sm btn-secondary disabled"><i class="ti ti-lock me-1"></i>Closed / Expired</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            {% if role == 'recruiter' and card.can_delete|default(false) %}
+                                <a href="{{ path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) }}" class="btn btn-sm btn-outline-primary mt-2">Edit</a>
+                                <form method="post" action="{{ path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) }}" onsubmit="return confirm('Delete this job offer?');" class="mt-2">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            {% endif %}
                         </div>
                     </div>
                 {% else %}
@@ -66,37 +144,99 @@
             </div>
 
                 </div>
-                <div class="col-12 col-xl-4">
-            <div id="offerDetailPanel" class="card tb-detail-panel tb-detail-panel-side">
-                <div class="card-header">
-                    <div>
-                        <div class="small text-secondary tb-detail-meta"></div>
-                        <h3 class="card-title mb-0 tb-detail-title">Offer Details</h3>
+                    <div class="col-12 col-xl-4">
+                <div id="offerDetailPanel" class="card tb-detail-panel tb-detail-panel-side">
+                    <div class="card-header">
+                        <div>
+                            <div class="small text-secondary tb-detail-meta"></div>
+                            <h3 class="card-title mb-0 tb-detail-title">Offer Details</h3>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3 tb-detail-text">Select an offer card to display details here.</p>
+                        <div class="tb-detail-extra small text-secondary mb-0"></div>
                     </div>
                 </div>
-                <div class="card-body">
-                    <p class="mb-3 tb-detail-text">Select an offer card to display details here.</p>
-                    <div class="tb-detail-extra small text-secondary mb-0"></div>
-                </div>
-            </div>
-                </div>
+                    </div>
             </div>
 
-            <div id="offerActionDock" class="tb-interview-action-dock tb-generic-action-dock d-none">
-                <div class="container-xl">
-                    <div class="tb-interview-action-dock-inner">
-                        <div class="small text-secondary">Selected offer actions</div>
-                        <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
-                            <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-edit me-1"></i>Primary Action</a>
-                            <form method="post" action="#" class="d-inline tb-dock-secondary-form">
-                                <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
-                            </form>
-                            <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
+            {% if role == 'recruiter' %}
+                <div id="offerActionDock" class="tb-interview-action-dock tb-generic-action-dock d-none">
+                    <div class="container-xl">
+                        <div class="tb-interview-action-dock-inner">
+                            <div class="small text-secondary">Selected offer actions</div>
+                            <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
+                                <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-edit me-1"></i>Primary Action</a>
+                                <form method="post" action="#" class="d-inline tb-dock-secondary-form">
+                                    <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
+                                </form>
+                                <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        const grid = document.getElementById('offerCardsGrid');
+        if (!grid) return;
+
+        const locationInput = document.getElementById('filterLocation');
+        const contractTypeInput = document.getElementById('filterContractType');
+        const statusSelect = document.getElementById('filterStatus');
+        const deadlineInput = document.getElementById('filterDeadline');
+        const resetBtn = document.getElementById('clearOfferFilters');
+        const resultLabel = document.getElementById('offerFilterResults');
+        const items = Array.from(grid.querySelectorAll('.tb-filter-item'));
+
+        const runFilters = function () {
+            const locationQuery = ((locationInput && locationInput.value) || '').trim().toLowerCase();
+            const contractQuery = ((contractTypeInput && contractTypeInput.value) || '').trim().toLowerCase();
+            const statusQuery = ((statusSelect && statusSelect.value) || '').trim().toLowerCase();
+            const deadlineQuery = ((deadlineInput && deadlineInput.value) || '').trim();
+
+            let visibleCount = 0;
+            items.forEach(function (item) {
+                const itemLocation = (item.dataset.filterLocation || '').toLowerCase();
+                const itemContractType = (item.dataset.filterContractType || '').toLowerCase();
+                const itemStatus = (item.dataset.filterStatus || '').toLowerCase();
+                const itemDeadline = (item.dataset.filterDeadline || '').trim();
+
+                const locationMatch = locationQuery === '' || itemLocation.includes(locationQuery);
+                const contractMatch = contractQuery === '' || itemContractType.includes(contractQuery);
+                const statusMatch = statusQuery === '' || itemStatus === statusQuery;
+                const deadlineMatch = deadlineQuery === '' || itemDeadline === deadlineQuery;
+
+                const isMatch = locationMatch && contractMatch && statusMatch && deadlineMatch;
+                item.classList.toggle('d-none', !isMatch);
+                if (isMatch) visibleCount += 1;
+            });
+
+            if (resultLabel) {
+                resultLabel.textContent = visibleCount + ' result(s)';
+            }
+        };
+
+        if (locationInput) locationInput.addEventListener('input', runFilters);
+        if (contractTypeInput) contractTypeInput.addEventListener('change', runFilters);
+        if (statusSelect) statusSelect.addEventListener('change', runFilters);
+        if (deadlineInput) deadlineInput.addEventListener('change', runFilters);
+
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function () {
+                if (locationInput) locationInput.value = '';
+                if (contractTypeInput) contractTypeInput.value = '';
+                if (statusSelect) statusSelect.value = '';
+                if (deadlineInput) deadlineInput.value = '';
+                runFilters();
+            });
+        }
+
+        runFilters();
+    })();
+</script>
 {% endblock %}

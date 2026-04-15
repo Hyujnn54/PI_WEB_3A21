@@ -31,25 +31,25 @@ class Interview
     private int $duration_minutes;
 
     #[ORM\Column(type: "string")]
-    private string $mode;
+    private string $mode = '';
 
     #[ORM\Column(type: "string", length: 255)]
-    private string $meeting_link;
+    private string $meeting_link = '';
 
     #[ORM\Column(type: "string", length: 255)]
-    private string $location;
+    private string $location = '';
 
     #[ORM\Column(type: "string")]
-    private string $status;
+    private string $status = 'SCHEDULED';
 
     #[ORM\Column(type: "text")]
-    private string $notes;
+    private string $notes = '';
 
     #[ORM\Column(type: "datetime")]
-    private \DateTimeInterface $created_at;
+    private ?\DateTimeInterface $created_at = null;
 
     #[ORM\Column(type: "boolean")]
-    private bool $reminder_sent;
+    private ?bool $reminder_sent = false;
 
     public function getId()
     {
@@ -103,17 +103,36 @@ class Interview
 
     public function getMode()
     {
-        return $this->mode;
+        $raw = strtolower(trim((string) ($this->mode ?? '')));
+
+        if (in_array($raw, ['onsite', 'on_site', 'on-site', 'on site', 'in_person', 'in-person', 'in person'], true)) {
+            return 'onsite';
+        }
+
+        if (in_array($raw, ['online', 'on_line', 'on-line', 'on line'], true)) {
+            return 'online';
+        }
+
+        // Fallback for legacy rows where mode is empty/invalid but location/link imply the mode.
+        $location = trim((string) ($this->location ?? ''));
+        $meetingLink = trim((string) ($this->meeting_link ?? ''));
+        if ($location !== '' && $meetingLink === '') {
+            return 'onsite';
+        }
+
+        return 'online';
     }
 
     public function setMode($value)
     {
-        $this->mode = $value;
+        $raw = strtolower(trim((string) $value));
+        $isOnsite = in_array($raw, ['onsite', 'on_site', 'on-site', 'on site', 'in_person', 'in-person', 'in person'], true);
+        $this->mode = $isOnsite ? 'ON_SITE' : 'ONLINE';
     }
 
     public function getMeeting_link()
     {
-        return $this->meeting_link;
+        return isset($this->meeting_link) ? (string) $this->meeting_link : '';
     }
 
     public function setMeeting_link($value)
@@ -123,7 +142,7 @@ class Interview
 
     public function getLocation()
     {
-        return $this->location;
+        return isset($this->location) ? (string) $this->location : '';
     }
 
     public function setLocation($value)
@@ -133,7 +152,7 @@ class Interview
 
     public function getStatus()
     {
-        return $this->status;
+        return isset($this->status) ? (string) $this->status : 'SCHEDULED';
     }
 
     public function setStatus($value)
@@ -143,7 +162,7 @@ class Interview
 
     public function getNotes()
     {
-        return $this->notes;
+        return isset($this->notes) ? (string) $this->notes : '';
     }
 
     public function setNotes($value)
@@ -163,7 +182,7 @@ class Interview
 
     public function getReminder_sent()
     {
-        return $this->reminder_sent;
+        return isset($this->reminder_sent) ? (bool) $this->reminder_sent : false;
     }
 
     public function setReminder_sent($value)

@@ -6,7 +6,7 @@
 {% set role = authUser.role|default('recruiter') %}
 <div class="page-wrapper">
     <div class="page-header d-print-none">
-        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2 tb-front-page-head">
             <div>
                 <h2 class="page-title"><i class="ti ti-clipboard-check me-1"></i>Interview Review</h2>
                 <p class="text-secondary mb-0">Submit score, decision, and review comment after interview end time.</p>
@@ -33,7 +33,8 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label">Review Comment</label>
-                            <textarea name="comment" rows="5" class="form-control" required>{{ formData.comment|default('') }}</textarea>
+                            <textarea name="comment" rows="5" class="form-control" required minlength="10" maxlength="1000">{{ formData.comment|default('') }}</textarea>
+                            <div class="form-hint">10-1000 chars. Letters, numbers and common punctuation.</div>
                         </div>
                         <div class="col-12 d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Save Review</button>

@@ -4,16 +4,35 @@
 
 {% block body %}
 {% set role = authUser.role|default('candidate') %}
+<style>
+    .tb-create-locked,
+    .tb-create-locked:hover,
+    .tb-create-locked:focus,
+    .tb-create-locked:active {
+        pointer-events: none !important;
+        cursor: not-allowed !important;
+        transform: none !important;
+        box-shadow: none !important;
+        filter: none !important;
+        opacity: 1 !important;
+        background: #8e9aac !important;
+        border-color: #8e9aac !important;
+        color: #ffffff !important;
+    }
+
+</style>
 <div class="page-wrapper">
     <div class="page-header d-print-none">
-        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2 tb-front-page-head">
             <div>
                 <h2 class="page-title"><i class="ti ti-file-check me-1"></i>Job Applications</h2>
-                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Evaluate applicant profiles and move them through your pipeline.' : 'Track each application and monitor your progress.' }}</p>
-            </div>
-            <div class="d-flex gap-2">
-                <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Review Queue' : 'My Pipeline' }}</a>
-                <a href="#" class="btn btn-outline-primary">Status Timeline</a>
+                <p class="text-secondary mb-0">
+                    {{ role == 'recruiter'
+                        ? 'Evaluate applicant profiles and move them through your pipeline.'
+                        : (role == 'admin'
+                            ? 'Read-only overview of all applications with full inspection access.'
+                            : 'Track each application and monitor your progress.') }}
+                </p>
             </div>
         </div>
     </div>
@@ -48,24 +67,83 @@
 
             <div id="applicationCardsGrid" class="row row-cards">
                 {% for card in cards %}
+                    {% set canCreateInterview = card.can_create_interview|default(true) %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Review Application' : 'Application Details' }}" data-action-primary-href="{{ role == 'recruiter' ? card.details_url : card.details_url }}" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Add Interview' : (card.can_withdraw ? 'Withdraw Application' : 'Cannot Withdraw') }}" data-action-secondary-href="{{ role == 'recruiter' ? '#' : (card.can_withdraw ? card.withdraw_url : '#') }}" data-action-secondary-disabled="{{ role == 'recruiter' ? '0' : (card.can_withdraw ? '0' : '1') }}" data-action-tertiary="{{ role == 'recruiter' ? 'Add Feedback' : (card.can_edit ? 'Edit Application' : 'Cannot Edit') }}" data-action-tertiary-href="{{ role == 'recruiter' ? '#' : (card.can_edit ? card.edit_url : '#') }}" data-action-tertiary-disabled="{{ role == 'recruiter' ? '0' : (card.can_edit ? '0' : '1') }}" data-detail-extra="Status: {{ card.meta }}||{{ card.title }}">
+                        <div class="tb-module-card h-100" 
+                            data-application-id="{{ card.id|default(0) }}" 
+                            data-detail-target="#applicationDetailPanel" 
+                            data-detail-meta="{{ card.meta }}" 
+                            data-detail-title="{{ card.title }}" 
+                            data-detail-text="{{ card.text }}"
+                            {# Recruiter data attributes #}
+                            {% if role == 'recruiter' %}
+                                data-accept-url="{{ card.accept_url|default('#') }}" 
+                                data-decline-url="{{ card.decline_url|default('#') }}" 
+                                data-create-url="{{ card.create_interview_url|default('#') }}" 
+                                data-create-check-url="{{ card.create_interview_check_url|default('') }}"
+                                data-create-disabled="{{ canCreateInterview ? '0' : '1' }}" 
+                                data-create-reason="{{ card.interview_block_reason|default('Interview already created for this application.')|e('html_attr') }}"
+                                data-details-url="{{ card.details_url|default('#') }}"
+                            {% endif %}
+                            {# Candidate data attributes #}
+                            {% if role == 'candidate' %}
+                                data-details-url="{{ card.details_url|default('#') }}"
+                                data-can-edit="{{ card.can_edit|default(false) ? '1' : '0' }}"
+                                data-edit-url="{{ card.edit_url|default('#') }}"
+                                data-can-withdraw="{{ card.can_withdraw|default(false) ? '1' : '0' }}"
+                                data-withdraw-url="{{ card.withdraw_url|default('#') }}"
+                            {% endif %}
+                            {% if role == 'admin' %}
+                                data-details-url="{{ card.details_url|default('#') }}"
+                            {% endif %}
+                            data-detail-extra="Status: {{ card.meta }}||{{ card.title }}{% if role == 'admin' %}||Inspect URL: {{ card.details_url|default('#') }}{% endif %}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already created for this application.') }}{% endif %}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
+                            {# Recruiter inline buttons for quick actions #}
                             {% if role == 'recruiter' %}
                                 <div class="d-flex flex-wrap gap-2 mt-3">
-                                    <form method="post" action="{{ card.shortlist_url|default('#') }}">
+                                    <a href="{{ card.details_url|default('#') }}" class="btn btn-sm btn-outline-primary"><i class="ti ti-eye me-1"></i>Review</a>
+                                    <form method="post" action="{{ card.shortlist_url|default('#') }}" class="d-inline">
                                         <input type="hidden" name="status" value="SHORTLISTED">
                                         <input type="hidden" name="return_to" value="list">
                                         <button type="submit" class="btn btn-sm btn-outline-success">Shortlist</button>
                                     </form>
-                                    <form method="post" action="{{ card.reject_url|default('#') }}">
+                                    <form method="post" action="{{ card.reject_url|default('#') }}" class="d-inline">
                                         <input type="hidden" name="status" value="REJECTED">
                                         <input type="hidden" name="return_to" value="list">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Reject</button>
                                     </form>
-                                    <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal" data-application-id="{{ card.id|default(0) }}" data-create-url="{{ card.create_interview_url|default('#') }}">Create Interview</button>
+                                    {% if canCreateInterview %}
+                                        <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal" 
+                                            data-application-id="{{ card.id|default(0) }}" 
+                                            data-create-url="{{ card.create_interview_url|default('#') }}">
+                                            <i class="ti ti-calendar-plus me-1"></i>Create Interview
+                                        </button>
+                                    {% else %}
+                                        <span class="btn btn-sm btn-secondary disabled" title="{{ card.interview_block_reason|default('Interview already created') }}" aria-disabled="true">
+                                            <i class="ti ti-check me-1"></i>Interview Already Created
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            {# Candidate inline buttons #}
+                            {% if role == 'candidate' %}
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <a href="{{ card.details_url|default('#') }}" class="btn btn-sm btn-outline-primary"><i class="ti ti-eye me-1"></i>View Details</a>
+                                    {% if card.can_edit|default(false) %}
+                                        <a href="{{ card.edit_url|default('#') }}" class="btn btn-sm btn-outline-secondary"><i class="ti ti-edit me-1"></i>Edit</a>
+                                    {% endif %}
+                                    {% if card.can_withdraw|default(false) %}
+                                        <form method="post" action="{{ card.withdraw_url|default('#') }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to withdraw this application?');"><i class="ti ti-trash me-1"></i>Withdraw</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            {% if role == 'admin' %}
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <a href="{{ card.details_url|default('#') }}" class="btn btn-sm btn-outline-primary"><i class="ti ti-eye me-1"></i>Inspect Details</a>
                                 </div>
                             {% endif %}
                         </div>
@@ -96,32 +174,10 @@
                 </div>
             </div>
 
-            <div id="applicationActionDock" class="tb-interview-action-dock tb-generic-action-dock d-none">
-                <div class="container-xl">
-                    <div class="tb-interview-action-dock-inner">
-                        <div class="small text-secondary">Selected application actions</div>
-                        <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
-                            <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-eye me-1"></i>Primary Action</a>
-                            {% if role == 'candidate' %}
-                                <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-edit me-1"></i>Tertiary Action</a>
-                                <form method="post" action="#" class="d-inline tb-dock-secondary-form">
-                                    <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
-                                </form>
-                            {% else %}
-                                <form method="post" action="#" class="d-inline tb-dock-secondary-form">
-                                    <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
-                                </form>
-                                <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="modal fade" id="createInterviewModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-centered">
-                    <div class="modal-content tb-admin-card">
-                        <div class="modal-header">
+                    <div class="modal-content tb-admin-card tb-modal-shell">
+                        <div class="modal-header tb-modal-header">
                             <h5 class="modal-title"><i class="ti ti-calendar-plus me-1"></i>Create Interview</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
@@ -144,15 +200,18 @@
                                 </div>
                                 <div class="col-md-6" data-online-field>
                                     <label class="form-label">Meeting Link (online)</label>
-                                    <input type="url" name="meeting_link" class="form-control" placeholder="https://...">
+                                    <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" maxlength="500">
+                                    <div class="form-hint">Use a complete http(s) URL.</div>
                                 </div>
                                 <div class="col-md-6" data-onsite-field>
                                     <label class="form-label">Room (onsite)</label>
-                                    <input type="text" name="location" class="form-control" placeholder="Room / Office location">
+                                    <input type="text" name="location" class="form-control" placeholder="Room / Office location" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
+                                    <div class="form-hint">3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Additional Notes</label>
-                                    <textarea name="notes" rows="3" class="form-control"></textarea>
+                                    <textarea name="notes" rows="3" class="form-control" maxlength="1000"></textarea>
+                                    <div class="form-hint"><span data-notes-count>0</span>/1000 characters</div>
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -168,20 +227,33 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const modalEl = document.getElementById('createInterviewModal');
-        const formEl = document.getElementById('createInterviewForm');
-        if (!modalEl || !formEl || typeof bootstrap === 'undefined') {
+    const initJobApplicationsPage = function () {
+        const pageRoot = document.querySelector('.tb-interviews-page');
+        if (!pageRoot) {
             return;
         }
 
-        const modal = new bootstrap.Modal(modalEl);
+        if (pageRoot.dataset.tbApplicationsInitialized === '1') {
+            return;
+        }
+        pageRoot.dataset.tbApplicationsInitialized = '1';
+
+        const modalEl = document.getElementById('createInterviewModal');
+        const formEl = document.getElementById('createInterviewForm');
+        if (!formEl) {
+            return;
+        }
+
+        const modal = (modalEl && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(modalEl) : null;
         const modeSelect = formEl.querySelector('select[name="mode"]');
         const scheduleInput = formEl.querySelector('input[name="scheduled_at"]');
         const meetingInput = formEl.querySelector('input[name="meeting_link"]');
         const locationInput = formEl.querySelector('input[name="location"]');
         const onlineField = formEl.querySelector('[data-online-field]');
         const onsiteField = formEl.querySelector('[data-onsite-field]');
+        const notesInput = formEl.querySelector('textarea[name="notes"]');
+        const notesCount = formEl.querySelector('[data-notes-count]');
+        let selectedCard = null;
 
         const now = new Date();
         const minValue = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -197,6 +269,7 @@
                 if (meetingInput) {
                     meetingInput.value = '';
                     meetingInput.required = false;
+                    meetingInput.setCustomValidity('');
                 }
                 if (locationInput) locationInput.required = true;
             } else {
@@ -205,6 +278,7 @@
                 if (locationInput) {
                     locationInput.value = '';
                     locationInput.required = false;
+                    locationInput.setCustomValidity('');
                 }
                 if (meetingInput) meetingInput.required = true;
             }
@@ -214,10 +288,26 @@
             modeSelect.addEventListener('change', applyModeFields);
         }
 
-        const openCreateModalForBtn = function (btn) {
-            if (!btn) return;
-            const createUrl = btn.getAttribute('data-create-url');
-            if (!createUrl) return;
+        if (locationInput) {
+            locationInput.addEventListener('input', function () {
+                if (!locationInput.value || locationInput.checkValidity()) {
+                    locationInput.setCustomValidity('');
+                } else {
+                    locationInput.setCustomValidity('Use 3-120 chars: letters, numbers and , . / # ( ) - only.');
+                }
+            });
+        }
+
+        if (notesInput && notesCount) {
+            const syncNotesCount = function () {
+                notesCount.textContent = String(notesInput.value.length);
+            };
+            notesInput.addEventListener('input', syncNotesCount);
+            syncNotesCount();
+        }
+
+        const openCreateModal = function (createUrl) {
+            if (!createUrl || createUrl === '#' || !modal) return;
             formEl.setAttribute('action', createUrl);
             if (modeSelect) modeSelect.value = 'online';
             if (scheduleInput) scheduleInput.min = minValue;
@@ -225,22 +315,132 @@
             modal.show();
         };
 
+        const syncInlineCreateButton = function (card) {
+            if (!card) return;
+            const inlineBtn = card.querySelector('.tb-open-interview-modal');
+            if (!inlineBtn) return;
+
+            const createDisabled = card.getAttribute('data-create-disabled') === '1';
+            const createReason = card.getAttribute('data-create-reason') || 'Interview already created for this application.';
+
+            inlineBtn.classList.toggle('tb-create-locked', createDisabled);
+            inlineBtn.toggleAttribute('disabled', createDisabled);
+            inlineBtn.setAttribute('aria-disabled', createDisabled ? 'true' : 'false');
+            inlineBtn.setAttribute('title', createDisabled ? createReason : '');
+            inlineBtn.innerHTML = createDisabled
+                ? '<i class="ti ti-lock me-1"></i>Interview Exists'
+                : '<i class="ti ti-calendar-plus me-1"></i>Create Interview';
+        };
+
+        const refreshCreateAvailability = async function (card) {
+            if (!card) return false;
+            const checkUrl = card.getAttribute('data-create-check-url') || '';
+            if (!checkUrl) {
+                syncInlineCreateButton(card);
+                return card.getAttribute('data-create-disabled') !== '1';
+            }
+
+            try {
+                const response = await fetch(checkUrl, {
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!response.ok) {
+                    syncInlineCreateButton(card);
+                    return card.getAttribute('data-create-disabled') !== '1';
+                }
+
+                const payload = await response.json();
+                if (!payload || payload.ok !== true) {
+                    syncInlineCreateButton(card);
+                    return card.getAttribute('data-create-disabled') !== '1';
+                }
+
+                card.setAttribute('data-create-disabled', payload.canCreateInterview ? '0' : '1');
+                card.setAttribute('data-create-url', payload.createUrl || '#');
+                card.setAttribute('data-create-reason', payload.reason || 'Interview already created for this application.');
+            } catch (e) {
+                // Keep existing card state when live check fails.
+            }
+
+            syncInlineCreateButton(card);
+            return card.getAttribute('data-create-disabled') !== '1';
+        };
+
+        const refreshAllCreateAvailability = function () {
+            document.querySelectorAll('#applicationCardsGrid .tb-module-card[data-create-check-url]').forEach(function (card) {
+                refreshCreateAvailability(card);
+            });
+        };
+
+        document.querySelectorAll('#applicationCardsGrid .tb-module-card').forEach(function (card) {
+            syncInlineCreateButton(card);
+            card.addEventListener('click', function () {
+                selectedCard = card;
+            });
+        });
+
         document.querySelectorAll('.tb-open-interview-modal').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                openCreateModalForBtn(btn);
+            btn.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const card = btn.closest('.tb-module-card');
+                if (!card) return;
+
+                const createDisabled = card.getAttribute('data-create-disabled') === '1';
+                if (createDisabled) {
+                    syncInlineCreateButton(card);
+                    return;
+                }
+
+                const initialUrl = card.getAttribute('data-create-url') || '#';
+                openCreateModal(initialUrl);
+
+                refreshCreateAvailability(card).then(function (canCreate) {
+                    if (!canCreate) {
+                        if (modal) {
+                            modal.hide();
+                        }
+                        return;
+                    }
+
+                    const freshUrl = card.getAttribute('data-create-url') || initialUrl;
+                    formEl.setAttribute('action', freshUrl);
+                });
             });
         });
 
         const params = new URLSearchParams(window.location.search);
         const openCreateFor = params.get('openCreateFor');
         if (openCreateFor) {
-            const btn = document.querySelector('.tb-open-interview-modal[data-application-id="' + openCreateFor + '"]');
-            if (btn) {
-                openCreateModalForBtn(btn);
+            const card = document.querySelector('#applicationCardsGrid .tb-module-card[data-application-id="' + openCreateFor + '"]');
+            if (card) {
+                selectedCard = card;
+                refreshCreateAvailability(card).then(function () {
+                    if (card.getAttribute('data-create-disabled') !== '1') {
+                        openCreateModal(card.getAttribute('data-create-url') || '#');
+                    }
+                });
             }
         }
 
+        const initiallySelected = document.querySelector('#applicationCardsGrid .tb-module-card.is-selected');
+        if (initiallySelected) {
+            selectedCard = initiallySelected;
+            refreshCreateAvailability(initiallySelected);
+        }
+
+        refreshAllCreateAvailability();
+
+        window.addEventListener('pageshow', function () {
+            refreshAllCreateAvailability();
+        });
+
         applyModeFields();
-    });
+    };
+
+    document.addEventListener('DOMContentLoaded', initJobApplicationsPage);
+    document.addEventListener('turbo:load', initJobApplicationsPage);
 </script>
 {% endblock %}

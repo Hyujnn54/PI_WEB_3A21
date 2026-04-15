@@ -3,53 +3,102 @@
 {% block title %}TalentBridge | Home{% endblock %}
 
 {% block body %}
+    {% set userRoles = app.session.get('user_roles')|default([]) %}
+    {% set isRecruiter = 'ROLE_RECRUITER' in userRoles %}
+    {% set isAdmin = 'ROLE_ADMIN' in userRoles %}
+    {% set roleLabel = isAdmin ? 'Administrator' : (isRecruiter ? 'Recruiter' : 'Candidate') %}
+
     {% set modules = [
-        { title: 'User Management', description: 'Organize candidate, recruiter, and admin profiles in one workspace.', icon: 'ti ti-users-group' },
-        { title: 'Job Offers', description: 'Publish and supervise open positions with clear status tracking.', icon: 'ti ti-briefcase-2' },
-        { title: 'Applications', description: 'Monitor applications from submission to final decision.', icon: 'ti ti-file-check' },
-        { title: 'Interviews', description: 'Plan and review interview cycles with shared visibility.', icon: 'ti ti-message-2' },
-        { title: 'Events', description: 'Coordinate recruitment events and engagement activities.', icon: 'ti ti-calendar-event' },
-        { title: 'Reporting', description: 'Use dashboard snapshots to support hiring decisions.', icon: 'ti ti-chart-bar' }
+        { title: 'Job Offers', description: isRecruiter ? 'Publish and maintain your open positions.' : 'Browse open opportunities and review details.', icon: 'ti ti-briefcase-2', link: path('front_job_offers') },
+        { title: 'Applications', description: isRecruiter ? 'Review candidates and progress each application.' : 'Track each application from submission to decision.', icon: 'ti ti-file-check', link: path('front_job_applications') },
+        { title: 'Interviews', description: isRecruiter ? 'Schedule interviews and update outcomes.' : 'Follow your interview schedule and feedback status.', icon: 'ti ti-message-2', link: path('front_interviews') },
+        { title: 'Events', description: isRecruiter ? 'Manage your recruitment events and attendance.' : (isAdmin ? 'Inspect all recruitment events and details.' : 'Register for events and stay connected.'), icon: 'ti ti-calendar-event', link: path('front_events') },
+        { title: 'Registrations', description: isRecruiter ? 'See registrations for your events.' : (isAdmin ? 'Read-only overview of event registrations.' : 'Manage your own event registrations.'), icon: 'ti ti-calendar-check', link: isRecruiter ? path('recruiter_event_registrations') : (isAdmin ? path('admin_event_registrations') : path('front_event_registrations')) },
+        { title: 'Profile', description: isRecruiter ? 'Update recruiter information and account settings.' : (isAdmin ? 'Manage administrator account preferences.' : 'Maintain your profile and candidate skills.'), icon: 'ti ti-user-circle', link: path('front_profile') }
     ] %}
+
+    <style>
+        .tb-home-hero {
+            background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(13, 110, 253, 0.02));
+            border: 1px solid rgba(13, 110, 253, 0.12);
+            border-radius: 1rem;
+        }
+
+        .tb-home-logo-wrap {
+            width: 120px;
+            height: 120px;
+            border-radius: 1rem;
+            background: #ffffff;
+            border: 1px solid rgba(13, 110, 253, 0.15);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.06);
+        }
+
+        .tb-home-module {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        }
+
+        .tb-home-module:hover {
+            transform: translateY(-2px);
+            border-color: rgba(13, 110, 253, 0.25);
+            box-shadow: 0 0.6rem 1.2rem rgba(2, 12, 27, 0.08);
+        }
+    </style>
 
     <section class="py-5">
         <div class="container-xl">
-            <div class="row align-items-center g-4">
-                <div class="col-lg-6">
-                    <h1 class="display-6 fw-bold mb-3">Recruitment Platform Template Setup</h1>
-                    <p class="lead mb-4">This home page is now switched to the template-handoff layout and kept as a UI-only showcase.</p>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a href="{{ path('back_dashboard') }}" class="btn btn-primary">Go to Dashboard</a>
-                        <a href="{{ path('front_job_offers', {role: 'candidate'}) }}" class="btn btn-outline-primary">Explore Job Offers</a>
+            <div class="tb-home-hero p-4 p-lg-5">
+                <div class="row g-4 align-items-center">
+                    <div class="col-lg-8">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <span class="badge bg-primary-lt text-primary">Talent Bridge</span>
+                            <span class="badge bg-light text-secondary">{{ roleLabel }}</span>
+                        </div>
+                        <h1 class="display-6 fw-bold mb-3">Professional Recruitment Workspace</h1>
+                        <p class="lead text-secondary mb-4">Access job offers, applications, interviews, events, registrations, and profile settings from one clean interface designed for operational clarity.</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="{{ path('front_job_offers') }}" class="btn btn-primary">Job Offers</a>
+                            <a href="{{ path('front_job_applications') }}" class="btn btn-outline-primary">Applications</a>
+                            <a href="{{ path('front_events') }}" class="btn btn-outline-primary">Events</a>
+                            <a href="{{ path('front_profile') }}" class="btn btn-outline-secondary">Profile</a>
+                        </div>
                     </div>
-                </div>
-                <div class="col-lg-6 text-center">
-                    <img src="{{ asset('team_uploads/logo.png') }}" class="img-fluid" alt="TalentBridge illustration" style="max-width: 260px;">
+                    <div class="col-lg-4 text-center text-lg-end">
+                        <div class="tb-home-logo-wrap">
+                            <img src="{{ asset('assets/team_upload/logo.png') }}" class="img-fluid" alt="Talent Bridge logo" style="max-width: 78px;" onerror="this.style.display='none'">
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="py-5">
+    <section class="pt-1 pb-5">
         <div class="container-xl">
-            <div class="row mb-4">
-                <div class="col-12 text-center">
-                    <h2 class="h3 mb-0">Core Modules</h2>
+            <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+                <div>
+                    <h2 class="h3 mb-1">Workspace Modules</h2>
+                    <p class="text-secondary mb-0">Quick access to the tools you use most.</p>
                 </div>
             </div>
-            <div class="row g-4">
+
+            <div class="row g-3 g-lg-4">
                 {% for module in modules %}
-                    <div class="col-md-6 col-lg-4">
-                        <div class="card card-body border h-100">
-                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-blue-lt text-blue mb-3" style="width: 44px; height: 44px;">
-                                <i class="{{ module.icon }}"></i>
+                    <div class="col-md-6 col-xl-4">
+                        <a href="{{ module.link }}" class="card card-body h-100 text-decoration-none tb-home-module">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-blue-lt text-blue mb-3" style="width: 46px; height: 46px;">
+                                <i class="{{ module.icon }} fs-2"></i>
                             </div>
-                            <h5>{{ module.title }}</h5>
-                            <p class="mb-0">{{ module.description }}</p>
-                        </div>
+                            <h5 class="text-body mb-2">{{ module.title }}</h5>
+                            <p class="text-secondary mb-0">{{ module.description }}</p>
+                        </a>
                     </div>
                 {% endfor %}
             </div>
         </div>
     </section>
 {% endblock %}
+

@@ -56,20 +56,27 @@ class JobApplicationManagementController extends AbstractController
         ];
 
         foreach ($applications as $application) {
-            $status = strtoupper((string) $application->getCurrent_status());
+            $status = strtoupper(trim((string) $application->getCurrent_status()));
+            $normalizedStatus = match ($status) {
+                'SHORTLISTED' => 'SHORTLISTED',
+                'REJECTED', 'DECLINED' => 'REJECTED',
+                'INTERVIEW', 'INTERVIEW_SCHEDULED' => 'INTERVIEW',
+                'HIRED', 'ACCEPTED' => 'HIRED',
+                default => 'SUBMITTED',
+            };
             $offer = $application->getOffer_id();
             $offerId = $offer ? (string) $offer->getId() : null;
 
             $global['total']++;
-            if ($status === 'SUBMITTED') {
+            if ($normalizedStatus === 'SUBMITTED') {
                 $global['submitted']++;
-            } elseif ($status === 'SHORTLISTED') {
+            } elseif ($normalizedStatus === 'SHORTLISTED') {
                 $global['shortlisted']++;
-            } elseif ($status === 'REJECTED') {
+            } elseif ($normalizedStatus === 'REJECTED') {
                 $global['rejected']++;
-            } elseif ($status === 'INTERVIEW') {
+            } elseif ($normalizedStatus === 'INTERVIEW') {
                 $global['interview']++;
-            } elseif ($status === 'HIRED') {
+            } elseif ($normalizedStatus === 'HIRED') {
                 $global['hired']++;
             }
 
@@ -78,15 +85,15 @@ class JobApplicationManagementController extends AbstractController
             }
 
             $offerRows[$offerId]['total']++;
-            if ($status === 'SUBMITTED') {
+            if ($normalizedStatus === 'SUBMITTED') {
                 $offerRows[$offerId]['submitted']++;
-            } elseif ($status === 'SHORTLISTED') {
+            } elseif ($normalizedStatus === 'SHORTLISTED') {
                 $offerRows[$offerId]['shortlisted']++;
-            } elseif ($status === 'REJECTED') {
+            } elseif ($normalizedStatus === 'REJECTED') {
                 $offerRows[$offerId]['rejected']++;
-            } elseif ($status === 'INTERVIEW') {
+            } elseif ($normalizedStatus === 'INTERVIEW') {
                 $offerRows[$offerId]['interview']++;
-            } elseif ($status === 'HIRED') {
+            } elseif ($normalizedStatus === 'HIRED') {
                 $offerRows[$offerId]['hired']++;
             }
         }
@@ -210,7 +217,7 @@ class JobApplicationManagementController extends AbstractController
             $history->setApplication_id($application);
             $history->setStatus('ARCHIVED');
             $history->setChanged_at(new \DateTime());
-            $history->setChanged_by($admin->getId());
+            $history->setChanged_by($admin);
             $history->setNote('Admin archived this application.');
             $em->persist($history);
         }
@@ -250,7 +257,7 @@ class JobApplicationManagementController extends AbstractController
             $history->setApplication_id($application);
             $history->setStatus('UNARCHIVED');
             $history->setChanged_at(new \DateTime());
-            $history->setChanged_by($admin->getId());
+            $history->setChanged_by($admin);
             $history->setNote('Admin unarchived this application.');
             $em->persist($history);
         }
@@ -299,7 +306,7 @@ class JobApplicationManagementController extends AbstractController
             $history->setApplication_id($application);
             $history->setStatus($newStatus);
             $history->setChanged_at(new \DateTime());
-            $history->setChanged_by($admin->getId());
+            $history->setChanged_by($admin);
             $history->setNote($note);
             $em->persist($history);
         }

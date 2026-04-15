@@ -13,13 +13,30 @@ class FrontOfficeController extends AbstractController
     #[Route('/home', name: 'app_home')]
     public function index(Request $request): Response
     {
-        $role = (string) $request->query->get('role', 'candidate');
-        if (!in_array($role, ['candidate', 'recruiter'], true)) {
-            $role = 'candidate';
+        $session = $request->getSession();
+        $userId = $session->get('user_id');
+        $roles = $session->get('user_roles', []);
+
+        if (!$userId) {
+            return $this->redirectToRoute('app_login');
         }
 
-        return $this->render('front/index.html.twig', [
-            'authUser' => ['role' => $role],
-        ]);
+        // =============== CANDIDATE ===============
+        if (in_array('ROLE_CANDIDATE', $roles)) {
+            return $this->redirectToRoute('candidate_home');
+        }
+
+        // =============== RECRUITER ===============
+        if (in_array('ROLE_RECRUITER', $roles)) {
+            return $this->redirectToRoute('recruiter_home');
+        }
+
+        // =============== ADMIN ===============
+        if (in_array('ROLE_ADMIN', $roles)) {
+            return $this->redirectToRoute('admin_front_home');
+        }
+
+        // =============== AUTHENTICATED DEFAULT ===============
+        return $this->render('front/index.html.twig');
     }
 }

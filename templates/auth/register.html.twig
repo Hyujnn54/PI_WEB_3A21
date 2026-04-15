@@ -5,45 +5,139 @@
 {% block body %}
 <div class="page-wrapper">
     <div class="page-body auth-body">
-        <div class="container container-tight py-4">
-            <div class="text-center mb-4">
-                <h1 class="h2">Create Your Account</h1>
-                <div class="text-secondary">Join Talent Bridge as candidate or recruiter</div>
-            </div>
-            <div class="card card-md auth-card">
-                <div class="card-body">
-                    {% for message in app.flashes('error') %}
-                        <div class="alert alert-danger">{{ message }}</div>
-                    {% endfor %}
-                    {% for message in app.flashes('success') %}
-                        <div class="alert alert-success">{{ message }}</div>
-                    {% endfor %}
-                    <form method="post" action="{{ path('app_register') }}">
-                        <div class="mb-3">
-                            <label class="form-label">Full Name</label>
-                            <input type="text" name="full_name" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" name="email" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Role</label>
-                            <select name="role" class="form-select" required>
-                                <option value="candidate">Candidate</option>
-                                <option value="recruiter">Recruiter</option>
-                            </select>
-                        </div>
-                        <div class="form-footer">
-                            <button type="submit" class="btn btn-primary w-100">Register</button>
-                        </div>
-                    </form>
+        <div class="container container-tight py-4 py-md-5">
+            <div class="tb-auth-shell tb-auth-shell-wide mx-auto">
+                <div class="text-center mb-4">
+                    <img src="{{ asset('assets/team_upload/logo.png') }}" alt="Talent Bridge" class="tb-auth-logo mb-3" onerror="this.style.display='none'">
+                    <h1 class="h2 mb-1">Create Your Account</h1>
+                    <div class="text-secondary">Join as candidate or recruiter and manage your hiring journey professionally.</div>
                 </div>
-            </div>
-            <div class="text-center text-secondary mt-3">
-                Already have an account? <a href="{{ path('app_login') }}">Login</a>
+
+                <div class="card card-md auth-card tb-auth-card">
+                    <div class="card-body p-4 p-md-4">
+                        {% for message in app.flashes('error') %}
+                            <div class="alert alert-danger tb-auth-alert" role="alert">
+                                <i class="ti ti-alert-circle me-2"></i>{{ message }}
+                            </div>
+                        {% endfor %}
+                        {% for message in app.flashes('success') %}
+                            <div class="alert alert-success tb-auth-alert" role="alert">
+                                <i class="ti ti-circle-check me-2"></i>{{ message }}
+                            </div>
+                        {% endfor %}
+
+                        <form method="post" action="{{ path('app_register') }}" enctype="multipart/form-data" novalidate>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">First Name</label>
+                                    <div class="input-icon">
+                                        <span class="input-icon-addon"><i class="ti ti-user"></i></span>
+                                        <input type="text" name="first_name" class="form-control tb-auth-input" placeholder="John" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Last Name</label>
+                                    <div class="input-icon">
+                                        <span class="input-icon-addon"><i class="ti ti-user"></i></span>
+                                        <input type="text" name="last_name" class="form-control tb-auth-input" placeholder="Doe" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Email Address</label>
+                                    <div class="input-icon">
+                                        <span class="input-icon-addon"><i class="ti ti-mail"></i></span>
+                                        <input type="email" name="email" class="form-control tb-auth-input" placeholder="example@test.com" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Phone Number</label>
+                                    <div class="input-icon">
+                                        <span class="input-icon-addon"><i class="ti ti-phone"></i></span>
+                                        <input type="text" name="phone" class="form-control tb-auth-input" placeholder="55 123 456" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Password</label>
+                                    <div class="input-icon">
+                                        <span class="input-icon-addon"><i class="ti ti-lock"></i></span>
+                                        <input type="password" name="password" class="form-control tb-auth-input" placeholder="********" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">I am registering as a:</label>
+                                    <select name="role" id="roleSelector" class="form-select tb-auth-input" required>
+                                        <option value="candidate">Candidate</option>
+                                        <option value="recruiter">Recruiter</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="candidateFields" class="tb-auth-subsection">
+                                <div class="tb-auth-subtitle"><i class="ti ti-id-badge-2 me-1"></i>Candidate Details</div>
+                                <div class="mb-3">
+                                    <label class="form-label">Personal Location</label>
+                                    <input type="text" name="location" class="form-control tb-auth-input" placeholder="City, Country">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Education Level</label>
+                                    <input type="text" name="education_level" class="form-control tb-auth-input" placeholder="e.g. Master in IT">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Years of Experience</label>
+                                    <input type="number" name="experience_years" class="form-control tb-auth-input" min="0">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Upload CV (PDF)</label>
+                                    <input type="file" name="cv_file" class="form-control tb-auth-input" accept=".pdf">
+                                </div>
+                            </div>
+
+                            <div id="recruiterFields" class="tb-auth-subsection" style="display: none;">
+                                <div class="tb-auth-subtitle"><i class="ti ti-building me-1"></i>Company Details</div>
+                                <div class="mb-3">
+                                    <label class="form-label">Company Name</label>
+                                    <input type="text" name="company_name" class="form-control tb-auth-input" placeholder="Google">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Company Location</label>
+                                    <input type="text" name="company_location" class="form-control tb-auth-input" placeholder="California, USA">
+                                </div>
+                            </div>
+
+                            <div class="form-footer pt-2">
+                                <button type="submit" class="btn btn-primary w-100 tb-auth-btn">Register</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="text-center text-secondary mt-3">
+                    Already have an account? <a href="{{ path('app_login') }}" class="tb-auth-link">Login</a>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.getElementById('roleSelector').addEventListener('change', function () {
+        const candidateDiv = document.getElementById('candidateFields');
+        const recruiterDiv = document.getElementById('recruiterFields');
+
+        if (this.value === 'candidate') {
+            candidateDiv.style.display = 'block';
+            recruiterDiv.style.display = 'none';
+        } else {
+            candidateDiv.style.display = 'none';
+            recruiterDiv.style.display = 'block';
+        }
+    });
+</script>
 {% endblock %}
+

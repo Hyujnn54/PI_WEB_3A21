@@ -32,7 +32,7 @@ class Job_application
     private string $cover_letter;
 
     #[ORM\Column(type: "string", length: 255)]
-    private string $cv_path;
+    private string $cv_path = '';
 
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $applied_at;
@@ -105,12 +105,22 @@ class Job_application
 
     public function getCv_path()
     {
-        return $this->cv_path;
+        return isset($this->cv_path) ? $this->cv_path : '';
     }
 
     public function setCv_path($value)
     {
-        $this->cv_path = $value;
+        $this->cv_path = (string) ($value ?? '');
+    }
+
+    public function getCvPath()
+    {
+        return $this->getCv_path();
+    }
+
+    public function setCvPath($value)
+    {
+        $this->setCv_path($value);
     }
 
     public function getApplied_at()

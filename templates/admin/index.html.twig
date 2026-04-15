@@ -3,24 +3,96 @@
 {% block title %}Talent Bridge | Admin Dashboard{% endblock %}
 
 {% block admin_content %}
+    <style>
+        .tb-admin-dashboard-hero {
+            background: linear-gradient(132deg, rgba(13, 91, 215, 0.13), rgba(26, 54, 93, 0.08));
+            border: 1px solid #d3e3ff;
+            border-radius: 14px;
+            box-shadow: 0 12px 28px rgba(16, 47, 94, 0.08);
+        }
+
+        .tb-kpi-card {
+            border-radius: 12px;
+            border: 1px solid #dce8ff;
+            box-shadow: 0 4px 14px rgba(16, 47, 94, 0.06);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .tb-kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(16, 47, 94, 0.1);
+        }
+
+        .tb-kpi-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            color: #fff;
+        }
+
+        .tb-tone-primary { background: linear-gradient(135deg, #0d5bd7, #1a365d); }
+        .tb-tone-warning { background: linear-gradient(135deg, #f59f00, #d97706); }
+        .tb-tone-azure { background: linear-gradient(135deg, #0ea5e9, #2563eb); }
+        .tb-tone-success { background: linear-gradient(135deg, #16a34a, #15803d); }
+
+        .tb-widget-card {
+            border-radius: 12px;
+            border: 1px solid #dce8ff;
+            box-shadow: 0 4px 14px rgba(16, 47, 94, 0.06);
+        }
+
+        .tb-activity-item {
+            border: 1px solid #e4edff;
+            border-radius: 10px;
+            padding: 0.75rem 0.85rem;
+            background: #fbfdff;
+        }
+
+        .tb-user-pill {
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            background: #eef4ff;
+            color: #355c8f;
+        }
+    </style>
+
     <div class="row mb-4">
         <div class="col-12">
-            <h1 class="h3 mb-1">Administration Dashboard</h1>
-            <p class="mb-0">Template scaffold ready for recruitment management workflows.</p>
+            <div class="tb-admin-dashboard-hero p-4">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                    <div>
+                        <h1 class="h3 mb-1">Admin Dashboard</h1>
+                        <p class="text-muted mb-0">Enterprise control center for monitoring users, hiring activity, and operational health.</p>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{{ path('app_admin_users') }}" class="btn btn-primary"><i class="ti ti-users me-1"></i>Manage Users</a>
+                        <a href="{{ path('app_admin_job_offers') }}" class="btn btn-outline-primary"><i class="ti ti-briefcase-2 me-1"></i>Manage Offers</a>
+                        <a href="{{ path('management_job_applications') }}" class="btn btn-outline-secondary"><i class="ti ti-file-check me-1"></i>Applications</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="row g-4 mb-4">
         {% for kpi in kpis %}
             <div class="col-md-6 col-xl-3">
-                <div class="card card-body border">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="mb-1 small text-muted">{{ kpi.label }}</p>
-                            <h4 class="mb-0">{{ kpi.value }}</h4>
-                        </div>
-                        <div class="icon-lg bg-primary bg-opacity-10 text-primary rounded-circle">
-                            <i class="{{ kpi.icon }}"></i>
+                <div class="card tb-kpi-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="mb-2 small text-muted text-uppercase fw-semibold">{{ kpi.label }}</p>
+                                <h3 class="mb-0 fw-bold">{{ kpi.value }}</h3>
+                            </div>
+                            <div class="tb-kpi-icon tb-tone-{{ kpi.tone|default('primary') }}">
+                                <i class="{{ kpi.icon }}"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -28,14 +100,190 @@
         {% endfor %}
     </div>
 
-    <div class="card border">
-        <div class="card-body">
-            <h5 class="card-title">Next Migration Steps</h5>
-            <ul class="mb-0">
-                <li>Connect this dashboard to Symfony entities and repositories.</li>
-                <li>Port Java module logic (users, offers, interviews, events).</li>
-                <li>Enable role-based security for admin and recruiter spaces.</li>
-            </ul>
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-xl-5">
+            <div class="card tb-widget-card h-100">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="ti ti-activity me-1"></i>Recent Activity</h3>
+                </div>
+                <div class="card-body d-flex flex-column gap-2">
+                    {% for item in recentActivity %}
+                        <div class="tb-activity-item d-flex align-items-start justify-content-between gap-2">
+                            <div>
+                                <div class="fw-semibold"><i class="{{ item.icon }} me-1"></i>{{ item.label }}</div>
+                                <div class="small text-muted">{{ item.description }}</div>
+                            </div>
+                            <span class="small text-muted">{{ item.created_at ? item.created_at|date('M d, H:i') : '-' }}</span>
+                        </div>
+                    {% else %}
+                        <div class="text-muted small">No recent activity available.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-7">
+            <div class="row g-4 h-100">
+                <div class="col-12">
+                    <div class="card tb-widget-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h3 class="card-title mb-0"><i class="ti ti-users me-1"></i>User Management Preview</h3>
+                            <a href="{{ path('app_admin_users') }}" class="btn btn-sm btn-primary">Manage Users</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in usersPreview %}
+                                        {% set roles = user.roles|default([]) %}
+                                        <tr>
+                                            <td>{{ (user.firstName|default('') ~ ' ' ~ user.lastName|default(''))|trim ?: 'User' }}</td>
+                                            <td>{{ user.email }}</td>
+                                            <td>
+                                                {% if 'ROLE_ADMIN' in roles %}
+                                                    <span class="tb-user-pill">Admin</span>
+                                                {% elseif 'ROLE_RECRUITER' in roles %}
+                                                    <span class="tb-user-pill">Recruiter</span>
+                                                {% else %}
+                                                    <span class="tb-user-pill">Candidate</span>
+                                                {% endif %}
+                                            </td>
+                                            <td><span class="badge {{ user.isActive ? 'bg-green-lt text-green' : 'bg-red-lt text-red' }}">{{ user.isActive ? 'Active' : 'Inactive' }}</span></td>
+                                        </tr>
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="4" class="text-muted">No users available.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card tb-widget-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h3 class="card-title mb-0"><i class="ti ti-briefcase-2 me-1"></i>Job Offers Overview</h3>
+                            <div class="d-flex gap-2">
+                                <a href="{{ path('app_admin_job_offers') }}" class="btn btn-sm btn-outline-primary">Manage Offers</a>
+                                <a href="{{ path('management_job_applications') }}" class="btn btn-sm btn-outline-secondary">View Applications</a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-center g-3">
+                                <div class="col-md-7">
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <span class="badge bg-green-lt text-green">Active: {{ offersOverview.active }}</span>
+                                        <span class="badge bg-secondary-lt text-secondary">Inactive: {{ offersOverview.inactive }}</span>
+                                    </div>
+                                    <p class="small text-muted mb-0 mt-2">Active offers are open and not expired. Inactive offers are paused, closed, or expired.</p>
+                                </div>
+                                <div class="col-md-5">
+                                    <div id="offersStatusChart" style="height: 180px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-xl-6">
+            <div class="card tb-widget-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0"><i class="ti ti-chart-bar me-1"></i>Reports</h3>
+                    <a href="{{ path('app_admin_stats') }}" class="btn btn-sm btn-outline-primary">Open Reports</a>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Access role distribution and platform growth reports for operational decisions.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{{ path('app_admin_stats') }}" class="btn btn-outline-primary btn-sm">User Statistics</a>
+                        <a href="{{ path('app_admin_job_offers_statistics') }}" class="btn btn-outline-primary btn-sm">Offer Statistics</a>
+                        <a href="{{ path('management_job_applications_statistics') }}" class="btn btn-outline-primary btn-sm">Application Statistics</a>
+                        <a href="{{ path('management_interviews_statistics') }}" class="btn btn-outline-primary btn-sm">Interview Statistics</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <div class="card tb-widget-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0"><i class="ti ti-adjustments me-1"></i>System Control</h3>
+                    <a href="{{ path('app_admin_profile') }}" class="btn btn-sm btn-outline-secondary">Profile</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Control</th>
+                                    <th class="text-end">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for control in systemControls %}
+                                    <tr>
+                                        <td>{{ control.label }}</td>
+                                        <td class="text-end">
+                                            <span class="badge {{ control.enabled ? 'bg-green-lt text-green' : 'bg-red-lt text-red' }}">
+                                                {{ control.enabled ? 'Enabled' : 'Disabled' }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            if (typeof ApexCharts === 'undefined') {
+                return;
+            }
+
+            const chartContainer = document.getElementById('offersStatusChart');
+            if (!chartContainer) {
+                return;
+            }
+
+            const chart = new ApexCharts(chartContainer, {
+                chart: {
+                    type: 'donut',
+                    height: 180,
+                    toolbar: { show: false }
+                },
+                labels: ['Active', 'Inactive'],
+                series: [{{ offersOverview.active|default(0) }}, {{ offersOverview.inactive|default(0) }}],
+                colors: ['#16a34a', '#94a3b8'],
+                legend: {
+                    position: 'bottom',
+                    fontSize: '12px'
+                },
+                stroke: {
+                    width: 2,
+                    colors: ['#fff']
+                },
+                dataLabels: {
+                    enabled: true
+                }
+            });
+
+            chart.render();
+        })();
+    </script>
 {% endblock %}
