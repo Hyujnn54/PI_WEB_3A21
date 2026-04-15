@@ -12,6 +12,7 @@ use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Form\ProfileType;
+use App\Repository\Job_applicationRepository;
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -585,70 +586,92 @@ class FrontPortalController extends AbstractController
     {
         $role = $this->resolveSessionRole($request);
         $cards = [];
+        $applicationFilters = [
+            'search' => '',
+            'status' => 'all',
+            'sort' => 'date_desc',
+        ];
 
         if ($role === 'recruiter') {
             // RECRUITER VIEW: Show applications for their job offers with interview creation capability
             $recruiter = $this->resolveCurrentRecruiter($request);
 
             if ($recruiter instanceof Recruiter) {
-                $ownedOffers = $this->doctrine->getRepository(Job_offer::class)->findBy(['recruiter_id' => $recruiter]);
-                if (!empty($ownedOffers)) {
-                    $applications = $this->doctrine->getRepository(Job_application::class)->findBy(
-                        ['offer_id' => $ownedOffers, 'is_archived' => false],
-                        ['applied_at' => 'DESC']
-                    );
+                $search = trim((string) $request->query->get('search', ''));
+                $status = strtolower(trim((string) $request->query->get('status', 'all')));
+                $sort = strtolower(trim((string) $request->query->get('sort', 'date_desc')));
 
-                    foreach ($applications as $application) {
-                        $offer = $application->getOffer_id();
-                        $candidate = $application->getCandidate_id();
-                        $candidateName = 'Candidate';
-                        if ($candidate instanceof Candidate) {
-                            $fullName = trim((string) $candidate->getFirstName() . ' ' . (string) $candidate->getLastName());
-                            if ($fullName !== '') {
-                                $candidateName = $fullName;
-                            }
+                $allowedStatuses = ['all', 'submitted', 'in_review', 'shortlisted', 'rejected', 'interview', 'hired'];
+                if (!in_array($status, $allowedStatuses, true)) {
+                    $status = 'all';
+                }
+
+                $allowedSorts = ['date_desc', 'date_asc', 'title_asc', 'title_desc', 'status_asc', 'status_desc'];
+                if (!in_array($sort, $allowedSorts, true)) {
+                    $sort = 'date_desc';
+                }
+
+                $applicationFilters = [
+                    'search' => $search,
+                    'status' => $status,
+                    'sort' => $sort,
+                ];
+
+                $statusForQuery = $status === 'all' ? 'all' : strtoupper($status);
+                /** @var Job_applicationRepository $applicationRepository */
+                $applicationRepository = $this->doctrine->getRepository(Job_application::class);
+                $applications = $applicationRepository->findForRecruiterListing($recruiter, $search, $statusForQuery, $sort);
+
+                foreach ($applications as $application) {
+                    $offer = $application->getOffer_id();
+                    $candidate = $application->getCandidate_id();
+                    $candidateName = 'Candidate';
+                    if ($candidate instanceof Candidate) {
+                        $fullName = trim((string) $candidate->getFirstName() . ' ' . (string) $candidate->getLastName());
+                        if ($fullName !== '') {
+                            $candidateName = $fullName;
                         }
-
-                        // Check if interview already exists (one interview per application rule)
-                        $hasActiveInterview = $this->hasActiveInterviewForApplication($application);
-                        $createInterviewUrl = $this->generateUrl('front_interview_create', [
-                            'applicationId' => (string) $application->getId(),
-                            'role' => $role
-                        ] + $request->query->all());
-                        $createInterviewCheckUrl = $this->generateUrl('front_application_interview_availability', [
-                            'applicationId' => (string) $application->getId(),
-                            'role' => $role,
-                        ] + $request->query->all());
-                        $acceptUrl = $this->generateUrl('front_application_set_status', [
-                            'applicationId' => (string) $application->getId(),
-                            'status' => 'accepted',
-                            'role' => $role
-                        ] + $request->query->all());
-                        $declineUrl = $this->generateUrl('front_application_set_status', [
-                            'applicationId' => (string) $application->getId(),
-                            'status' => 'declined',
-                            'role' => $role
-                        ] + $request->query->all());
-
-                        $cards[] = [
-                            'id' => (string) $application->getId(),
-                            'meta' => (string) $application->getCurrent_status(),
-                            'title' => 'Offer: ' . ($offer ? $offer->getTitle() : 'Unknown Offer'),
-                            'text' => $candidateName . ' | Applied on ' . $application->getApplied_at()->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
-                            'status' => (string) $application->getCurrent_status(),
-                            // From application-mangement: recruiter details
-                            'details_url' => $this->generateUrl('app_recruiter_application_details', ['applicationId' => $application->getId()]),
-                            'shortlist_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
-                            'reject_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
-                            // From interview: interview creation with one-per-application rule
-                            'create_interview_url' => $hasActiveInterview ? '#' : $createInterviewUrl,
-                            'create_interview_check_url' => $createInterviewCheckUrl,
-                            'can_create_interview' => !$hasActiveInterview,
-                            'interview_block_reason' => $hasActiveInterview ? 'Interview already created for this application.' : '',
-                            'accept_url' => $acceptUrl,
-                            'decline_url' => $declineUrl,
-                        ];
                     }
+
+                    // Check if interview already exists (one interview per application rule)
+                    $hasActiveInterview = $this->hasActiveInterviewForApplication($application);
+                    $createInterviewUrl = $this->generateUrl('front_interview_create', [
+                        'applicationId' => (string) $application->getId(),
+                        'role' => $role
+                    ] + $request->query->all());
+                    $createInterviewCheckUrl = $this->generateUrl('front_application_interview_availability', [
+                        'applicationId' => (string) $application->getId(),
+                        'role' => $role,
+                    ] + $request->query->all());
+                    $acceptUrl = $this->generateUrl('front_application_set_status', [
+                        'applicationId' => (string) $application->getId(),
+                        'status' => 'accepted',
+                        'role' => $role
+                    ] + $request->query->all());
+                    $declineUrl = $this->generateUrl('front_application_set_status', [
+                        'applicationId' => (string) $application->getId(),
+                        'status' => 'declined',
+                        'role' => $role
+                    ] + $request->query->all());
+
+                    $cards[] = [
+                        'id' => (string) $application->getId(),
+                        'meta' => (string) $application->getCurrent_status(),
+                        'title' => 'Offer: ' . ($offer ? $offer->getTitle() : 'Unknown Offer'),
+                        'text' => $candidateName . ' | Applied on ' . $application->getApplied_at()->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
+                        'status' => (string) $application->getCurrent_status(),
+                        // From application-mangement: recruiter details
+                        'details_url' => $this->generateUrl('app_recruiter_application_details', ['applicationId' => $application->getId()]),
+                        'shortlist_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
+                        'reject_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
+                        // From interview: interview creation with one-per-application rule
+                        'create_interview_url' => $hasActiveInterview ? '#' : $createInterviewUrl,
+                        'create_interview_check_url' => $createInterviewCheckUrl,
+                        'can_create_interview' => !$hasActiveInterview,
+                        'interview_block_reason' => $hasActiveInterview ? 'Interview already created for this application.' : '',
+                        'accept_url' => $acceptUrl,
+                        'decline_url' => $declineUrl,
+                    ];
                 }
             }
         } elseif ($role === 'admin') {
@@ -726,6 +749,7 @@ class FrontPortalController extends AbstractController
         return $this->render('front/modules/job_applications.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
+            'applicationFilters' => $applicationFilters,
         ]);
     }
 

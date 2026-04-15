@@ -147,6 +147,7 @@
                                     </label>
                                     <small class="form-hint text-secondary">If selected, we will use the CV currently stored in your profile.</small>
                                     {{ form_errors(form.use_profile_cv) }}
+                                    <div id="profile-cv-js-error" class="invalid-feedback d-block" style="display:none;"></div>
                                 </div>
 
                                 <div id="cv-upload-wrapper" class="tb-apply-field mb-0">
@@ -200,10 +201,13 @@
         const phoneInput = document.getElementById('{{ form.phone.vars.id }}');
         const coverLetterInput = document.getElementById('{{ form.cover_letter.vars.id }}');
         const useProfileCvCheckbox = document.getElementById('{{ form.use_profile_cv.vars.id }}');
+        const hasProfileCv = {{ (candidate.cvPath is defined and candidate.cvPath) ? 'true' : 'false' }};
+        const hasExistingCv = {{ (application.cvPath is defined and application.cvPath) ? 'true' : 'false' }};
         const cvUploadWrapper = document.getElementById('cv-upload-wrapper');
         const cvFileInput = document.getElementById('{{ form.cv_file.vars.id }}');
         const phoneError = document.getElementById('phone-js-error');
         const coverLetterError = document.getElementById('cover-letter-js-error');
+        const profileCvError = document.getElementById('profile-cv-js-error');
         const cvError = document.getElementById('cv-js-error');
 
         if (!useProfileCvCheckbox || !cvUploadWrapper) {
@@ -296,13 +300,26 @@
 
         const validateCvSource = function () {
             if (useProfileCvCheckbox.checked) {
+                if (!hasProfileCv) {
+                    showError(useProfileCvCheckbox, profileCvError, 'No CV found in your profile. Uncheck this option and upload a CV.');
+                    return false;
+                }
+
+                clearError(useProfileCvCheckbox, profileCvError);
                 clearError(cvFileInput, cvError);
                 return true;
             }
 
+            clearError(useProfileCvCheckbox, profileCvError);
+
             if (!cvFileInput || !cvFileInput.files || cvFileInput.files.length === 0) {
-                clearError(cvFileInput, cvError);
-                return true;
+                if (hasExistingCv) {
+                    clearError(cvFileInput, cvError);
+                    return true;
+                }
+
+                showError(cvFileInput, cvError, 'Please upload a CV file or choose the profile CV option.');
+                return false;
             }
 
             clearError(cvFileInput, cvError);

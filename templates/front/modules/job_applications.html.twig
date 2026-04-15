@@ -4,6 +4,7 @@
 
 {% block body %}
 {% set role = authUser.role|default('candidate') %}
+{% set filters = applicationFilters|default({'search': '', 'status': 'all', 'sort': 'date_desc'}) %}
 <style>
     .tb-create-locked,
     .tb-create-locked:hover,
@@ -42,26 +43,56 @@
                 <div class="col-12 col-xl-8">
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
-                    <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#applicationCardsGrid">
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                            <input type="text" class="form-control" placeholder="Search applications by id, offer, status..." data-filter-search>
+                    {% if role == 'recruiter' %}
+                        <form method="get" action="{{ path('front_job_applications') }}" class="d-flex flex-wrap align-items-center gap-2">
+                            <input type="hidden" name="role" value="recruiter">
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                                <input type="text" name="search" class="form-control" value="{{ filters.search|default('') }}" placeholder="Search by offer, candidate, phone, status...">
+                            </div>
+                            <select name="status" class="form-select" style="max-width: 220px;">
+                                <option value="all" {{ (filters.status|default('all')) == 'all' ? 'selected' : '' }}>All Statuses</option>
+                                <option value="submitted" {{ (filters.status|default('all')) == 'submitted' ? 'selected' : '' }}>Submitted</option>
+                                <option value="in_review" {{ (filters.status|default('all')) == 'in_review' ? 'selected' : '' }}>In Review</option>
+                                <option value="shortlisted" {{ (filters.status|default('all')) == 'shortlisted' ? 'selected' : '' }}>Shortlisted</option>
+                                <option value="rejected" {{ (filters.status|default('all')) == 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                <option value="interview" {{ (filters.status|default('all')) == 'interview' ? 'selected' : '' }}>Interview</option>
+                                <option value="hired" {{ (filters.status|default('all')) == 'hired' ? 'selected' : '' }}>Hired</option>
+                            </select>
+                            <select name="sort" class="form-select" style="max-width: 230px;">
+                                <option value="date_desc" {{ (filters.sort|default('date_desc')) == 'date_desc' ? 'selected' : '' }}>Date Newest</option>
+                                <option value="date_asc" {{ (filters.sort|default('date_desc')) == 'date_asc' ? 'selected' : '' }}>Date Oldest</option>
+                                <option value="title_asc" {{ (filters.sort|default('date_desc')) == 'title_asc' ? 'selected' : '' }}>Title A-Z</option>
+                                <option value="title_desc" {{ (filters.sort|default('date_desc')) == 'title_desc' ? 'selected' : '' }}>Title Z-A</option>
+                                <option value="status_asc" {{ (filters.sort|default('date_desc')) == 'status_asc' ? 'selected' : '' }}>Status A-Z</option>
+                                <option value="status_desc" {{ (filters.sort|default('date_desc')) == 'status_desc' ? 'selected' : '' }}>Status Z-A</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Apply</button>
+                            <a href="{{ path('front_job_applications', {role: 'recruiter'}) }}" class="btn btn-outline-secondary"><i class="ti ti-rotate-clockwise-2 me-1"></i>Reset</a>
+                            <div class="small text-secondary ms-auto">{{ cards|length }} result(s)</div>
+                        </form>
+                    {% else %}
+                        <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#applicationCardsGrid">
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                                <input type="text" class="form-control" placeholder="Search applications by id, offer, status..." data-filter-search>
+                            </div>
+                            <select class="form-select" style="max-width: 220px;" data-filter-criteria>
+                                <option value="all">Search In: All</option>
+                                <option value="title">Title</option>
+                                <option value="meta">Meta</option>
+                                <option value="description">Description</option>
+                            </select>
+                            <select class="form-select" style="max-width: 230px;" data-filter-sort>
+                                <option value="default">Default Order</option>
+                                <option value="title_asc">Title A-Z</option>
+                                <option value="title_desc">Title Z-A</option>
+                                <option value="meta_asc">Meta A-Z</option>
+                                <option value="meta_desc">Meta Z-A</option>
+                            </select>
+                            <div class="small text-secondary ms-auto" data-filter-results></div>
                         </div>
-                        <select class="form-select" style="max-width: 220px;" data-filter-criteria>
-                            <option value="all">Search In: All</option>
-                            <option value="title">Title</option>
-                            <option value="meta">Meta</option>
-                            <option value="description">Description</option>
-                        </select>
-                        <select class="form-select" style="max-width: 230px;" data-filter-sort>
-                            <option value="default">Default Order</option>
-                            <option value="title_asc">Title A-Z</option>
-                            <option value="title_desc">Title Z-A</option>
-                            <option value="meta_asc">Meta A-Z</option>
-                            <option value="meta_desc">Meta Z-A</option>
-                        </select>
-                        <div class="small text-secondary ms-auto" data-filter-results></div>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
 

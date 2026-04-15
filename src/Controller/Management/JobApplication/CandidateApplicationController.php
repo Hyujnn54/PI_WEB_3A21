@@ -15,6 +15,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormInterface;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class CandidateApplicationController extends AbstractController
 {
@@ -80,8 +82,16 @@ class CandidateApplicationController extends AbstractController
             $useProfileCv = $form->get('use_profile_cv')->getData();
             $cvFile = $form->get('cv_file')->getData();
 
+            if (!$this->verifyApplyFormInController($form, $application, $useProfileCv, $cvFile, $candidate, true)) {
+                return $this->render('management/job_application/apply.html.twig', [
+                    'form' => $form->createView(),
+                    'offer' => $jobOffer,
+                    'candidate' => $candidate,
+                ]);
+            }
+
             if ($useProfileCv) {
-                $profileCvPath = method_exists($candidate, 'getCv_path') ? $candidate->getCv_path() : null;
+                $profileCvPath = method_exists($candidate, 'getCvPath') ? $candidate->getCvPath() : null;
                 if (empty($profileCvPath)) {
                     $form->get('use_profile_cv')->addError(new FormError('No CV found in your profile. Uncheck this option and upload a CV.'));
 
@@ -277,8 +287,17 @@ class CandidateApplicationController extends AbstractController
             $useProfileCv = $form->get('use_profile_cv')->getData();
             $cvFile = $form->get('cv_file')->getData();
 
+            if (!$this->verifyApplyFormInController($form, $application, $useProfileCv, $cvFile, $candidate, false)) {
+                return $this->render('management/job_application/edit.html.twig', [
+                    'form' => $form->createView(),
+                    'application' => $application,
+                    'offer' => $application->getOffer_id(),
+                    'candidate' => $candidate,
+                ]);
+            }
+
             if ($useProfileCv) {
-                $profileCvPath = method_exists($candidate, 'getCv_path') ? $candidate->getCv_path() : null;
+                $profileCvPath = method_exists($candidate, 'getCvPath') ? $candidate->getCvPath() : null;
                 if (empty($profileCvPath)) {
                     $form->get('use_profile_cv')->addError(new FormError('No CV found in your profile. Uncheck this option and upload a CV.'));
 
@@ -286,6 +305,7 @@ class CandidateApplicationController extends AbstractController
                         'form' => $form->createView(),
                         'application' => $application,
                         'offer' => $application->getOffer_id(),
+                        'candidate' => $candidate,
                     ]);
                 }
 
@@ -309,6 +329,7 @@ class CandidateApplicationController extends AbstractController
                         'form' => $form->createView(),
                         'application' => $application,
                         'offer' => $application->getOffer_id(),
+                        'candidate' => $candidate,
                     ]);
                 }
             }
@@ -343,7 +364,76 @@ class CandidateApplicationController extends AbstractController
             'form' => $form->createView(),
             'application' => $application,
             'offer' => $application->getOffer_id(),
+            'candidate' => $candidate,
         ]);
+    }
+
+    private function verifyApplyFormInController(
+        FormInterface $form,
+        Job_application $application,
+        bool $useProfileCv,
+        ?UploadedFile $cvFile,
+        Candidate $candidate,
+        bool $requireCvSource
+    ): bool {
+        $isValid = true;
+
+        $phone = trim((string) $application->getPhone());
+        $localPhone = $this->extractTunisianLocalNumber($phone);
+        if (!preg_match('/^[259][0-9]{7}$/', $localPhone)) {
+            $form->get('phone')->addError(new FormError('Please enter a valid Tunisian phone number (+216XXXXXXXX, 216XXXXXXXX, 0XXXXXXXX or XXXXXXXX).'));
+            $isValid = false;
+        } else {
+            $application->setPhone('+216' . $localPhone);
+        }
+
+        $coverLetter = trim((string) $application->getCover_letter());
+        $coverLetterLength = mb_strlen($coverLetter);
+        if ($coverLetterLength < 50 || $coverLetterLength > 2000) {
+            $form->get('cover_letter')->addError(new FormError('Cover letter must be between 50 and 2000 characters.'));
+            $isValid = false;
+        } else {
+            $application->setCover_letter($coverLetter);
+        }
+
+        if ($useProfileCv) {
+            $profileCvPath = method_exists($candidate, 'getCvPath') ? (string) $candidate->getCvPath() : '';
+            if ($profileCvPath === '') {
+                $form->get('use_profile_cv')->addError(new FormError('No CV found in your profile. Uncheck this option and upload a CV.'));
+                $isValid = false;
+            }
+        } else {
+            $existingCvPath = trim((string) $application->getCv_path());
+            if (!$cvFile instanceof UploadedFile && ($requireCvSource || $existingCvPath === '')) {
+                $form->get('cv_file')->addError(new FormError('Please upload a CV file or choose the profile CV option.'));
+                $isValid = false;
+            }
+        }
+
+        return $isValid;
+    }
+
+    private function extractTunisianLocalNumber(string $value): string
+    {
+        $cleaned = preg_replace('/[^0-9+]/', '', $value) ?? '';
+
+        if (str_starts_with($cleaned, '+216') && strlen($cleaned) === 12) {
+            return substr($cleaned, 4);
+        }
+
+        if (str_starts_with($cleaned, '216') && strlen($cleaned) === 11) {
+            return substr($cleaned, 3);
+        }
+
+        if (str_starts_with($cleaned, '0') && strlen($cleaned) === 9) {
+            return substr($cleaned, 1);
+        }
+
+        if (strlen($cleaned) === 8 && ctype_digit($cleaned)) {
+            return $cleaned;
+        }
+
+        return '';
     }
 
     private function logStatusHistory(

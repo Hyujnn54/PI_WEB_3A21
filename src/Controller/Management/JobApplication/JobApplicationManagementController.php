@@ -334,9 +334,16 @@ class JobApplicationManagementController extends AbstractController
             return $this->redirectToRoute('management_job_applications_details', ['applicationId' => $applicationId]);
         }
 
+        $currentNote = trim((string) $history->getNote());
         $newNote = trim((string) $request->request->get('note', ''));
         if ($newNote === '') {
             $this->addFlash('warning', 'Note cannot be empty.');
+
+            return $this->redirectToRoute('management_job_applications_details', ['applicationId' => $applicationId]);
+        }
+
+        if ($newNote === $currentNote) {
+            $this->addFlash('info', 'No changes detected in the note.');
 
             return $this->redirectToRoute('management_job_applications_details', ['applicationId' => $applicationId]);
         }
