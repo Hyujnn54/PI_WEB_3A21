@@ -1,0 +1,121 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | Event Registrations{% endblock %}
+
+{% block body %}
+{% set role = authUser.role|default('recruiter') %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="page-title"><i class="ti ti-users-group me-1"></i>Event Registrations</h2>
+                <p class="text-secondary mb-0">{{ role == 'admin' ? 'View candidate registrations across all events.' : 'View and manage candidate registrations for your events.' }}</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ path('front_events', {'role': 'recruiter'}) }}" class="btn btn-outline-primary">Back to Events</a>
+            </div>
+        </div>
+    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            {% if events is not empty %}
+                {% for event in events %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h4 class="card-title mb-1">{{ event.title }}</h4>
+                                    <p class="text-muted mb-0">{{ event.meta }}</p>
+                                </div>
+                                <span class="badge bg-light text-dark border">{{ event.event_type }}</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <dl class="small">
+                                        <dt class="text-muted">Location</dt>
+                                        <dd>{{ event.location }}</dd>
+                                    </dl>
+                                </div>
+                                <div class="col-md-3">
+                                    <dl class="small">
+                                        <dt class="text-muted">Capacity</dt>
+                                        <dd>{{ event.capacity }}</dd>
+                                    </dl>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="alert alert-info mb-0">
+                                        <i class="ti ti-users me-2"></i>
+                                        <strong>Registered Candidates:</strong> {{ event.registration_count }} / {{ event.capacity }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Candidate Name</th>
+                                            <th>Email</th>
+                                            <th>Registration Date</th>
+                                            <th>Status</th>
+                                            {% if role == 'recruiter' %}
+                                                <th>Actions</th>
+                                            {% endif %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if event.registrations is not empty %}
+                                            {% for candidate in event.registrations %}
+                                                <tr>
+                                                    <td>{{ candidate.name }}</td>
+                                                    <td>{{ candidate.email }}</td>
+                                                    <td>{{ candidate.registered_at|date('d M Y H:i') }}</td>
+                                                    <td>
+                                                        {% if candidate.status == 'confirmed' %}
+                                                            <span class="badge bg-success">Confirmed</span>
+                                                        {% elseif candidate.status == 'rejected' %}
+                                                            <span class="badge bg-danger">Rejected</span>
+                                                        {% else %}
+                                                            <span class="badge bg-warning">Under Review</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    {% if role == 'recruiter' %}
+                                                        <td>
+                                                            <div class="btn-list flex-nowrap">
+                                                                <form method="post" action="{{ path('recruiter_update_registration_status', {'id': candidate.registration_id}) }}" class="d-inline">
+                                                                    <input type="hidden" name="status" value="confirmed">
+                                                                    <button type="submit" class="btn btn-icon btn-outline-success btn-sm" title="Confirm Attendance"><i class="ti ti-check"></i></button>
+                                                                </form>
+                                                                <form method="post" action="{{ path('recruiter_update_registration_status', {'id': candidate.registration_id}) }}" class="d-inline">
+                                                                    <input type="hidden" name="status" value="rejected">
+                                                                    <button type="submit" class="btn btn-icon btn-outline-danger btn-sm" title="Reject"><i class="ti ti-x"></i></button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    {% endif %}
+                                                </tr>
+                                            {% endfor %}
+                                        {% else %}
+                                            <tr class="text-muted">
+                                                <td colspan="{{ role == 'recruiter' ? 5 : 4 }}" class="text-center py-3">No candidates registered for this event yet.</td>
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="card">
+                    <div class="card-body text-center text-secondary">
+                        {{ role == 'admin' ? 'No event registrations found yet.' : 'You haven\'t created any events yet. Create an event to start receiving candidate registrations.' }}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

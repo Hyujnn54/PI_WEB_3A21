@@ -23,14 +23,16 @@
 </style>
 <div class="page-wrapper">
     <div class="page-header d-print-none">
-        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2 tb-front-page-head">
             <div>
                 <h2 class="page-title"><i class="ti ti-file-check me-1"></i>Job Applications</h2>
-                <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Evaluate applicant profiles and move them through your pipeline.' : 'Track each application and monitor your progress.' }}</p>
-            </div>
-            <div class="d-flex gap-2">
-                <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Review Queue' : 'My Pipeline' }}</a>
-                <a href="#" class="btn btn-outline-primary">Status Timeline</a>
+                <p class="text-secondary mb-0">
+                    {{ role == 'recruiter'
+                        ? 'Evaluate applicant profiles and move them through your pipeline.'
+                        : (role == 'admin'
+                            ? 'Read-only overview of all applications with full inspection access.'
+                            : 'Track each application and monitor your progress.') }}
+                </p>
             </div>
         </div>
     </div>
@@ -67,10 +69,83 @@
                 {% for card in cards %}
                     {% set canCreateInterview = card.can_create_interview|default(true) %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-application-id="{{ card.id|default(0) }}" data-detail-target="#applicationDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-accept-url="{{ card.accept_url|default('#') }}" data-decline-url="{{ card.decline_url|default('#') }}" data-create-url="{{ card.create_interview_url|default('#') }}" data-create-disabled="{{ canCreateInterview ? '0' : '1' }}" data-create-reason="{{ card.interview_block_reason|default('Interview already created for this application.')|e('html_attr') }}" data-create-check-url="{{ path('front_application_interview_availability', {applicationId: card.id}|merge(app.request.query.all|merge({role: role}))) }}" data-detail-extra="Application: {{ card.meta }}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already created for this application.') }}{% endif %}">
+                        <div class="tb-module-card h-100" 
+                            data-application-id="{{ card.id|default(0) }}" 
+                            data-detail-target="#applicationDetailPanel" 
+                            data-detail-meta="{{ card.meta }}" 
+                            data-detail-title="{{ card.title }}" 
+                            data-detail-text="{{ card.text }}"
+                            {# Recruiter data attributes #}
+                            {% if role == 'recruiter' %}
+                                data-accept-url="{{ card.accept_url|default('#') }}" 
+                                data-decline-url="{{ card.decline_url|default('#') }}" 
+                                data-create-url="{{ card.create_interview_url|default('#') }}" 
+                                data-create-check-url="{{ card.create_interview_check_url|default('') }}"
+                                data-create-disabled="{{ canCreateInterview ? '0' : '1' }}" 
+                                data-create-reason="{{ card.interview_block_reason|default('Interview already created for this application.')|e('html_attr') }}"
+                                data-details-url="{{ card.details_url|default('#') }}"
+                            {% endif %}
+                            {# Candidate data attributes #}
+                            {% if role == 'candidate' %}
+                                data-details-url="{{ card.details_url|default('#') }}"
+                                data-can-edit="{{ card.can_edit|default(false) ? '1' : '0' }}"
+                                data-edit-url="{{ card.edit_url|default('#') }}"
+                                data-can-withdraw="{{ card.can_withdraw|default(false) ? '1' : '0' }}"
+                                data-withdraw-url="{{ card.withdraw_url|default('#') }}"
+                            {% endif %}
+                            {% if role == 'admin' %}
+                                data-details-url="{{ card.details_url|default('#') }}"
+                            {% endif %}
+                            data-detail-extra="Status: {{ card.meta }}||{{ card.title }}{% if role == 'admin' %}||Inspect URL: {{ card.details_url|default('#') }}{% endif %}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already created for this application.') }}{% endif %}">
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
+                            {# Recruiter inline buttons for quick actions #}
+                            {% if role == 'recruiter' %}
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <a href="{{ card.details_url|default('#') }}" class="btn btn-sm btn-outline-primary"><i class="ti ti-eye me-1"></i>Review</a>
+                                    <form method="post" action="{{ card.shortlist_url|default('#') }}" class="d-inline">
+                                        <input type="hidden" name="status" value="SHORTLISTED">
+                                        <input type="hidden" name="return_to" value="list">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Shortlist</button>
+                                    </form>
+                                    <form method="post" action="{{ card.reject_url|default('#') }}" class="d-inline">
+                                        <input type="hidden" name="status" value="REJECTED">
+                                        <input type="hidden" name="return_to" value="list">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Reject</button>
+                                    </form>
+                                    {% if canCreateInterview %}
+                                        <button type="button" class="btn btn-sm btn-primary tb-open-interview-modal" 
+                                            data-application-id="{{ card.id|default(0) }}" 
+                                            data-create-url="{{ card.create_interview_url|default('#') }}">
+                                            <i class="ti ti-calendar-plus me-1"></i>Create Interview
+                                        </button>
+                                    {% else %}
+                                        <span class="btn btn-sm btn-secondary disabled" title="{{ card.interview_block_reason|default('Interview already created') }}" aria-disabled="true">
+                                            <i class="ti ti-check me-1"></i>Interview Already Created
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            {# Candidate inline buttons #}
+                            {% if role == 'candidate' %}
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <a href="{{ card.details_url|default('#') }}" class="btn btn-sm btn-outline-primary"><i class="ti ti-eye me-1"></i>View Details</a>
+                                    {% if card.can_edit|default(false) %}
+                                        <a href="{{ card.edit_url|default('#') }}" class="btn btn-sm btn-outline-secondary"><i class="ti ti-edit me-1"></i>Edit</a>
+                                    {% endif %}
+                                    {% if card.can_withdraw|default(false) %}
+                                        <form method="post" action="{{ card.withdraw_url|default('#') }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to withdraw this application?');"><i class="ti ti-trash me-1"></i>Withdraw</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            {% if role == 'admin' %}
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <a href="{{ card.details_url|default('#') }}" class="btn btn-sm btn-outline-primary"><i class="ti ti-eye me-1"></i>Inspect Details</a>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 {% else %}
@@ -99,27 +174,10 @@
                 </div>
             </div>
 
-            <div id="applicationActionDock" class="tb-interview-action-dock">
-                <div class="container-xl">
-                    <div class="tb-interview-action-dock-inner">
-                        <div class="small text-secondary" id="applicationActionLabel">Choose an application to unlock actions</div>
-                        <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
-                            <form method="post" action="#" class="d-inline" id="applicationAcceptForm">
-                                <button type="submit" class="btn btn-outline-success" id="applicationAcceptBtn" disabled aria-disabled="true"><i class="ti ti-check me-1"></i>Accept</button>
-                            </form>
-                            <form method="post" action="#" class="d-inline" id="applicationDeclineForm">
-                                <button type="submit" class="btn btn-outline-danger" id="applicationDeclineBtn" disabled aria-disabled="true"><i class="ti ti-x me-1"></i>Decline</button>
-                            </form>
-                            <button type="button" class="btn btn-primary" id="applicationCreateBtn" disabled aria-disabled="true"><i class="ti ti-hand-click me-1"></i>Choose Application</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="modal fade" id="createInterviewModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-centered">
-                    <div class="modal-content tb-admin-card">
-                        <div class="modal-header">
+                    <div class="modal-content tb-admin-card tb-modal-shell">
+                        <div class="modal-header tb-modal-header">
                             <h5 class="modal-title"><i class="ti ti-calendar-plus me-1"></i>Create Interview</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
@@ -201,13 +259,6 @@
         const onsiteField = formEl.querySelector('[data-onsite-field]');
         const notesInput = formEl.querySelector('textarea[name="notes"]');
         const notesCount = formEl.querySelector('[data-notes-count]');
-        const actionDock = document.getElementById('applicationActionDock');
-        const actionLabel = document.getElementById('applicationActionLabel');
-        const acceptForm = document.getElementById('applicationAcceptForm');
-        const declineForm = document.getElementById('applicationDeclineForm');
-        const acceptBtn = document.getElementById('applicationAcceptBtn');
-        const declineBtn = document.getElementById('applicationDeclineBtn');
-        const createBtn = document.getElementById('applicationCreateBtn');
         let selectedCard = null;
 
         const now = new Date();
@@ -341,45 +392,28 @@
             });
         }
 
-        const syncDockFromCard = function (card) {
-            if (!card || !actionDock) return;
-            const acceptUrl = card.getAttribute('data-accept-url') || '#';
-            const declineUrl = card.getAttribute('data-decline-url') || '#';
-            const createUrl = card.getAttribute('data-create-url') || '#';
+        const syncInlineCreateButton = function (card) {
+            if (!card) return;
+            const inlineBtn = card.querySelector('.tb-open-interview-modal');
+            if (!inlineBtn) return;
+
             const createDisabled = card.getAttribute('data-create-disabled') === '1';
+            const createReason = card.getAttribute('data-create-reason') || 'Interview already created for this application.';
 
-            if (acceptForm) acceptForm.setAttribute('action', acceptUrl);
-            if (declineForm) declineForm.setAttribute('action', declineUrl);
-            if (acceptBtn) {
-                acceptBtn.disabled = false;
-                acceptBtn.setAttribute('aria-disabled', 'false');
-            }
-            if (declineBtn) {
-                declineBtn.disabled = false;
-                declineBtn.setAttribute('aria-disabled', 'false');
-            }
-
-            if (createBtn) {
-                createBtn.setAttribute('data-create-url', createUrl);
-                createBtn.classList.toggle('tb-create-locked', createDisabled);
-                createBtn.toggleAttribute('disabled', createDisabled);
-                createBtn.setAttribute('aria-disabled', createDisabled ? 'true' : 'false');
-                createBtn.innerHTML = createDisabled
-                    ? '<i class="ti ti-lock me-1"></i>Interview Already Exists'
-                    : '<i class="ti ti-calendar-plus me-1"></i>Create Interview';
-            }
-
-            if (actionLabel) {
-                actionLabel.textContent = (card.getAttribute('data-detail-title') || 'Selected application') + ' actions';
-            }
-
+            inlineBtn.classList.toggle('tb-create-locked', createDisabled);
+            inlineBtn.toggleAttribute('disabled', createDisabled);
+            inlineBtn.setAttribute('aria-disabled', createDisabled ? 'true' : 'false');
+            inlineBtn.setAttribute('title', createDisabled ? createReason : '');
+            inlineBtn.innerHTML = createDisabled
+                ? '<i class="ti ti-lock me-1"></i>Interview Exists'
+                : '<i class="ti ti-calendar-plus me-1"></i>Create Interview';
         };
 
         const refreshCreateAvailability = async function (card) {
             if (!card) return false;
             const checkUrl = card.getAttribute('data-create-check-url') || '';
             if (!checkUrl) {
-                syncDockFromCard(card);
+                syncInlineCreateButton(card);
                 return card.getAttribute('data-create-disabled') !== '1';
             }
 
@@ -389,44 +423,70 @@
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 });
                 if (!response.ok) {
-                    syncDockFromCard(card);
+                    syncInlineCreateButton(card);
                     return card.getAttribute('data-create-disabled') !== '1';
                 }
 
                 const payload = await response.json();
                 if (!payload || payload.ok !== true) {
-                    syncDockFromCard(card);
+                    syncInlineCreateButton(card);
                     return card.getAttribute('data-create-disabled') !== '1';
                 }
 
                 card.setAttribute('data-create-disabled', payload.canCreateInterview ? '0' : '1');
                 card.setAttribute('data-create-url', payload.createUrl || '#');
+                card.setAttribute('data-create-reason', payload.reason || 'Interview already created for this application.');
             } catch (e) {
                 // Keep existing card state when live check fails.
             }
 
-            syncDockFromCard(card);
+            syncInlineCreateButton(card);
             return card.getAttribute('data-create-disabled') !== '1';
         };
 
+        const refreshAllCreateAvailability = function () {
+            document.querySelectorAll('#applicationCardsGrid .tb-module-card[data-create-check-url]').forEach(function (card) {
+                refreshCreateAvailability(card);
+            });
+        };
+
         document.querySelectorAll('#applicationCardsGrid .tb-module-card').forEach(function (card) {
+            syncInlineCreateButton(card);
             card.addEventListener('click', function () {
                 selectedCard = card;
-                // Render immediately from current card data (instant response).
-                syncDockFromCard(card);
             });
         });
 
-        if (createBtn) {
-            createBtn.addEventListener('click', async function () {
-                if (!selectedCard) return;
-                if (createBtn.disabled || createBtn.classList.contains('tb-create-locked')) {
-                    const canCreate = await refreshCreateAvailability(selectedCard);
-                    if (!canCreate) return;
+        document.querySelectorAll('.tb-open-interview-modal').forEach(function (btn) {
+            btn.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const card = btn.closest('.tb-module-card');
+                if (!card) return;
+
+                const createDisabled = card.getAttribute('data-create-disabled') === '1';
+                if (createDisabled) {
+                    syncInlineCreateButton(card);
+                    return;
                 }
-                openCreateModal(createBtn.getAttribute('data-create-url') || '#', selectedCard);
+
+                const initialUrl = card.getAttribute('data-create-url') || '#';
+                openCreateModal(initialUrl, card);
+
+                refreshCreateAvailability(card).then(function (canCreate) {
+                    if (!canCreate) {
+                        if (modal) {
+                            modal.hide();
+                        }
+                        return;
+                    }
+
+                    const freshUrl = card.getAttribute('data-create-url') || initialUrl;
+                    formEl.setAttribute('action', freshUrl);
+                });
             });
-        }
+        });
 
         const params = new URLSearchParams(window.location.search);
         const openCreateFor = params.get('openCreateFor');
@@ -448,10 +508,10 @@
             refreshCreateAvailability(initiallySelected);
         }
 
+        refreshAllCreateAvailability();
+
         window.addEventListener('pageshow', function () {
-            if (selectedCard) {
-                refreshCreateAvailability(selectedCard);
-            }
+            refreshAllCreateAvailability();
         });
 
         applyModeFields();

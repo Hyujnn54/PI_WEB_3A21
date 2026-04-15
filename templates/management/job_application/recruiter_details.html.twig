@@ -1,0 +1,192 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Recruiter | Application Review{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="page-title"><i class="ti ti-clipboard-check me-1"></i>Application Review</h2>
+                <p class="text-secondary mb-0">Full application details, history, and status update actions.</p>
+            </div>
+            <a href="{{ path('front_job_applications', {role: 'recruiter'}) }}" class="btn btn-outline-secondary">Back to Recruiter Applications</a>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="row g-3">
+                <div class="col-12 col-lg-8">
+                    <div class="card tb-admin-card">
+                        <div class="card-header">
+                            <h3 class="card-title mb-0">{{ offer ? offer.title : 'Unknown Offer' }}</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="small text-secondary">Current Status</div>
+                                    <div class="fw-semibold">{{ application.current_status }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="small text-secondary">Applied At</div>
+                                    <div class="fw-semibold">{{ application.applied_at|date('d M Y H:i') }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="small text-secondary">Candidate</div>
+                                    <div class="fw-semibold">
+                                        {% if candidate and candidate.id %}
+                                            {{ candidate.id.first_name|default('') }} {{ candidate.id.last_name|default('') }}
+                                        {% else %}
+                                            Unknown Candidate
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="small text-secondary">Phone Number</div>
+                                    <div class="fw-semibold">{{ application.phone }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="small text-secondary">CV File</div>
+                                    {% set cvPath = (application.cv_path|default('')|trim) %}
+                                    {% set cvPathNormalized = cvPath|replace({'\\': '/'}) %}
+                                    {% set cvUrl = '' %}
+                                    {% if cvPathNormalized != '' %}
+                                        {% if cvPathNormalized starts with 'http://' or cvPathNormalized starts with 'https://' %}
+                                            {% set cvUrl = cvPathNormalized %}
+                                        {% elseif cvPathNormalized starts with '/' %}
+                                            {% set cvUrl = cvPathNormalized %}
+                                        {% elseif cvPathNormalized starts with 'public/' %}
+                                            {% set cvUrl = asset(cvPathNormalized|slice(7)) %}
+                                        {% elseif cvPathNormalized starts with 'uploads/' %}
+                                            {% set cvUrl = asset(cvPathNormalized) %}
+                                        {% else %}
+                                            {% set cvUrl = asset('uploads/applications/' ~ cvPathNormalized) %}
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {% if cvUrl != '' %}
+                                        <a class="btn btn-outline-primary btn-sm" href="{{ cvUrl }}" target="_blank" rel="noopener">
+                                            <i class="ti ti-file-cv me-1"></i>Open CV
+                                        </a>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis">CV unavailable</span>
+                                    {% endif %}
+                                </div>
+                                <div class="col-12">
+                                    <div class="small text-secondary mb-1">Cover Letter</div>
+                                    <div class="p-3 border rounded bg-light-subtle">{{ application.cover_letter }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4">
+                    <div class="card tb-admin-card">
+                        <div class="card-header">
+                            <h3 class="card-title mb-0"><i class="ti ti-refresh me-1"></i>Update Status</h3>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" action="{{ path('app_recruiter_application_update_status', {'applicationId': application.id}) }}">
+                                <div class="mb-3">
+                                    <label class="form-label">New Status</label>
+                                    <select name="status" class="form-select" required>
+                                        {% for statusOption in statusOptions %}
+                                            <option value="{{ statusOption.value }}" {{ application.current_status == statusOption.value ? 'selected' : '' }}>{{ statusOption.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Note (optional)</label>
+                                    <textarea name="note" rows="4" class="form-control" placeholder="Write a custom note (optional). If empty, a note is generated automatically."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Save Status Update</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card tb-admin-card">
+                        <div class="card-header">
+                            <h3 class="card-title mb-0"><i class="ti ti-history me-1"></i>Status History</h3>
+                        </div>
+                        <div class="card-body">
+                            {% if historyEntries is not empty %}
+                                <div class="list-group list-group-flush">
+                                    {% for entry in historyEntries %}
+                                        <div class="list-group-item px-0">
+                                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                                <div>
+                                                    <div class="fw-semibold">{{ entry.status }}</div>
+                                                    <div class="text-secondary">{{ entry.note }}</div>
+                                                    {% if editableHistoryIds[entry.id]|default(false) %}
+                                                        <form method="post" action="{{ path('app_recruiter_history_note_update', {'applicationId': application.id, 'historyId': entry.id}) }}" class="mt-2 js-note-edit-form" novalidate>
+                                                            <div class="input-group input-group-sm">
+                                                                <input type="text" name="note" class="form-control js-note-input" value="{{ entry.note }}" maxlength="255">
+                                                                <button type="submit" class="btn btn-outline-primary">Update Note</button>
+                                                            </div>
+                                                            <div class="invalid-feedback d-block js-note-error" style="display:none;"></div>
+                                                        </form>
+                                                    {% else %}
+                                                        <div class="small text-muted mt-1">Not editable (auto-generated or created by another user)</div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="small text-secondary">{{ entry.changed_at|date('d M Y H:i') }}</div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="text-secondary">No status history available yet.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const forms = document.querySelectorAll('.js-note-edit-form');
+        if (!forms.length) {
+            return;
+        }
+
+        forms.forEach(function (form) {
+            const input = form.querySelector('.js-note-input');
+            const error = form.querySelector('.js-note-error');
+            if (!input || !error) {
+                return;
+            }
+
+            const validate = function () {
+                const value = (input.value || '').trim();
+                if (value === '') {
+                    input.classList.add('is-invalid');
+                    error.textContent = 'Note cannot be empty.';
+                    error.style.display = 'block';
+                    return false;
+                }
+
+                input.classList.remove('is-invalid');
+                error.textContent = '';
+                error.style.display = 'none';
+                return true;
+            };
+
+            input.addEventListener('input', validate);
+            input.addEventListener('blur', validate);
+
+            form.addEventListener('submit', function (event) {
+                if (!validate()) {
+                    event.preventDefault();
+                }
+            });
+        });
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,194 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Talent Bridge | Admin Applications{% endblock %}
+
+{% block admin_content %}
+    <div class="row mb-4">
+        <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h1 class="h3 mb-1">All Applications</h1>
+                <p class="mb-0 text-muted">Centralized admin view of all job applications in the system.</p>
+            </div>
+            <span id="adminApplicationRecordCount" class="badge bg-primary-subtle text-primary-emphasis">{{ rows|length }} records</span>
+        </div>
+    </div>
+
+    <div class="card border mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-xl-6">
+                    <label class="form-label mb-1">Search</label>
+                    <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                        <input id="adminApplicationSearch" type="text" class="form-control" placeholder="Search by offer, candidate, phone, status...">
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-xl-3">
+                    <label class="form-label mb-1">Filter by Status</label>
+                    <select id="adminApplicationStatusFilter" class="form-select">
+                        <option value="all">All Statuses</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="in_review">In Review</option>
+                        <option value="shortlisted">Shortlisted</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="interview">Interview</option>
+                        <option value="hired">Hired</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-6 col-xl-3">
+                    <label class="form-label mb-1">Sort</label>
+                    <select id="adminApplicationSortMode" class="form-select">
+                        <option value="default">Default Order</option>
+                        <option value="title_asc">Title A-Z</option>
+                        <option value="title_desc">Title Z-A</option>
+                        <option value="date_desc">Date Newest</option>
+                        <option value="date_asc">Date Oldest</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex justify-content-end">
+                    <button id="adminApplicationReset" type="button" class="btn btn-outline-secondary">
+                        <i class="ti ti-rotate-clockwise-2 me-1"></i>Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Offer</th>
+                        <th>Candidate</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Applied At</th>
+                        <th>Archived</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                        <tr class="js-admin-application-row" data-search-text="{{ (row.offer_title ~ ' ' ~ row.candidate_name ~ ' ' ~ row.phone ~ ' ' ~ row.status)|lower }}" data-filter-status="{{ row.status|lower }}" data-sort-title="{{ row.offer_title|lower }}" data-sort-date="{{ row.applied_at|date('U') }}" data-archived="{{ row.is_archived ? '1' : '0' }}">
+                            <td>#{{ row.id }}</td>
+                            <td>{{ row.offer_title }}</td>
+                            <td>{{ row.candidate_name }}</td>
+                            <td>{{ row.phone }}</td>
+                            <td><span class="badge bg-primary text-white fw-semibold">{{ row.status }}</span></td>
+                            <td>{{ row.applied_at|date('d M Y H:i') }}</td>
+                            <td>
+                                <span class="badge {{ row.is_archived ? 'bg-danger text-white' : 'bg-success text-white' }} fw-semibold">
+                                    {{ row.is_archived ? 'ARCHIVED' : 'ACTIVE' }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a href="{{ row.details_url }}" class="btn btn-sm btn-primary"><i class="ti ti-eye me-1"></i>Inspect</a>
+                                    <form method="post" action="{{ row.is_archived ? row.unarchive_url : row.archive_url }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm {{ row.is_archived ? 'btn-outline-success' : 'btn-outline-danger' }}">
+                                            <i class="ti {{ row.is_archived ? 'ti-box' : 'ti-archive' }} me-1"></i>{{ row.is_archived ? 'Unarchive' : 'Archive' }}
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">No applications found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const rows = document.querySelectorAll('.js-admin-application-row');
+            const searchInput = document.getElementById('adminApplicationSearch');
+            const statusFilter = document.getElementById('adminApplicationStatusFilter');
+            const sortModeSelect = document.getElementById('adminApplicationSortMode');
+            const resetBtn = document.getElementById('adminApplicationReset');
+            const recordCountBadge = document.getElementById('adminApplicationRecordCount');
+            const tableBody = document.querySelector('table tbody');
+            if (!rows.length) {
+                return;
+            }
+
+            const rowList = Array.from(rows);
+
+            const runFiltersAndSort = function () {
+                const query = ((searchInput && searchInput.value) || '').trim().toLowerCase();
+                const selectedStatus = ((statusFilter && statusFilter.value) || 'all').toLowerCase();
+                const sortMode = (sortModeSelect && sortModeSelect.value) || 'default';
+                let visibleCount = 0;
+
+                rowList.forEach(function (row) {
+                    const haystack = (row.getAttribute('data-search-text') || '').toLowerCase();
+                    const rowStatus = (row.getAttribute('data-filter-status') || '').toLowerCase();
+
+                    const searchMatch = query === '' || haystack.includes(query);
+                    const statusMatch = selectedStatus === 'all' || rowStatus === selectedStatus;
+                    const visible = searchMatch && statusMatch;
+
+                    row.classList.toggle('d-none', !visible);
+                    if (visible) {
+                        visibleCount += 1;
+                    }
+                });
+
+                const sortedRows = rowList.slice().sort(function (a, b) {
+                    if (sortMode === 'title_asc') {
+                        return (a.getAttribute('data-sort-title') || '').localeCompare((b.getAttribute('data-sort-title') || ''));
+                    }
+                    if (sortMode === 'title_desc') {
+                        return (b.getAttribute('data-sort-title') || '').localeCompare((a.getAttribute('data-sort-title') || ''));
+                    }
+                    if (sortMode === 'date_desc') {
+                        return Number(b.getAttribute('data-sort-date') || 0) - Number(a.getAttribute('data-sort-date') || 0);
+                    }
+                    if (sortMode === 'date_asc') {
+                        return Number(a.getAttribute('data-sort-date') || 0) - Number(b.getAttribute('data-sort-date') || 0);
+                    }
+                    return 0;
+                });
+
+                sortedRows.forEach(function (row) {
+                    tableBody.appendChild(row);
+                });
+
+                if (recordCountBadge) {
+                    recordCountBadge.textContent = visibleCount + ' records';
+                }
+            };
+
+            if (searchInput) {
+                searchInput.addEventListener('input', runFiltersAndSort);
+            }
+            if (statusFilter) {
+                statusFilter.addEventListener('change', runFiltersAndSort);
+            }
+            if (sortModeSelect) {
+                sortModeSelect.addEventListener('change', runFiltersAndSort);
+            }
+            if (resetBtn) {
+                resetBtn.addEventListener('click', function () {
+                    if (searchInput) {
+                        searchInput.value = '';
+                    }
+                    if (statusFilter) {
+                        statusFilter.value = 'all';
+                    }
+                    if (sortModeSelect) {
+                        sortModeSelect.value = 'default';
+                    }
+                    runFiltersAndSort();
+                });
+            }
+
+            runFiltersAndSort();
+        });
+    </script>
+{% endblock %}

@@ -6,18 +6,37 @@
 {% set role = authUser.role|default('candidate') %}
 <div class="page-wrapper">
     <div class="page-header d-print-none">
-        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2 tb-front-page-head">
             <div>
                 <h2 class="page-title"><i class="ti ti-calendar-event me-1"></i>Events</h2>
                 <p class="text-secondary mb-0">{{ role == 'recruiter' ? 'Plan and promote talent events with targeted audiences.' : 'Join hiring events and build direct connections with recruiters.' }}</p>
             </div>
             <div class="d-flex gap-2">
-                <a href="#" class="btn btn-primary">{{ role == 'recruiter' ? 'Create Event' : 'My Registrations' }}</a>
-                <a href="#" class="btn btn-outline-primary">Calendar View</a>
+                {% if role == 'recruiter' %}
+                    <a href="{{ path('recruiter_create_event') }}" class="btn btn-primary">Create Event</a>
+                    <a href="{{ path('recruiter_event_registrations') }}" class="btn btn-outline-primary">View Registrations</a>
+                {% elseif role == 'candidate' %}
+                    <a href="{{ path('front_event_registrations') }}" class="btn btn-primary">My Registrations</a>
+                {% endif %}
             </div>
         </div>
     </div>
     <div class="page-body">
+        {% if app.flashes('success') %}
+            <div class="container-xl">
+                {% for message in app.flashes('success') %}
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <div class="d-flex">
+                            <div>
+                                <i class="ti ti-check me-2"></i>
+                                {{ message }}
+                            </div>
+                        </div>
+                        <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
         <div class="container-xl tb-interviews-page">
             <div class="row g-3 tb-interviews-layout">
                 <div class="col-12 col-xl-8">
@@ -48,11 +67,37 @@
 
             <div id="eventCardsGrid" class="row row-cards">
                 {% for card in cards %}
-                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="{{ role == 'recruiter' ? 'Review Event Feedback' : 'Event Details' }}" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}">
-                            <div class="tb-module-meta">{{ card.meta }}</div>
-                            <h3>{{ card.title }}</h3>
+                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-type="{{ card.event_type|default('')|lower }}" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
+                        <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="See Details" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}" data-event-id="{{ card.id|default('') }}" data-event-type="{{ card.event_type|default('') }}" data-event-location="{{ card.location|default('') }}" data-event-capacity="{{ card.capacity|default('') }}" data-event-meet-link="{{ card.meet_link|default('') }}" data-event-date-value="{{ card.event_date_value|default('') }}">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div class="tb-module-meta">{{ card.meta }}</div>
+                                    <h3>{{ card.title }}</h3>
+                                </div>
+                                {% if card.registered and role == 'candidate' %}
+                                    <span class="badge bg-success">Registered</span>
+                                {% endif %}
+                            </div>
                             <p>{{ card.text }}</p>
+
+                            <div class="d-flex gap-2 mt-3 flex-wrap">
+                                {% if role == 'candidate' %}
+                                    {% if card.registered %}
+                                        <form method="post" action="{{ path('front_event_unregister', {'id': card.id}) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Unregister</button>
+                                        </form>
+                                    {% else %}
+                                        <form method="post" action="{{ path('front_event_register', {'id': card.id}) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-primary">Register</button>
+                                        </form>
+                                    {% endif %}
+                                {% elseif role == 'recruiter' %}
+                                    <a href="{{ path('recruiter_update_event', {'id': card.id}) }}" class="btn btn-sm btn-outline-primary">Modify</a>
+                                    <form method="post" action="{{ path('recruiter_delete_event', {'id': card.id}) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this event?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 {% else %}
@@ -77,25 +122,132 @@
                     <p class="mb-3 tb-detail-text">Select an event card to display details here.</p>
                     <div class="tb-detail-extra small text-secondary mb-0"></div>
                 </div>
+                {% if role in ['candidate', 'recruiter', 'admin'] %}
+                    <div class="card-footer">
+                        <button type="button" id="candidateEventDetailBtn" class="btn btn-outline-primary w-100 tb-detail-tertiary" disabled>
+                            See Details
+                        </button>
+                    </div>
+                {% endif %}
             </div>
                 </div>
             </div>
 
-            <div id="eventActionDock" class="tb-interview-action-dock tb-generic-action-dock d-none">
-                <div class="container-xl">
-                    <div class="tb-interview-action-dock-inner">
-                        <div class="small text-secondary">Selected event actions</div>
-                        <div class="d-flex gap-2 align-items-center tb-interview-action-buttons">
-                            <a href="#" class="btn btn-primary tb-dock-primary"><i class="ti ti-edit me-1"></i>Primary Action</a>
-                            <form method="post" action="#" class="d-inline tb-dock-secondary-form">
-                                <button type="submit" class="btn btn-outline-danger tb-dock-secondary"><i class="ti ti-trash me-1"></i>Secondary Action</button>
-                            </form>
-                            <a href="#" class="btn btn-outline-primary tb-dock-tertiary"><i class="ti ti-link me-1"></i>Tertiary Action</a>
-                        </div>
-                    </div>
+        </div>
+    </div>
+</div>
+
+{% if role in ['candidate', 'recruiter', 'admin'] %}
+    <div class="modal fade" id="candidateEventDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Event Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3" id="candidateEventDetailMeta"></p>
+                    <dl class="row mb-3">
+                        <dt class="col-sm-4">Type</dt>
+                        <dd class="col-sm-8" id="candidateEventDetailType"></dd>
+
+                        <dt class="col-sm-4">Date & Time</dt>
+                        <dd class="col-sm-8" id="candidateEventDetailDate"></dd>
+
+                        <dt class="col-sm-4">Location</dt>
+                        <dd class="col-sm-8" id="candidateEventDetailLocation"></dd>
+
+                        <dt class="col-sm-4">Capacity</dt>
+                        <dd class="col-sm-8" id="candidateEventDetailCapacity"></dd>
+
+                        <dt class="col-sm-4" id="candidateEventDetailMeetLabel">Meeting Link</dt>
+                        <dd class="col-sm-8" id="candidateEventDetailMeetValue">
+                            <a id="candidateEventDetailMeetLink" href="#" target="_blank" rel="noopener noreferrer">Open meeting link</a>
+                        </dd>
+                    </dl>
+                    <h6>Description</h6>
+                    <p class="mb-0" id="candidateEventDetailDescription"></p>
                 </div>
             </div>
         </div>
     </div>
-</div>
+
+    <script>
+        window.addEventListener('load', function () {
+            const detailButton = document.getElementById('candidateEventDetailBtn');
+            const modalEl = document.getElementById('candidateEventDetailModal');
+            if (!detailButton || !modalEl) {
+                return;
+            }
+
+            if (typeof bootstrap === 'undefined') {
+                return;
+            }
+
+            const modal = new bootstrap.Modal(modalEl);
+
+            const findSelectedCard = function () {
+                return document.querySelector('.tb-module-card.is-selected');
+            };
+
+            const syncButtonState = function () {
+                detailButton.disabled = !findSelectedCard();
+            };
+
+            document.querySelectorAll('.tb-module-card').forEach(function (card) {
+                card.addEventListener('click', function () {
+                    setTimeout(syncButtonState, 0);
+                });
+            });
+
+            syncButtonState();
+
+            detailButton.addEventListener('click', function () {
+                const card = findSelectedCard();
+                if (!card) {
+                    return;
+                }
+
+                const title = card.getAttribute('data-detail-title') || 'Event Details';
+                const meta = card.getAttribute('data-detail-meta') || '';
+                const description = card.getAttribute('data-detail-text') || '';
+                const eventType = card.getAttribute('data-event-type') || 'N/A';
+                const location = card.getAttribute('data-event-location') || 'N/A';
+                const capacity = card.getAttribute('data-event-capacity') || 'N/A';
+                const meetLink = card.getAttribute('data-event-meet-link') || '';
+                const eventDateValue = card.getAttribute('data-event-date-value') || '';
+
+                modalEl.querySelector('.modal-title').textContent = title;
+                document.getElementById('candidateEventDetailMeta').textContent = meta;
+                document.getElementById('candidateEventDetailType').textContent = eventType;
+                document.getElementById('candidateEventDetailLocation').textContent = location;
+                document.getElementById('candidateEventDetailCapacity').textContent = capacity;
+                document.getElementById('candidateEventDetailDescription').textContent = description;
+
+                if (eventDateValue !== '') {
+                    const parsedDate = new Date(eventDateValue);
+                    document.getElementById('candidateEventDetailDate').textContent = isNaN(parsedDate.getTime())
+                        ? eventDateValue
+                        : parsedDate.toLocaleString();
+                } else {
+                    document.getElementById('candidateEventDetailDate').textContent = 'N/A';
+                }
+
+                const meetLabel = document.getElementById('candidateEventDetailMeetLabel');
+                const meetValue = document.getElementById('candidateEventDetailMeetValue');
+                const meetLinkEl = document.getElementById('candidateEventDetailMeetLink');
+                const hasMeetLink = /^https?:\/\//i.test(meetLink);
+
+                meetLabel.classList.toggle('d-none', !hasMeetLink);
+                meetValue.classList.toggle('d-none', !hasMeetLink);
+                if (hasMeetLink) {
+                    meetLinkEl.href = meetLink;
+                    meetLinkEl.textContent = meetLink;
+                }
+
+                modal.show();
+            });
+        });
+    </script>
+{% endif %}
 {% endblock %}

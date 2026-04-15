@@ -19,14 +19,20 @@ class Event_registration
     private Recruitment_event $event_id;
 
         #[ORM\ManyToOne(targetEntity: Candidate::class, inversedBy: "event_registrations")]
-    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    private Candidate $candidate_id;
+    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id', onDelete: 'CASCADE', nullable: true)]
+    private ?Candidate $candidate_id = null;
 
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $registered_at;
 
     #[ORM\Column(type: "string", length: 255)]
     private string $attendance_status;
+
+    #[ORM\Column(type: "string", length: 255, nullable: true)]
+    private ?string $candidate_name = null;
+
+    #[ORM\Column(type: "string", length: 255, nullable: true)]
+    private ?string $candidate_email = null;
 
     public function getId()
     {
@@ -48,12 +54,12 @@ class Event_registration
         $this->event_id = $value;
     }
 
-    public function getCandidate_id()
+    public function getCandidate_id(): ?Candidate
     {
         return $this->candidate_id;
     }
 
-    public function setCandidate_id($value)
+    public function setCandidate_id(?Candidate $value)
     {
         $this->candidate_id = $value;
     }
@@ -76,5 +82,25 @@ class Event_registration
     public function setAttendance_status($value)
     {
         $this->attendance_status = $value;
+    }
+
+    public function getCandidate_name()
+    {
+        return $this->candidate_name;
+    }
+
+    public function setCandidate_name($value)
+    {
+        $this->candidate_name = $value;
+    }
+
+    public function getCandidate_email()
+    {
+        return $this->candidate_email;
+    }
+
+    public function setCandidate_email($value)
+    {
+        $this->candidate_email = $value;
     }
 }

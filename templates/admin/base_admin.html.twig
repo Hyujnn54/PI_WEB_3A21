@@ -9,6 +9,7 @@
     <style>
         main {
             min-height: 100vh;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%);
         }
 
         .navbar.sidebar {
@@ -16,76 +17,139 @@
             top: 0;
             left: 0;
             bottom: 0;
-            width: 270px;
+            width: 280px;
             z-index: 1030;
             display: flex;
             flex-direction: column;
             align-items: stretch;
-            padding: 1rem 0.75rem;
+            padding: 0;
             overflow-y: auto;
+            background: linear-gradient(180deg, #1a365d 0%, #0d5bd7 100%) !important;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .sidebar-brand-wrapper {
+            padding: 1.5rem 1.25rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar-brand-wrapper .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .sidebar-brand-wrapper .navbar-brand-item {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            background: white;
+            padding: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .sidebar-brand-wrapper .tb-brand-label {
+            font-size: 1.25rem !important;
+            font-weight: 700;
+            color: #ffffff !important;
+            letter-spacing: -0.02em;
+        }
+
+        .sidebar-content {
+            padding: 1rem 0.75rem;
+            flex: 1;
         }
 
         .navbar.sidebar .navbar-nav {
             flex-direction: column !important;
         }
 
-        .page-content {
-            margin-left: 270px;
-            min-height: 100vh;
-            width: calc(100% - 270px);
-            background: transparent;
+        .sidebar-section-title {
+            color: rgba(255, 255, 255, 0.5) !important;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 1rem 0.75rem 0.5rem;
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .sidebar.bg-dark,
-        .sidebar .offcanvas-body.bg-dark {
-            background: #0d5bd7 !important;
+        .sidebar-section-title i {
+            font-size: 0.85rem;
         }
 
         .sidebar .nav-link {
-            color: rgba(255, 255, 255, 0.9) !important;
-            border-radius: 8px;
-            margin-bottom: 0.35rem;
+            color: rgba(255, 255, 255, 0.85) !important;
+            border-radius: 10px;
+            margin-bottom: 0.25rem;
             background: transparent !important;
             background-image: none !important;
             box-shadow: none !important;
             border: none !important;
-            padding: 0.55rem 0.7rem;
-            transition: background-color 0.16s ease, color 0.16s ease;
+            padding: 0.75rem 1rem;
+            transition: all 0.2s ease;
             filter: none !important;
+            font-weight: 500;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
-        .sidebar .nav-link:hover,
-        .sidebar .nav-link.active {
-            background: rgba(255, 255, 255, 0.16) !important;
-            background-image: none !important;
+        .sidebar .nav-link:hover {
+            background: rgba(255, 255, 255, 0.12) !important;
             color: #ffffff !important;
-            border: none !important;
-            filter: none !important;
+            transform: translateX(4px);
+        }
+
+        .sidebar .nav-link.active {
+            background: rgba(255, 255, 255, 0.2) !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
         }
 
         .sidebar .nav-link i {
-            width: 1.1rem;
+            width: 1.25rem;
+            font-size: 1.1rem;
             text-align: center;
-            margin-right: 0.5rem;
-            opacity: 0.95;
+            opacity: 0.9;
         }
 
-        .navbar-brand .tb-brand-label {
-            display: inline-block !important;
-            font-size: 1rem !important;
-            line-height: 1.2 !important;
-            letter-spacing: 0.01em;
-            vertical-align: middle;
+        .sidebar-footer {
+            padding: 1rem 1.25rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.1);
         }
 
-        .sidebar .navbar-brand .tb-brand-label {
-            color: #ffffff !important;
+        .sidebar-footer .btn {
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: white !important;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-footer .btn:hover {
+            background: rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .page-content {
+            margin-left: 280px;
+            min-height: 100vh;
+            width: calc(100% - 280px);
+            background: transparent;
         }
 
         .page-content .btn {
             background-image: none !important;
             box-shadow: none !important;
             border-radius: 8px;
+            font-weight: 500;
         }
 
         .page-content .btn:focus {
@@ -93,7 +157,18 @@
         }
 
         .page-content .card {
-            border-color: #dbe7ff;
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        .page-content .card-body {
+            padding: 1.5rem;
+        }
+
+        .page-content h1.h3 {
+            color: #1a365d;
+            font-weight: 700;
         }
 
         @media (max-width: 1199.98px) {
@@ -118,6 +193,14 @@
 
         <div class="page-content">
             <section class="pt-4 px-3 px-xl-5">
+                {% for label in ['success', 'warning', 'error'] %}
+                    {% for message in app.flashes(label) %}
+                        <div class="alert alert-{{ label == 'error' ? 'danger' : (label == 'warning' ? 'warning' : 'success') }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endfor %}
                 {% block admin_content %}{% endblock %}
             </section>
         </div>
@@ -128,5 +211,10 @@
     {{ parent() }}
     <script src="{{ asset('assets/vendor/purecounterjs/dist/purecounter_vanilla.js') }}"></script>
     <script src="{{ asset('assets/vendor/apexcharts/js/apexcharts.min.js') }}"></script>
+    <script>
+        if (typeof ApexCharts === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/apexcharts"><\\/script>');
+        }
+    </script>
     <script src="{{ asset('assets/vendor/overlay-scrollbar/js/overlayscrollbars.min.js') }}"></script>
 {% endblock %}

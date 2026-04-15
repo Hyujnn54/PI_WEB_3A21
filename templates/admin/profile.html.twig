@@ -1,0 +1,78 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Talent Bridge | Admin Profile{% endblock %}
+
+{% block admin_content %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card tb-widget-card">
+                <div class="card-body d-flex justify-content-between align-items-start flex-wrap gap-3">
+                    <div>
+                        <h1 class="h3 mb-1">My Profile</h1>
+                        <p class="text-muted mb-0">Manage your administrator account details inside Back Office.</p>
+                    </div>
+                    <a href="{{ path('app_admin') }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-arrow-left me-1"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-8">
+            <div class="card tb-widget-card h-100">
+                <div class="card-header">
+                    <h3 class="card-title mb-0"><i class="ti ti-user-circle me-1"></i>Account Information</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">First Name</div>
+                            <div class="fw-semibold">{{ user.firstName|default('-') }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Last Name</div>
+                            <div class="fw-semibold">{{ user.lastName|default('-') }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Email</div>
+                            <div class="fw-semibold">{{ user.email|default('-') }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Phone</div>
+                            <div class="fw-semibold">{{ user.phone|default('-') }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Role</div>
+                            <span class="badge bg-primary-lt text-primary">{{ roleLabel }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Created At</div>
+                            <div class="fw-semibold">{{ user.createdAt ? user.createdAt|date('M d, Y H:i') : '-' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="card tb-widget-card h-100">
+                <div class="card-header">
+                    <h3 class="card-title mb-0"><i class="ti ti-settings me-1"></i>Quick Actions</h3>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    <a href="{{ path('app_admin_edit_user', {id: user.id}) }}" class="btn btn-primary">
+                        <i class="ti ti-edit me-1"></i>Edit Profile
+                    </a>
+                    <a href="{{ path('app_admin_users') }}" class="btn btn-outline-primary">
+                        <i class="ti ti-users me-1"></i>Manage Users
+                    </a>
+                    <a href="{{ path('app_admin') }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-layout-dashboard me-1"></i>Open Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

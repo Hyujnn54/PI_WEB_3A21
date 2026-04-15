@@ -1,0 +1,245 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Talent Bridge | Job Offers Statistics{% endblock %}
+
+{% block admin_content %}
+    <style>
+        .tb-stats-hero {
+            background: linear-gradient(135deg, #15335b 0%, #0d5bd7 100%);
+            border-radius: 14px;
+            color: #fff;
+            box-shadow: 0 10px 30px rgba(13, 91, 215, 0.18);
+        }
+
+        .tb-stat-card {
+            border: 1px solid #e9eef4;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+        }
+
+        .tb-kpi-value {
+            font-size: clamp(1.65rem, 2.6vw, 2.2rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1;
+        }
+
+        .tb-stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .tb-chart-shell {
+            min-height: 250px;
+            position: relative;
+        }
+    </style>
+
+    <div class="row mb-4 align-items-center">
+        <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="tb-stats-hero p-4 p-lg-5 w-100 d-flex justify-content-between align-items-start flex-wrap gap-3">
+                <div>
+                    <h1 class="h3 mb-1 text-white">Job Offers Statistics</h1>
+                    <p class="mb-0 text-white-50">Analytics view for all published offers.</p>
+                </div>
+                <a href="{{ path('app_admin_job_offers') }}" class="btn btn-light btn-sm">
+                    <i class="ti ti-arrow-left me-1"></i>Back to All Job Offers
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="card tb-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="small text-secondary">Published Offers</div>
+                        <span class="tb-stat-icon bg-primary-lt text-primary"><i class="ti ti-briefcase"></i></span>
+                    </div>
+                    <div class="tb-kpi-value text-primary">{{ offerStats.total_published }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card tb-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="small text-secondary">Open Offers</div>
+                        <span class="tb-stat-icon bg-green-lt text-green"><i class="ti ti-lock-open"></i></span>
+                    </div>
+                    <div class="tb-kpi-value text-green mb-1">{{ offerStats.total_open }}</div>
+                    <span class="badge bg-success-lt text-success">{{ offerStats.open_percentage }}%</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card tb-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="small text-secondary">Closed Offers</div>
+                        <span class="tb-stat-icon bg-red-lt text-danger"><i class="ti ti-lock"></i></span>
+                    </div>
+                    <div class="tb-kpi-value text-danger mb-1">{{ offerStats.total_closed }}</div>
+                    <span class="badge bg-red-lt text-danger">{{ offerStats.closed_percentage }}%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-xl-6">
+            <div class="card tb-stat-card h-100">
+                <div class="card-header">
+                    <h3 class="card-title mb-0"><i class="ti ti-chart-donut-3 me-2 text-primary"></i>Open vs Closed</h3>
+                </div>
+                <div class="card-body d-flex justify-content-center">
+                    <div class="tb-chart-shell d-flex align-items-center justify-content-center">
+                        <canvas id="adminStatusPie" width="220" height="220" style="max-width:220px; max-height:220px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-6">
+            <div class="card tb-stat-card h-100">
+                <div class="card-header">
+                    <h3 class="card-title mb-0"><i class="ti ti-chart-pie me-2 text-primary"></i>Contract Types</h3>
+                </div>
+                <div class="card-body d-flex justify-content-center">
+                    <div class="tb-chart-shell d-flex align-items-center justify-content-center">
+                        <canvas id="adminContractPie" width="220" height="220" style="max-width:220px; max-height:220px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-xl-7">
+            <div class="card tb-stat-card h-100">
+                <div class="card-header">
+                    <h3 class="card-title mb-0"><i class="ti ti-map-pin me-2 text-primary"></i>By City</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm card-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>City</th>
+                                <th>Total</th>
+                                <th>Open</th>
+                                <th>Closed</th>
+                                <th>Open Rate</th>
+                                <th>Closed Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for city in offerStats.city_stats %}
+                                <tr>
+                                    <td>{{ city.city }}</td>
+                                    <td>{{ city.total }}</td>
+                                    <td>{{ city.open }}</td>
+                                    <td>{{ city.closed }}</td>
+                                    <td>{{ city.open_rate }}%</td>
+                                    <td>{{ city.closed_rate }}%</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-secondary">No data.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-5">
+            <div class="card tb-stat-card h-100">
+                <div class="card-header">
+                    <h3 class="card-title mb-0"><i class="ti ti-id-badge-2 me-2 text-primary"></i>By Contract</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm card-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Total</th>
+                                <th>Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for contract in offerStats.contract_stats %}
+                                <tr>
+                                    <td>{{ contract.contract_type }}</td>
+                                    <td>{{ contract.total }}</td>
+                                    <td>{{ contract.percentage }}%</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-secondary">No data.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const stats = {{ offerStats is not null ? offerStats|json_encode|raw : 'null' }};
+            if (!stats) return;
+
+            const initCharts = function () {
+                if (!window.Chart) return;
+                const statusCanvas = document.getElementById('adminStatusPie');
+                const contractCanvas = document.getElementById('adminContractPie');
+
+                if (statusCanvas) {
+                    new Chart(statusCanvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Open', 'Closed'],
+                            datasets: [{
+                                data: [Number(stats.total_open || 0), Number(stats.total_closed || 0)],
+                                backgroundColor: ['#2fb344', '#d63939']
+                            }]
+                        },
+                        options: { responsive: true, cutout: '68%', radius: '78%', plugins: { legend: { position: 'bottom' } } }
+                    });
+                }
+
+                if (contractCanvas) {
+                    const labels = (stats.contract_stats || []).map(function (item) { return item.contract_type; });
+                    const values = (stats.contract_stats || []).map(function (item) { return Number(item.total || 0); });
+                    new Chart(contractCanvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: values,
+                                backgroundColor: ['#206bc4', '#4299e1', '#17a2b8', '#f59f00', '#2fb344', '#d63939', '#7950f2']
+                            }]
+                        },
+                        options: { responsive: true, cutout: '68%', radius: '78%', plugins: { legend: { position: 'bottom' } } }
+                    });
+                }
+            };
+
+            if (window.Chart) {
+                initCharts();
+                return;
+            }
+
+            const chartScript = document.createElement('script');
+            chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+            chartScript.onload = initCharts;
+            document.head.appendChild(chartScript);
+        })();
+    </script>
+{% endblock %}

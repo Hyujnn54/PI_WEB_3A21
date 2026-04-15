@@ -1,0 +1,376 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Talent Bridge | Admin Interviews{% endblock %}
+
+{% block admin_content %}
+    <style>
+        .tb-interview-hero {
+            border: 0;
+            border-radius: 16px;
+            background:
+                radial-gradient(circle at 12% 20%, rgba(13, 91, 215, 0.28), transparent 45%),
+                radial-gradient(circle at 82% 14%, rgba(25, 135, 84, 0.2), transparent 40%),
+                linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%);
+            box-shadow: 0 14px 36px rgba(22, 32, 60, 0.08);
+        }
+
+        .tb-kpi-card {
+            border: 0;
+            border-radius: 14px;
+            box-shadow: 0 10px 24px rgba(22, 32, 60, 0.08);
+        }
+
+        .tb-kpi-value {
+            font-size: 1.55rem;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .tb-interview-table tbody tr {
+            cursor: pointer;
+            transition: background-color 0.18s ease;
+        }
+
+        .tb-interview-table tbody tr:hover {
+            background: #f7faff;
+        }
+
+        .tb-mode-pill {
+            border-radius: 999px;
+            padding: 0.3rem 0.65rem;
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .tb-mode-pill-online {
+            background: rgba(13, 202, 240, 0.18);
+            color: #0b7285;
+        }
+
+        .tb-mode-pill-onsite {
+            background: rgba(255, 193, 7, 0.2);
+            color: #8b6b00;
+        }
+
+        .tb-notes {
+            max-width: 360px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tb-record-badge {
+            border-radius: 999px;
+            padding: 0.45rem 0.85rem;
+            font-size: 0.78rem;
+        }
+    </style>
+
+    <div class="card tb-interview-hero mb-4">
+        <div class="card-body p-4 p-xl-5">
+            <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3">
+                <div>
+                    <h1 class="h3 mb-1">Interview Operations Center</h1>
+                    <p class="text-muted mb-0">A single admin workspace for interview scheduling quality, completion tracking, and recruiter follow-up.</p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ path('management_interviews_statistics') }}" class="btn btn-primary">
+                        <i class="ti ti-chart-bar me-1"></i>Open Statistics
+                    </a>
+                    <a href="{{ path('management_interviews') }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-refresh me-1"></i>Refresh
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-2">
+            <div class="card tb-kpi-card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">Total Interviews</div>
+                    <div class="tb-kpi-value text-primary">{{ stats.total }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-2">
+            <div class="card tb-kpi-card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">Upcoming</div>
+                    <div class="tb-kpi-value text-info">{{ stats.upcoming }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-2">
+            <div class="card tb-kpi-card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">Completed</div>
+                    <div class="tb-kpi-value text-success">{{ stats.completed }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-2">
+            <div class="card tb-kpi-card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">Pending Feedback</div>
+                    <div class="tb-kpi-value text-warning">{{ stats.pending_feedback }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-2">
+            <div class="card tb-kpi-card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">Online</div>
+                    <div class="tb-kpi-value">{{ stats.online }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-2">
+            <div class="card tb-kpi-card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">Onsite</div>
+                    <div class="tb-kpi-value">{{ stats.onsite }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-xl-5">
+                    <label class="form-label mb-1">Search Interviews</label>
+                    <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                        <input id="adminInterviewSearch" type="text" class="form-control" placeholder="Search by offer, recruiter, candidate, status, notes...">
+                    </div>
+                </div>
+                <div class="col-12 col-md-4 col-xl-2">
+                    <label class="form-label mb-1">Status</label>
+                    <select id="adminInterviewStatusFilter" class="form-select">
+                        <option value="all">All Statuses</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="pending_review">Pending Review</option>
+                        <option value="completed">Completed</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4 col-xl-2">
+                    <label class="form-label mb-1">Mode</label>
+                    <select id="adminInterviewModeFilter" class="form-select">
+                        <option value="all">All Modes</option>
+                        <option value="online">Online</option>
+                        <option value="onsite">Onsite</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4 col-xl-3">
+                    <label class="form-label mb-1">Sort</label>
+                    <select id="adminInterviewSortMode" class="form-select">
+                        <option value="date_desc">Date Newest</option>
+                        <option value="date_asc">Date Oldest</option>
+                        <option value="offer_asc">Offer A-Z</option>
+                        <option value="offer_desc">Offer Z-A</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex justify-content-between align-items-center pt-1">
+                    <span id="adminInterviewRecordCount" class="badge bg-primary-subtle text-primary-emphasis tb-record-badge">{{ rows|length }} records</span>
+                    <button id="adminInterviewReset" type="button" class="btn btn-outline-secondary btn-sm">
+                        <i class="ti ti-rotate-clockwise-2 me-1"></i>Reset Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 tb-interview-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Offer</th>
+                        <th>Candidate</th>
+                        <th>Recruiter</th>
+                        <th>Scheduled At</th>
+                        <th>Duration</th>
+                        <th>Mode</th>
+                        <th>Status</th>
+                        <th>Score</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody id="adminInterviewTableBody">
+                    {% for row in rows %}
+                        <tr class="js-admin-interview-row"
+                            data-search-text="{{ (row.offer_title ~ ' ' ~ row.candidate_name ~ ' ' ~ row.recruiter_name ~ ' ' ~ row.status_label ~ ' ' ~ row.notes_excerpt)|lower }}"
+                            data-filter-status="{{ row.status_key }}"
+                            data-filter-mode="{{ row.mode_key }}"
+                            data-sort-offer="{{ row.offer_title|lower }}"
+                            data-sort-date="{{ row.scheduled_ts }}">
+                            <td>#{{ row.id }}</td>
+                            <td class="fw-semibold">{{ row.offer_title }}</td>
+                            <td>{{ row.candidate_name }}</td>
+                            <td>{{ row.recruiter_name }}</td>
+                            <td>{{ row.scheduled_at|date('d M Y H:i') }}</td>
+                            <td>{{ row.duration_minutes }} min</td>
+                            <td>
+                                <span class="tb-mode-pill {{ row.mode_key == 'onsite' ? 'tb-mode-pill-onsite' : 'tb-mode-pill-online' }}">{{ row.mode_label }}</span>
+                            </td>
+                            <td>
+                                <span class="badge {{ row.status_class }} text-white fw-semibold">{{ row.status_label }}</span>
+                            </td>
+                            <td>
+                                {% if row.feedback_score is not null %}
+                                    <span class="fw-semibold">{{ row.feedback_score }}/100</span>
+                                {% else %}
+                                    <span class="text-muted">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td class="tb-notes text-muted" title="{{ row.notes_excerpt }}">{{ row.notes_excerpt }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="10" class="text-center text-muted py-5">No interviews available.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const pageMarker = 'tbAdminInterviewsBound';
+            const initKey = '__tbAdminInterviewsInit';
+
+            const initAdminInterviews = function () {
+                const tableBody = document.getElementById('adminInterviewTableBody');
+                if (!tableBody) {
+                    return;
+                }
+
+                const pageRoot = tableBody.closest('.page-content');
+                if (pageRoot && pageRoot.dataset[pageMarker] === '1') {
+                    return;
+                }
+                if (pageRoot) {
+                    pageRoot.dataset[pageMarker] = '1';
+                }
+
+                const rows = Array.from(tableBody.querySelectorAll('.js-admin-interview-row'));
+                const searchInput = document.getElementById('adminInterviewSearch');
+                const statusFilter = document.getElementById('adminInterviewStatusFilter');
+                const modeFilter = document.getElementById('adminInterviewModeFilter');
+                const sortModeSelect = document.getElementById('adminInterviewSortMode');
+                const resetBtn = document.getElementById('adminInterviewReset');
+                const recordCountBadge = document.getElementById('adminInterviewRecordCount');
+
+                if (!rows.length) {
+                    if (recordCountBadge) {
+                        recordCountBadge.textContent = '0 records';
+                    }
+                    return;
+                }
+
+                const runFiltersAndSort = function () {
+                    const query = ((searchInput && searchInput.value) || '').trim().toLowerCase();
+                    const selectedStatus = ((statusFilter && statusFilter.value) || 'all').toLowerCase();
+                    const selectedMode = ((modeFilter && modeFilter.value) || 'all').toLowerCase();
+                    const sortMode = (sortModeSelect && sortModeSelect.value) || 'date_desc';
+
+                    let visibleCount = 0;
+                    rows.forEach(function (row) {
+                        const haystack = (row.getAttribute('data-search-text') || '').toLowerCase();
+                        const rowStatus = (row.getAttribute('data-filter-status') || '').toLowerCase();
+                        const rowMode = (row.getAttribute('data-filter-mode') || '').toLowerCase();
+
+                        const searchMatch = query === '' || haystack.includes(query);
+                        const statusMatch = selectedStatus === 'all' || rowStatus === selectedStatus;
+                        const modeMatch = selectedMode === 'all' || rowMode === selectedMode;
+                        const visible = searchMatch && statusMatch && modeMatch;
+
+                        row.classList.toggle('d-none', !visible);
+                        if (visible) {
+                            visibleCount += 1;
+                        }
+                    });
+
+                    const sortedRows = rows.slice().sort(function (a, b) {
+                        if (sortMode === 'date_asc') {
+                            return Number(a.getAttribute('data-sort-date') || 0) - Number(b.getAttribute('data-sort-date') || 0);
+                        }
+                        if (sortMode === 'date_desc') {
+                            return Number(b.getAttribute('data-sort-date') || 0) - Number(a.getAttribute('data-sort-date') || 0);
+                        }
+                        if (sortMode === 'offer_asc') {
+                            return (a.getAttribute('data-sort-offer') || '').localeCompare((b.getAttribute('data-sort-offer') || ''));
+                        }
+                        if (sortMode === 'offer_desc') {
+                            return (b.getAttribute('data-sort-offer') || '').localeCompare((a.getAttribute('data-sort-offer') || ''));
+                        }
+                        return 0;
+                    });
+
+                    sortedRows.forEach(function (row) {
+                        tableBody.appendChild(row);
+                    });
+
+                    if (recordCountBadge) {
+                        recordCountBadge.textContent = visibleCount + ' records';
+                    }
+                };
+
+                if (searchInput) {
+                    searchInput.addEventListener('input', runFiltersAndSort);
+                }
+                if (statusFilter) {
+                    statusFilter.addEventListener('change', runFiltersAndSort);
+                }
+                if (modeFilter) {
+                    modeFilter.addEventListener('change', runFiltersAndSort);
+                }
+                if (sortModeSelect) {
+                    sortModeSelect.addEventListener('change', runFiltersAndSort);
+                }
+                if (resetBtn) {
+                    resetBtn.addEventListener('click', function () {
+                        if (searchInput) {
+                            searchInput.value = '';
+                        }
+                        if (statusFilter) {
+                            statusFilter.value = 'all';
+                        }
+                        if (modeFilter) {
+                            modeFilter.value = 'all';
+                        }
+                        if (sortModeSelect) {
+                            sortModeSelect.value = 'date_desc';
+                        }
+
+                        runFiltersAndSort();
+                    });
+                }
+
+                runFiltersAndSort();
+            };
+
+            if (!window[initKey]) {
+                window[initKey] = true;
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', initAdminInterviews, { once: true });
+                } else {
+                    initAdminInterviews();
+                }
+                document.addEventListener('turbo:load', initAdminInterviews);
+            }
+
+            initAdminInterviews();
+        })();
+    </script>
+{% endblock %}

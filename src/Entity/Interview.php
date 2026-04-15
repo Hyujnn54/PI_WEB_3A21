@@ -103,12 +103,31 @@ class Interview
 
     public function getMode()
     {
-        return isset($this->mode) ? (string) $this->mode : '';
+        $raw = strtolower(trim((string) ($this->mode ?? '')));
+
+        if (in_array($raw, ['onsite', 'on_site', 'on-site', 'on site', 'in_person', 'in-person', 'in person'], true)) {
+            return 'onsite';
+        }
+
+        if (in_array($raw, ['online', 'on_line', 'on-line', 'on line'], true)) {
+            return 'online';
+        }
+
+        // Fallback for legacy rows where mode is empty/invalid but location/link imply the mode.
+        $location = trim((string) ($this->location ?? ''));
+        $meetingLink = trim((string) ($this->meeting_link ?? ''));
+        if ($location !== '' && $meetingLink === '') {
+            return 'onsite';
+        }
+
+        return 'online';
     }
 
     public function setMode($value)
     {
-        $this->mode = $value;
+        $raw = strtolower(trim((string) $value));
+        $isOnsite = in_array($raw, ['onsite', 'on_site', 'on-site', 'on site', 'in_person', 'in-person', 'in person'], true);
+        $this->mode = $isOnsite ? 'ON_SITE' : 'ONLINE';
     }
 
     public function getMeeting_link()

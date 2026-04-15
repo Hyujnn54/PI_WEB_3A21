@@ -1,0 +1,207 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | {{ isEdit|default(false) ? 'Edit Event' : 'Create Event' }}{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title"><i class="ti ti-calendar-plus me-1"></i>{{ isEdit|default(false) ? 'Edit Recruitment Event' : 'Create Recruitment Event' }}</h2>
+                    <div class="text-secondary">{{ isEdit|default(false) ? 'Update your recruitment event details.' : 'Create a new recruitment event for candidates.' }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="row">
+                <div class="col-md-8">
+                    {% if errors is defined and errors is not empty %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <strong>Please fix the following errors:</strong>
+                            <ul class="mb-0">
+                                {% for field, message in errors %}
+                                    <li>{{ message }}</li>
+                                {% endfor %}
+                            </ul>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endif %}
+                    <form method="post" class="card" id="createEventForm" novalidate>
+                        <div class="card-header">
+                            <h3 class="card-title">Event Details</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Title <span class="text-danger">*</span></label>
+                                <input type="text" name="title" id="title" class="form-control" minlength="3" maxlength="255" value="{{ formData.title|default('') }}">
+                                <small class="text-danger d-none" id="titleError"></small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description <span class="text-danger">*</span></label>
+                                <textarea name="description" id="description" class="form-control" rows="3" minlength="10">{{ formData.description|default('') }}</textarea>
+                                <small class="text-danger d-none" id="descriptionError"></small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Event Type <span class="text-danger">*</span></label>
+                                <select name="event_type" id="event_type" class="form-select">
+                                    <option value="">-- Select Type --</option>
+                                    <option value="Workshop" {{ formData.event_type|default('') == 'Workshop' ? 'selected' : '' }}>Workshop</option>
+                                    <option value="Hiring Day" {{ formData.event_type|default('') == 'Hiring Day' ? 'selected' : '' }}>Hiring Day</option>
+                                    <option value="Webinar" {{ formData.event_type|default('') == 'Webinar' ? 'selected' : '' }}>Webinar</option>
+                                </select>
+                                <small class="text-danger d-none" id="event_typeError"></small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Location <span class="text-danger">*</span></label>
+                                <input type="text" name="location" id="location" class="form-control" minlength="2" value="{{ formData.location|default('') }}">
+                                <small class="text-danger d-none" id="locationError"></small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Event Date <span class="text-danger">*</span></label>
+                                <input type="datetime-local" name="event_date" id="event_date" class="form-control" value="{{ formData.event_date|default('') }}">
+                                <small class="text-danger d-none" id="event_dateError"></small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Capacity <span class="text-danger">*</span></label>
+                                <input type="number" name="capacity" id="capacity" class="form-control" min="1" max="1000" value="{{ formData.capacity|default('50') }}">
+                                <small class="text-danger d-none" id="capacityError"></small>
+                            </div>
+                            <div class="mb-3 {{ formData.event_type|default('') == 'Webinar' ? '' : 'd-none' }}" id="meetLinkContainer">
+                                <label class="form-label">Meet Link</label>
+                                <input type="url" name="meet_link" id="meet_link" class="form-control" placeholder="https://meet.google.com/xyz" value="{{ formData.meet_link|default('') }}">
+                                <small class="text-danger d-none" id="meet_linkError"></small>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button type="submit" class="btn btn-primary">{{ isEdit|default(false) ? 'Save Changes' : 'Create Event' }}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const createEventForm = document.getElementById('createEventForm');
+        const eventTypeSelect = document.getElementById('event_type');
+        const meetLinkContainer = document.getElementById('meetLinkContainer');
+
+        function toggleMeetLinkVisibility() {
+            if (!eventTypeSelect || !meetLinkContainer) {
+                return;
+            }
+
+            const isWebinar = eventTypeSelect.value === 'Webinar';
+            meetLinkContainer.classList.toggle('d-none', !isWebinar);
+        }
+
+        function validateForm() {
+            const errors = {};
+            const title = document.getElementById('title').value.trim();
+            const description = document.getElementById('description').value.trim();
+            const eventType = document.getElementById('event_type').value.trim();
+            const location = document.getElementById('location').value.trim();
+            const eventDate = document.getElementById('event_date').value;
+            const capacity = document.getElementById('capacity').value;
+            const meetLink = document.getElementById('meet_link').value.trim();
+
+            // Clear previous errors
+            document.querySelectorAll('[id$="Error"]').forEach(el => el.classList.add('d-none'));
+
+            // Validate title
+            if (!title) {
+                errors.title = 'Event title is required.';
+            } else if (title.length < 3) {
+                errors.title = 'Event title must be at least 3 characters.';
+            } else if (title.length > 255) {
+                errors.title = 'Event title cannot exceed 255 characters.';
+            }
+
+            // Validate description
+            if (!description) {
+                errors.description = 'Description is required.';
+            } else if (description.length < 10) {
+                errors.description = 'Description must be at least 10 characters.';
+            }
+
+            // Validate event type
+            if (!eventType) {
+                errors.event_type = 'Event type is required.';
+            }
+
+            // Validate location
+            if (!location) {
+                errors.location = 'Location is required.';
+            } else if (location.length < 2) {
+                errors.location = 'Location must be at least 2 characters.';
+            }
+
+            // Validate event date
+            if (!eventDate) {
+                errors.event_date = 'Event date is required.';
+            } else {
+                const date = new Date(eventDate);
+                const now = new Date();
+                if (date <= now) {
+                    errors.event_date = 'Event date must be in the future.';
+                }
+            }
+
+            // Validate capacity
+            if (!capacity) {
+                errors.capacity = 'Capacity is required.';
+            } else {
+                const cap = parseInt(capacity);
+                if (cap < 1) {
+                    errors.capacity = 'Capacity must be at least 1.';
+                } else if (cap > 1000) {
+                    errors.capacity = 'Capacity cannot exceed 1000.';
+                }
+            }
+
+            // Validate meet link
+            if (eventType === 'Webinar' && meetLink && !isValidUrl(meetLink)) {
+                errors.meet_link = 'Please enter a valid URL.';
+            }
+
+            // Display errors
+            if (Object.keys(errors).length > 0) {
+                Object.keys(errors).forEach(field => {
+                    const errorEl = document.getElementById(field + 'Error');
+                    if (errorEl) {
+                        errorEl.textContent = errors[field];
+                        errorEl.classList.remove('d-none');
+                    }
+                });
+                return false;
+            }
+            return true;
+        }
+
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        createEventForm.addEventListener('submit', function(e) {
+            if (!validateForm()) {
+                e.preventDefault();
+            }
+        });
+
+        if (eventTypeSelect) {
+            eventTypeSelect.addEventListener('change', toggleMeetLinkVisibility);
+        }
+
+        toggleMeetLinkVisibility();
+    </script>
+</div>
+{% endblock %}

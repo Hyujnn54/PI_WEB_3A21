@@ -5,43 +5,52 @@
 {% block body %}
 <div class="page-wrapper">
     <div class="page-body auth-body">
-        <div class="container container-tight py-4">
-            <div class="text-center mb-4">
-                <h1 class="h2">Talent Bridge</h1>
-                <div class="text-secondary">Sign in to continue to your workspace</div>
-            </div>
-            <div class="card card-md auth-card">
-                <div class="card-body">
-                    {% for message in app.flashes('error') %}
-                        <div class="alert alert-danger">{{ message }}</div>
-                    {% endfor %}
-                    <form method="post" action="{{ path('app_login') }}">
-                        <div class="mb-3">
-                            <label class="form-label">Full Name</label>
-                            <input type="text" name="full_name" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" name="email" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Role</label>
-                            <select name="role" class="form-select" required>
-                                <option value="candidate">Candidate</option>
-                                <option value="recruiter">Recruiter</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </div>
-                        <div class="form-footer">
-                            <button type="submit" class="btn btn-primary w-100">Sign In</button>
-                        </div>
-                    </form>
+        <div class="container container-tight py-4 py-md-5">
+            <div class="tb-auth-shell mx-auto">
+                <div class="text-center mb-4">
+                    <img src="{{ asset('assets/team_upload/logo.png') }}" alt="Talent Bridge" class="tb-auth-logo mb-3" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='{{ asset('assets/team_uploads/logo.png') }}';}else{this.style.display='none';}">
+                    <h1 class="h2 mb-1">Welcome Back</h1>
+                    <div class="text-secondary">Sign in to continue managing your HR workspace.</div>
                 </div>
-            </div>
-            <div class="text-center text-secondary mt-3">
-                No account yet? <a href="{{ path('app_register') }}">Register</a>
+
+                <div class="card card-md auth-card tb-auth-card">
+                    <div class="card-body p-4 p-md-4">
+                        {% for message in app.flashes('error') %}
+                            <div class="alert alert-danger tb-auth-alert" role="alert">
+                                <i class="ti ti-alert-circle me-2"></i>{{ message }}
+                            </div>
+                        {% endfor %}
+
+                        <form method="post" action="{{ path('app_login') }}" novalidate>
+                            <div class="mb-3">
+                                <label class="form-label">Email Address</label>
+                                <div class="input-icon">
+                                    <span class="input-icon-addon"><i class="ti ti-mail"></i></span>
+                                    <input type="email" name="email" class="form-control tb-auth-input" placeholder="your@email.com" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Password</label>
+                                <div class="input-icon">
+                                    <span class="input-icon-addon"><i class="ti ti-lock"></i></span>
+                                    <input type="password" name="password" class="form-control tb-auth-input" placeholder="Your password" required>
+                                </div>
+                            </div>
+
+                            <div class="form-footer pt-2">
+                                <button type="submit" class="btn btn-primary w-100 tb-auth-btn">Sign In</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="text-center text-secondary mt-3">
+                    No account yet? <a href="{{ path('app_register') }}" class="tb-auth-link">Register</a>
+                </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
+

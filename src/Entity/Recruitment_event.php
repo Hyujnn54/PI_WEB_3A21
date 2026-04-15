@@ -13,8 +13,9 @@ class Recruitment_event
 {
 
     #[ORM\Id]
+    #[ORM\GeneratedValue(strategy: "AUTO")]
     #[ORM\Column(type: "bigint")]
-    private string $id;
+    private ?int $id = null;
 
         #[ORM\ManyToOne(targetEntity: Recruiter::class, inversedBy: "recruitment_events")]
     #[ORM\JoinColumn(name: 'recruiter_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
@@ -39,12 +40,12 @@ class Recruitment_event
     private int $capacity;
 
     #[ORM\Column(type: "string", length: 255)]
-    private string $meet_link;
+    private string $meet_link = '';
 
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $created_at;
 
-    public function getId()
+    public function getId(): ?int
     {
         return $this->id;
     }
@@ -126,7 +127,7 @@ class Recruitment_event
 
     public function getMeet_link()
     {
-        return $this->meet_link;
+        return isset($this->meet_link) ? $this->meet_link : '';
     }
 
     public function setMeet_link($value)

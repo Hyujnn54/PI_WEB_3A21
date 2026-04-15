@@ -1,0 +1,14 @@
+
+(admin)
+admin@gmail.com
+admin123!
+
+( candidate)
+
+candidate@gmail.com
+candidate123!
+
+(recruter)
+
+recruiter@gmail.com
+recruiter123!
