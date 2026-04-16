@@ -6,11 +6,15 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Users;
 use Doctrine\ORM\Mapping as ORM;
+use App\Entity\Job_application;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'candidate')]
 class Candidate extends Users
 {
+    #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Job_application::class)]
+    private Collection $job_applications;
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $location = null;
 
@@ -23,6 +27,12 @@ class Candidate extends Users
     #[ORM\Column(name: "cv_path", length: 255, nullable: true)]
     private ?string $cvPath = null;
 
+    public function __construct()
+    {
+        parent::__construct();
+        $this->job_applications = new ArrayCollection();
+    }
+
     public function getLocation(): ?string { return $this->location; }
     public function setLocation(?string $location): self { $this->location = $location; return $this; }
 
@@ -34,6 +44,25 @@ class Candidate extends Users
 
     public function getCvPath(): ?string { return $this->cvPath; }
     public function setCvPath(?string $cvPath): self { $this->cvPath = $cvPath; return $this; }
+
+    public function getJob_applications(): Collection { return $this->job_applications; }
+
+    public function addJob_application(Job_application $jobApplication): self
+    {
+        if (!$this->job_applications->contains($jobApplication)) {
+            $this->job_applications[] = $jobApplication;
+            $jobApplication->setCandidate_id($this);
+        }
+
+        return $this;
+    }
+
+    public function removeJob_application(Job_application $jobApplication): self
+    {
+        $this->job_applications->removeElement($jobApplication);
+
+        return $this;
+    }
 
     public function getRoles(): array { return ['ROLE_CANDIDATE']; }
 }

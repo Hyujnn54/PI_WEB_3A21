@@ -4,12 +4,13 @@ namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
+use App\Repository\Job_applicationRepository;
 
 use App\Entity\Candidate;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Interview;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: Job_applicationRepository::class)]
 class Job_application
 {
 
