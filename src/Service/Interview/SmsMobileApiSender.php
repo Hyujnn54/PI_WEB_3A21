@@ -49,13 +49,21 @@ class SmsMobileApiSender
             $payload['sIdentifiant'] = $deviceId;
         }
 
+        $this->logger->info('SMS Mobile API dispatch attempt.', [
+            'recipient' => $recipient,
+        ]);
+
         try {
             $response = $this->httpClient->request('POST', trim($this->endpoint), [
                 'body' => $payload,
             ]);
 
             $statusCode = $response->getStatusCode();
-            $data = $response->toArray(false);
+            $responseBody = $response->getContent(false);
+            $data = json_decode($responseBody, true);
+            if (!is_array($data)) {
+                $data = [];
+            }
             $result = is_array($data['result'] ?? null) ? $data['result'] : [];
             $error = (string) ($result['error'] ?? '');
             $sent = (string) ($result['sent'] ?? '');
@@ -64,21 +72,37 @@ class SmsMobileApiSender
                 $isErrorFree = $error === '' || $error === '0';
                 $isSent = $sent === '' || $sent === '1';
                 if ($isErrorFree && $isSent) {
+                    $this->logger->info('SMS Mobile API message sent.', [
+                        'recipient' => $recipient,
+                        'statusCode' => $statusCode,
+                    ]);
                     return true;
                 }
             }
 
             $this->logger->warning('SMS Mobile API request failed.', [
+                'recipient' => $recipient,
                 'statusCode' => $statusCode,
                 'error' => $error,
                 'sent' => $sent,
+                'response' => $this->snippet($responseBody),
             ]);
         } catch (Throwable $exception) {
             $this->logger->error('SMS Mobile API request threw an exception.', [
+                'recipient' => $recipient,
                 'message' => $exception->getMessage(),
             ]);
         }
 
         return false;
+    }
+
+    private function snippet(string $value, int $maxLength = 500): string
+    {
+        if (strlen($value) <= $maxLength) {
+            return $value;
+        }
+
+        return substr($value, 0, $maxLength) . '...';
     }
 }

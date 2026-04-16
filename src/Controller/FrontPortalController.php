@@ -13,6 +13,7 @@ use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Service\Interview\JitsiMeetingLinkGenerator;
 use App\Form\ProfileType;
+use App\Repository\InterviewRepository;
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,8 +32,6 @@ class FrontPortalController extends AbstractController
 {
     private const MAX_FUTURE_DAYS = 90;
     private const EDIT_LOCK_HOURS = 2;
-    private const LOCATION_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,120}$/u';
-    private const TEXTAREA_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{0,1000}$/u';
     private const REVIEW_COMMENT_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,1000}$/u';
     private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
@@ -1195,7 +1194,25 @@ class FrontPortalController extends AbstractController
     public function interviews(Request $request): Response
     {
         $role = $this->resolveSessionRole($request);
-        $interviews = $this->doctrine->getRepository(Interview::class)->findBy([], ['id' => 'DESC']);
+
+        $search = trim((string) $request->query->get('search', ''));
+        $criteria = strtolower(trim((string) $request->query->get('criteria', 'all')));
+        $sort = strtolower(trim((string) $request->query->get('sort', 'date_desc')));
+        $allowedCriteria = ['all', 'title', 'meta', 'description', 'status'];
+        $allowedSorts = ['default', 'date_desc', 'date_asc', 'status_asc', 'status_desc', 'title_asc', 'title_desc', 'meta_asc', 'meta_desc'];
+        if (!in_array($criteria, $allowedCriteria, true)) {
+            $criteria = 'all';
+        }
+        if (!in_array($sort, $allowedSorts, true)) {
+            $sort = 'date_desc';
+        }
+
+        $interviewRepository = $this->doctrine->getRepository(Interview::class);
+        if ($interviewRepository instanceof InterviewRepository) {
+            $interviews = $interviewRepository->findBySearchFilterSort($search, $criteria, $sort);
+        } else {
+            $interviews = $this->doctrine->getRepository(Interview::class)->findBy([], ['scheduled_at' => 'DESC']);
+        }
 
         $cards = [];
         $upcomingInterviews = [];
@@ -1289,7 +1306,8 @@ class FrontPortalController extends AbstractController
                     'title' => $title === '' ? 'Untitled offer' : $title,
                     'mode' => strtoupper($mode),
                     'status' => $displayStatus,
-                    'location' => $location === '' ? 'N/A' : $location,
+                    'location' => $mode === 'onsite' ? ($location === '' ? 'N/A' : $location) : '',
+                    'meeting_link' => $mode === 'online' ? ($meetingLink === '' ? 'N/A' : $meetingLink) : '',
                 ];
             } catch (Throwable) {
                 // Skip malformed rows so one broken interview does not break the page.
@@ -1303,6 +1321,11 @@ class FrontPortalController extends AbstractController
             'authUser' => ['role' => $role],
             'cards' => $cards,
             'upcomingInterviews' => $upcomingInterviews,
+            'listFilters' => [
+                'search' => $search,
+                'criteria' => $criteria,
+                'sort' => $sort,
+            ],
         ]);
     }
 
@@ -1436,7 +1459,7 @@ class FrontPortalController extends AbstractController
                 return $this->redirectToRoute('front_job_applications', $request->query->all() + ['openCreateFor' => $applicationId]);
             }
 
-            $validation = $this->validateInterviewPayload($formData);
+            $validation = Interview::validateInput($formData, self::MAX_FUTURE_DAYS);
             if ($validation['ok']) {
                 $offer = $application->getOffer_id();
                 $recruiter = $offer->getRecruiter_id();
@@ -1519,7 +1542,7 @@ class FrontPortalController extends AbstractController
                 'notes' => trim((string) $request->request->get('notes', '')),
             ];
 
-            $validation = $this->validateInterviewPayload($formData);
+            $validation = Interview::validateInput($formData, self::MAX_FUTURE_DAYS);
             if ($validation['ok']) {
                 $previousScheduledAt = $interview->getScheduled_at();
                 $interview->setScheduled_at($validation['scheduledAt']);
@@ -1868,91 +1891,6 @@ class FrontPortalController extends AbstractController
         }
 
         return $userId;
-    }
-
-    private function validateInterviewPayload(array $data): array
-    {
-        try {
-            $scheduledAt = new \DateTime((string) ($data['scheduled_at'] ?? ''));
-        } catch (Throwable) {
-            return ['ok' => false, 'error' => 'Invalid interview date/time.'];
-        }
-
-        $now = new \DateTimeImmutable();
-        if ($scheduledAt <= $now) {
-            return ['ok' => false, 'error' => 'Interview date/time must be in the future.'];
-        }
-
-        if ($scheduledAt > $now->modify('+' . self::MAX_FUTURE_DAYS . ' days')) {
-            return ['ok' => false, 'error' => 'Interview cannot be scheduled more than ' . self::MAX_FUTURE_DAYS . ' days ahead.'];
-        }
-
-        $duration = (int) ($data['duration_minutes'] ?? 0);
-        if ($duration < 15 || $duration > 240) {
-            return ['ok' => false, 'error' => 'Duration must be between 15 and 240 minutes.'];
-        }
-
-        $mode = strtolower(trim((string) ($data['mode'] ?? 'online')));
-        if (!in_array($mode, ['online', 'onsite'], true)) {
-            return ['ok' => false, 'error' => 'Interview mode must be online or onsite.'];
-        }
-
-        $meetingLink = trim((string) ($data['meeting_link'] ?? ''));
-        $location = trim((string) ($data['location'] ?? ''));
-        $notes = trim((string) ($data['notes'] ?? ''));
-
-        if ($mode === 'online' && $meetingLink === '') {
-            return ['ok' => false, 'error' => 'Meeting link is required for online interviews.'];
-        }
-
-        if ($mode === 'online' && !$this->isValidMeetingLink($meetingLink)) {
-            return ['ok' => false, 'error' => 'Meeting link must be a valid http(s) URL.'];
-        }
-
-        if ($mode === 'onsite' && $location === '') {
-            return ['ok' => false, 'error' => 'Location is required for onsite interviews.'];
-        }
-
-        if ($mode === 'onsite' && !$this->isValidLocation($location)) {
-            return ['ok' => false, 'error' => 'Location can contain letters, numbers and common punctuation (3-120 chars).'];
-        }
-
-        if (!$this->isValidTextarea($notes)) {
-            return ['ok' => false, 'error' => 'Notes contain unsupported characters or exceed 1000 characters.'];
-        }
-
-        return [
-            'ok' => true,
-            'scheduledAt' => $scheduledAt,
-            'duration' => $duration,
-            'mode' => $mode,
-            'meetingLink' => $meetingLink,
-            'location' => $location,
-            'notes' => $notes,
-        ];
-    }
-
-    private function isValidMeetingLink(string $meetingLink): bool
-    {
-        if (!filter_var($meetingLink, FILTER_VALIDATE_URL)) {
-            return false;
-        }
-
-        return (bool) preg_match('/^https?:\/\/[\S]+$/i', $meetingLink);
-    }
-
-    private function isValidLocation(string $location): bool
-    {
-        return (bool) preg_match(self::LOCATION_REGEX, $location);
-    }
-
-    private function isValidTextarea(string $value): bool
-    {
-        if (mb_strlen($value) > 1000) {
-            return false;
-        }
-
-        return (bool) preg_match(self::TEXTAREA_REGEX, $value);
     }
 
     private function validateReviewComment(string $comment): array

@@ -4,6 +4,7 @@
 
 {% block body %}
 {% set role = authUser.role|default('candidate') %}
+{% set filters = listFilters|default({'search': '', 'criteria': 'all', 'sort': 'date_desc'}) %}
 <div class="page-wrapper">
     <div class="page-header d-print-none">
         <div class="container-xl d-flex justify-content-between align-items-center flex-wrap gap-2 tb-front-page-head">
@@ -22,31 +23,33 @@
                 <div class="col-12 col-xl-8">
                     <div class="card tb-admin-card mb-3 tb-filter-bar">
                         <div class="card-body py-2">
-                            <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#interviewCardsGrid">
+                            <form method="get" class="d-flex flex-wrap align-items-center gap-2">
                                 <div class="input-icon">
                                     <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                                    <input type="text" class="form-control" placeholder="Search interviews by title, date, status..." data-filter-search>
+                                    <input type="text" name="search" value="{{ filters.search|default('') }}" class="form-control" placeholder="Search interviews by title, notes, mode or status...">
                                 </div>
-                                <select class="form-select" style="max-width: 220px;" data-filter-criteria>
-                                    <option value="all">Search In: All</option>
-                                    <option value="title">Title</option>
-                                    <option value="meta">Meta</option>
-                                    <option value="description">Description</option>
-                                    <option value="status">Status</option>
+                                <select class="form-select" style="max-width: 220px;" name="criteria">
+                                    <option value="all" {{ filters.criteria|default('all') == 'all' ? 'selected' : '' }}>Search In: All</option>
+                                    <option value="title" {{ filters.criteria|default('all') == 'title' ? 'selected' : '' }}>Title</option>
+                                    <option value="meta" {{ filters.criteria|default('all') == 'meta' ? 'selected' : '' }}>Meta</option>
+                                    <option value="description" {{ filters.criteria|default('all') == 'description' ? 'selected' : '' }}>Description</option>
+                                    <option value="status" {{ filters.criteria|default('all') == 'status' ? 'selected' : '' }}>Status</option>
                                 </select>
-                                <select class="form-select" style="max-width: 230px;" data-filter-sort>
-                                    <option value="default">Default Order</option>
-                                    <option value="date_desc">Date Newest</option>
-                                    <option value="date_asc">Date Oldest</option>
-                                    <option value="status_asc">Status A-Z</option>
-                                    <option value="status_desc">Status Z-A</option>
-                                    <option value="title_asc">Title A-Z</option>
-                                    <option value="title_desc">Title Z-A</option>
-                                    <option value="meta_asc">Meta A-Z</option>
-                                    <option value="meta_desc">Meta Z-A</option>
+                                <select class="form-select" style="max-width: 230px;" name="sort">
+                                    <option value="default" {{ filters.sort|default('date_desc') == 'default' ? 'selected' : '' }}>Default Order</option>
+                                    <option value="date_desc" {{ filters.sort|default('date_desc') == 'date_desc' ? 'selected' : '' }}>Date Newest</option>
+                                    <option value="date_asc" {{ filters.sort|default('date_desc') == 'date_asc' ? 'selected' : '' }}>Date Oldest</option>
+                                    <option value="status_asc" {{ filters.sort|default('date_desc') == 'status_asc' ? 'selected' : '' }}>Status A-Z</option>
+                                    <option value="status_desc" {{ filters.sort|default('date_desc') == 'status_desc' ? 'selected' : '' }}>Status Z-A</option>
+                                    <option value="title_asc" {{ filters.sort|default('date_desc') == 'title_asc' ? 'selected' : '' }}>Title A-Z</option>
+                                    <option value="title_desc" {{ filters.sort|default('date_desc') == 'title_desc' ? 'selected' : '' }}>Title Z-A</option>
+                                    <option value="meta_asc" {{ filters.sort|default('date_desc') == 'meta_asc' ? 'selected' : '' }}>Meta A-Z</option>
+                                    <option value="meta_desc" {{ filters.sort|default('date_desc') == 'meta_desc' ? 'selected' : '' }}>Meta Z-A</option>
                                 </select>
-                                <div class="small text-secondary ms-auto" data-filter-results></div>
-                            </div>
+                                <button type="submit" class="btn btn-primary">Apply</button>
+                                <a href="{{ path('front_interviews') }}" class="btn btn-outline-secondary">Reset</a>
+                                <div class="small text-secondary ms-auto">{{ cards|length }} result(s)</div>
+                            </form>
                         </div>
                     </div>
 
@@ -55,8 +58,8 @@
                             {% set statusLabel = card.status_label|default('Pending') %}
                             {% set statusKey = card.status_key|default('pending') %}
                             {% set detailExtra = card.detail_extra|default([]) %}
-                            <div class="{{ role == 'candidate' ? 'col-12' : 'col-md-6 col-xl-4' }} tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text ~ ' ' ~ statusLabel)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-filter-status="{{ statusLabel|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}" data-sort-status="{{ card.status_sort|default(statusLabel|lower) }}" data-sort-date="{{ card.scheduled_ts|default('0') }}">
-                                <div class="tb-module-card h-100 {{ role == 'candidate' ? 'tb-candidate-card tb-status-' ~ statusKey : '' }}" data-interview-id="{{ card.id|default(0) }}" data-application-id="{{ card.application_id|default('') }}" data-edit-url="{{ card.edit_url|default('#') }}" data-edit-scheduled-at="{{ card.form_scheduled_at|default('') }}" data-edit-duration="{{ card.form_duration_minutes|default('60') }}" data-edit-mode="{{ card.form_mode|default('online') }}" data-edit-meeting-link="{{ card.form_meeting_link|default('')|e('html_attr') }}" data-edit-location="{{ card.form_location|default('')|e('html_attr') }}" data-edit-notes="{{ card.full_notes|default('')|e('html_attr') }}" data-review-score="{{ card.review_score|default('80') }}" data-review-decision="{{ card.review_decision|default('accepted') }}" data-review-comment="{{ card.review_comment|default('')|e('html_attr') }}" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-detail-extra="{{ detailExtra|join('||')|e('html_attr') }}" data-action-primary="{{ role == 'recruiter' ? 'Modify' : '' }}" data-action-primary-href="#" data-action-primary-disabled="{{ role == 'recruiter' and card.can_modify|default(false) ? '0' : '1' }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete' : '' }}" data-action-secondary-href="{{ role == 'recruiter' ? card.delete_url|default('#') : '#' }}" data-action-secondary-disabled="{{ role == 'recruiter' and card.can_modify|default(false) ? '0' : '1' }}" data-action-tertiary="{{ role == 'recruiter' ? card.review_label|default('Review') : '' }}" data-action-tertiary-href="{{ role == 'recruiter' ? card.feedback_url|default('#') : '#' }}" data-action-tertiary-disabled="{{ role == 'recruiter' and card.can_feedback|default(false) ? '0' : '1' }}">
+                            <div class="{{ role == 'candidate' ? 'col-12' : 'col-md-6 col-xl-4' }}">
+                                <div class="tb-module-card h-100 {{ role == 'candidate' ? 'tb-candidate-card tb-status-' ~ statusKey : '' }}" data-interview-id="{{ card.id|default(0) }}" data-sort-date="{{ card.scheduled_ts|default('0') }}" data-application-id="{{ card.application_id|default('') }}" data-edit-url="{{ card.edit_url|default('#') }}" data-edit-scheduled-at="{{ card.form_scheduled_at|default('') }}" data-edit-duration="{{ card.form_duration_minutes|default('60') }}" data-edit-mode="{{ card.form_mode|default('online') }}" data-edit-meeting-link="{{ card.form_meeting_link|default('')|e('html_attr') }}" data-edit-location="{{ card.form_location|default('')|e('html_attr') }}" data-edit-notes="{{ card.full_notes|default('')|e('html_attr') }}" data-review-score="{{ card.review_score|default('80') }}" data-review-decision="{{ card.review_decision|default('accepted') }}" data-review-comment="{{ card.review_comment|default('')|e('html_attr') }}" data-detail-target="#interviewDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-detail-extra="{{ detailExtra|join('||')|e('html_attr') }}" data-action-primary="{{ role == 'recruiter' ? 'Modify' : '' }}" data-action-primary-href="#" data-action-primary-disabled="{{ role == 'recruiter' and card.can_modify|default(false) ? '0' : '1' }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete' : '' }}" data-action-secondary-href="{{ role == 'recruiter' ? card.delete_url|default('#') : '#' }}" data-action-secondary-disabled="{{ role == 'recruiter' and card.can_modify|default(false) ? '0' : '1' }}" data-action-tertiary="{{ role == 'recruiter' ? card.review_label|default('Review') : '' }}" data-action-tertiary-href="{{ role == 'recruiter' ? card.feedback_url|default('#') : '#' }}" data-action-tertiary-disabled="{{ role == 'recruiter' and card.can_feedback|default(false) ? '0' : '1' }}">
                                     <div class="d-flex align-items-start justify-content-between gap-2">
                                         <div class="tb-module-meta mb-0">{{ card.meta }}</div>
                                         <span class="badge tb-interview-status tb-status-anchor {{ card.status_class|default('bg-blue-lt') }}">{{ statusLabel }}</span>
@@ -331,6 +334,7 @@
                     mode: entry.mode || 'n/a',
                     status: entry.status || 'pending',
                     location: entry.location || 'No location specified',
+                    meetingLink: entry.meeting_link || entry.meetingLink || 'No meeting link specified',
                     timestamp: Number(entry.timestamp || 0)
                 });
             });
@@ -459,7 +463,12 @@
                     block += '<span class="tb-calendar-event-status">' + escapeHtml(entry.status) + '</span>';
                     block += '</div>';
                     block += '<div class="small text-secondary">' + escapeHtml(entry.date || formatPrettyDate(entry.ymd)) + '</div>';
-                    block += '<div class="small text-secondary">Mode: ' + escapeHtml(entry.mode) + ' | Location: ' + escapeHtml(entry.location) + '</div>';
+                    const normalizedMode = String(entry.mode || '').toLowerCase();
+                    if (normalizedMode === 'onsite' || normalizedMode === 'on_site' || normalizedMode === 'on-site') {
+                        block += '<div class="small text-secondary">Mode: ' + escapeHtml(entry.mode) + ' | Location: ' + escapeHtml(entry.location) + '</div>';
+                    } else {
+                        block += '<div class="small text-secondary">Mode: ' + escapeHtml(entry.mode) + ' | Meeting Link: ' + escapeHtml(entry.meetingLink) + '</div>';
+                    }
                     if (hasLink) {
                         block += '<div class="small text-primary mt-1">Open interview details</div>';
                     }

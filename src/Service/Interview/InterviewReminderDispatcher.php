@@ -17,6 +17,7 @@ class InterviewReminderDispatcher
         private readonly ManagerRegistry $doctrine,
         private readonly BrevoEmailSender $emailSender,
         private readonly SmsMobileApiSender $smsSender,
+        private readonly ReminderMessageBuilder $messageBuilder,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -68,7 +69,7 @@ class InterviewReminderDispatcher
                     continue;
                 }
 
-                $subject = sprintf('Interview reminder: %s in 24 hours', $context['offerTitle']);
+                $subject = $this->messageBuilder->buildSubject($context['offerTitle']);
 
                 foreach ($context['recipients'] as $recipient) {
                     $recipientName = $recipient['name'];
@@ -76,7 +77,7 @@ class InterviewReminderDispatcher
                     $phone = $recipient['phone'];
                     $roleLabel = ucfirst($recipient['role']);
 
-                    $emailBody = $this->buildEmailBody(
+                    $emailTextBody = $this->messageBuilder->buildEmailText(
                         $recipientName,
                         $roleLabel,
                         $context['offerTitle'],
@@ -87,11 +88,22 @@ class InterviewReminderDispatcher
                         $context['notes']
                     );
 
-                    if ($email !== '' && $this->emailSender->send($email, $recipientName, $subject, $emailBody)) {
+                    $emailHtmlBody = $this->messageBuilder->buildEmailHtml(
+                        $recipientName,
+                        $roleLabel,
+                        $context['offerTitle'],
+                        $context['scheduledAt'],
+                        $context['durationMinutes'],
+                        $context['modeLabel'],
+                        $context['placeLabel'],
+                        $context['notes']
+                    );
+
+                    if ($email !== '' && $this->emailSender->send($email, $recipientName, $subject, $emailTextBody, $emailHtmlBody)) {
                         ++$stats['emails_sent'];
                     }
 
-                    $smsText = $this->buildSmsText(
+                    $smsText = $this->messageBuilder->buildSmsText(
                         $context['offerTitle'],
                         $context['scheduledAt'],
                         $context['modeLabel'],
@@ -229,51 +241,4 @@ class InterviewReminderDispatcher
         return preg_replace('/\D+/', '', $trimmed) ?? '';
     }
 
-    private function buildEmailBody(
-        string $recipientName,
-        string $roleLabel,
-        string $offerTitle,
-        string $scheduledAt,
-        int $durationMinutes,
-        string $modeLabel,
-        string $placeLabel,
-        string $notes
-    ): string {
-        $lines = [
-            'Hello ' . $recipientName . ',',
-            '',
-            'This is a 24-hour reminder for an upcoming interview.',
-            'Role: ' . $roleLabel,
-            'Job offer: ' . $offerTitle,
-            'Date and time: ' . $scheduledAt,
-            'Duration: ' . $durationMinutes . ' minutes',
-            'Mode: ' . $modeLabel,
-        ];
-
-        if ($modeLabel === 'ONLINE') {
-            $lines[] = 'Meeting link: ' . $placeLabel;
-        } else {
-            $lines[] = 'Location: ' . $placeLabel;
-        }
-
-        if ($notes !== '') {
-            $lines[] = 'Notes: ' . $notes;
-        }
-
-        $lines[] = '';
-        $lines[] = 'Talent Bridge';
-
-        return implode("\n", $lines);
-    }
-
-    private function buildSmsText(string $offerTitle, string $scheduledAt, string $modeLabel, string $placeLabel): string
-    {
-        $base = sprintf('Reminder: Interview for %s in 24h. %s, %s.', $offerTitle, $scheduledAt, $modeLabel);
-
-        if ($modeLabel === 'ONLINE') {
-            return $base . ' Link: ' . $placeLabel;
-        }
-
-        return $base . ' Location: ' . $placeLabel;
-    }
 }
