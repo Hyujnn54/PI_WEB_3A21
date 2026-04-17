@@ -273,45 +273,12 @@ class FrontPortalController extends AbstractController
                 $formData['skills'] = [['name' => '', 'level' => '']];
             }
 
-            if ($formData['title'] === '') {
-                $fieldErrors['title'] = 'Title is required.';
-            }
-            if ($formData['contract_type'] === '') {
-                $fieldErrors['contract_type'] = 'Contract type is required.';
-            } elseif (!in_array($formData['contract_type'], self::CONTRACT_TYPES, true)) {
-                $fieldErrors['contract_type'] = 'Please select a valid contract type.';
-            }
-            if ($formData['status'] === '') {
-                $fieldErrors['status'] = 'Status is required.';
-            } elseif (!in_array($formData['status'], self::JOB_STATUSES, true)) {
-                $fieldErrors['status'] = 'Please select a valid status.';
-            }
-            if ($formData['description'] === '') {
-                $fieldErrors['description'] = 'Description is required.';
-            }
-            if ($formData['location'] === '') {
-                $fieldErrors['location'] = 'Location is required.';
-            }
-            if ($formData['deadline'] === '') {
-                $fieldErrors['deadline'] = 'Deadline is required.';
-            } else {
-                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
-                if (!$deadline) {
-                    $fieldErrors['deadline'] = 'Invalid deadline format.';
-                } elseif ($deadline <= new \DateTimeImmutable()) {
-                    $fieldErrors['deadline'] = 'Deadline must be greater than today.';
-                }
-            }
-            foreach ($formData['skills'] as $index => $skill) {
-                if ($skill['name'] === '') {
-                    $fieldErrors['skills'][$index]['name'] = 'Skill name is required.';
-                }
-                if ($skill['level'] === '') {
-                    $fieldErrors['skills'][$index]['level'] = 'Skill level is required.';
-                } elseif (!in_array($skill['level'], self::SKILL_LEVELS, true)) {
-                    $fieldErrors['skills'][$index]['level'] = 'Invalid skill level.';
-                }
-            }
+            $fieldErrors = Job_offer::validateCreateFormData(
+                $formData,
+                self::CONTRACT_TYPES,
+                self::JOB_STATUSES,
+                self::SKILL_LEVELS
+            );
 
             if (empty($fieldErrors)) {
                 $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
@@ -442,41 +409,11 @@ class FrontPortalController extends AbstractController
                 $formData['skills'] = [['name' => '', 'level' => '']];
             }
 
-            if ($formData['title'] === '') {
-                $fieldErrors['title'] = 'Title is required.';
-            }
-            if ($formData['contract_type'] === '') {
-                $fieldErrors['contract_type'] = 'Contract type is required.';
-            } elseif (!in_array($formData['contract_type'], self::CONTRACT_TYPES, true)) {
-                $fieldErrors['contract_type'] = 'Please select a valid contract type.';
-            }
-            if ($formData['description'] === '') {
-                $fieldErrors['description'] = 'Description is required.';
-            }
-            if ($formData['location'] === '') {
-                $fieldErrors['location'] = 'Location is required.';
-            }
-            if ($formData['deadline'] === '') {
-                $fieldErrors['deadline'] = 'Deadline is required.';
-            } else {
-                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
-                if (!$deadline) {
-                    $fieldErrors['deadline'] = 'Invalid deadline format.';
-                } elseif ($deadline <= new \DateTimeImmutable()) {
-                    $fieldErrors['deadline'] = 'Deadline must be greater than today.';
-                }
-            }
-
-            foreach ($formData['skills'] as $index => $skill) {
-                if ($skill['name'] === '') {
-                    $fieldErrors['skills'][$index]['name'] = 'Skill name is required.';
-                }
-                if ($skill['level'] === '') {
-                    $fieldErrors['skills'][$index]['level'] = 'Skill level is required.';
-                } elseif (!in_array($skill['level'], self::SKILL_LEVELS, true)) {
-                    $fieldErrors['skills'][$index]['level'] = 'Invalid skill level.';
-                }
-            }
+            $fieldErrors = Job_offer::validateEditFormData(
+                $formData,
+                self::CONTRACT_TYPES,
+                self::SKILL_LEVELS
+            );
 
             if (empty($fieldErrors)) {
                 $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
