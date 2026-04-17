@@ -8,9 +8,12 @@ use App\Entity\Job_offer;
 use App\Entity\Candidate;
 use App\Form\JobApplicationType;
 use App\Repository\Application_status_historyRepository;
+use App\Repository\Candidate_skillRepository;
 use App\Repository\Job_applicationRepository;
+use App\Service\JobApplication\GroqCoverLetterGenerator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -22,6 +25,138 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class CandidateApplicationController extends AbstractController
 {
+    #[Route('/applicationmanagement/candidate/offers/{offerId}/cover-letter/generate', name: 'app_candidate_cover_letter_generate', methods: ['POST'])]
+    public function generateCoverLetter(
+        int $offerId,
+        Request $request,
+        EntityManagerInterface $em,
+        Candidate_skillRepository $candidateSkillRepository,
+        GroqCoverLetterGenerator $groqCoverLetterGenerator,
+        Job_applicationRepository $jobApplicationRepository
+    ): JsonResponse {
+        $roles = (array) $request->getSession()->get('user_roles', []);
+        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Only candidates can generate a cover letter.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $candidateId = (string) $request->getSession()->get('user_id', '');
+        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        $offer = $em->getRepository(Job_offer::class)->find($offerId);
+
+        if (!$candidate || !$offer) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Candidate or offer not found.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $useProfileCv = filter_var((string) $request->request->get('use_profile_cv', '0'), FILTER_VALIDATE_BOOL);
+        $uploadedCv = $request->files->get('cv_file');
+        $applicationId = (int) $request->request->get('application_id', 0);
+        $profileCvPath = method_exists($candidate, 'getCvPath') ? trim((string) $candidate->getCvPath()) : '';
+        $applicationCvPath = '';
+
+        if ($useProfileCv && $profileCvPath === '') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'No CV found in your profile. Uncheck "Use CV from profile", upload a CV, then generate the cover letter.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (!$useProfileCv && !($uploadedCv instanceof UploadedFile)) {
+            if ($applicationId > 0) {
+                $application = $jobApplicationRepository->findForCandidate($applicationId, $candidate);
+                if ($application instanceof Job_application) {
+                    $applicationCvPath = trim((string) $application->getCv_path());
+                }
+            }
+
+            if ($applicationCvPath !== '') {
+                $cvText = $this->extractCvTextFromApplicationPath($applicationCvPath);
+                if ($cvText !== '') {
+                    $skills = $candidateSkillRepository->findSkillSummariesForCandidate($candidate);
+
+                    try {
+                        $coverLetter = $groqCoverLetterGenerator->generate([
+                            'candidate_name' => $this->resolveCandidateDisplayName($candidate),
+                            'candidate_email' => trim((string) $candidate->getEmail()),
+                            'candidate_phone' => trim((string) $candidate->getPhone()),
+                            'candidate_location' => trim((string) $candidate->getLocation()),
+                            'education_level' => trim((string) $candidate->getEducationLevel()),
+                            'experience_years' => $candidate->getExperienceYears() !== null
+                                ? ((string) $candidate->getExperienceYears() . ' years')
+                                : '',
+                            'skills' => $skills,
+                            'offer_title' => trim((string) $offer->getTitle()),
+                            'offer_location' => trim((string) $offer->getLocation()),
+                            'offer_contract' => trim((string) $offer->getContract_type()),
+                            'cv_text' => $cvText,
+                        ]);
+                    } catch (\Throwable $exception) {
+                        return $this->json([
+                            'ok' => false,
+                            'error' => $exception->getMessage(),
+                        ], Response::HTTP_BAD_GATEWAY);
+                    }
+
+                    return $this->json([
+                        'ok' => true,
+                        'cover_letter' => $coverLetter,
+                    ]);
+                }
+            }
+
+            return $this->json([
+                'ok' => false,
+                'error' => 'Please upload a CV first, or keep an existing CV in this application, then generate the cover letter.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $cvText = $useProfileCv
+            ? $this->extractCvTextFromProfilePath($profileCvPath)
+            : $this->extractCvTextFromUploadedFile($uploadedCv);
+
+        if ($cvText === '') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Could not read text from the selected CV. Please upload a readable CV (PDF, DOCX, or TXT) and try again.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $skills = $candidateSkillRepository->findSkillSummariesForCandidate($candidate);
+
+        try {
+            $coverLetter = $groqCoverLetterGenerator->generate([
+                'candidate_name' => $this->resolveCandidateDisplayName($candidate),
+                'candidate_email' => trim((string) $candidate->getEmail()),
+                'candidate_phone' => trim((string) $candidate->getPhone()),
+                'candidate_location' => trim((string) $candidate->getLocation()),
+                'education_level' => trim((string) $candidate->getEducationLevel()),
+                'experience_years' => $candidate->getExperienceYears() !== null
+                    ? ((string) $candidate->getExperienceYears() . ' years')
+                    : '',
+                'skills' => $skills,
+                'offer_title' => trim((string) $offer->getTitle()),
+                'offer_location' => trim((string) $offer->getLocation()),
+                'offer_contract' => trim((string) $offer->getContract_type()),
+                'cv_text' => $cvText,
+            ]);
+        } catch (\Throwable $exception) {
+            return $this->json([
+                'ok' => false,
+                'error' => $exception->getMessage(),
+            ], Response::HTTP_BAD_GATEWAY);
+        }
+
+        return $this->json([
+            'ok' => true,
+            'cover_letter' => $coverLetter,
+        ]);
+    }
+
     #[Route('/applicationmanagement/candidate/apply/{offerId}', name: 'app_candidate_apply')]
     public function apply(
         int $offerId,
@@ -459,6 +594,138 @@ class CandidateApplicationController extends AbstractController
         $fullName = trim($firstName . ' ' . $lastName);
 
         return $fullName !== '' ? $fullName : 'Candidate';
+    }
+
+    private function extractCvTextFromProfilePath(string $profileCvPath): string
+    {
+        $fileName = basename(trim($profileCvPath));
+        if ($fileName === '') {
+            return '';
+        }
+
+        $projectDir = (string) $this->getParameter('kernel.project_dir');
+        $candidatePaths = [
+            $projectDir . '/public/uploads/cvs/' . $fileName,
+            $projectDir . '/public/uploads/applications/' . $fileName,
+            $projectDir . '/public/' . $fileName,
+        ];
+
+        foreach ($candidatePaths as $path) {
+            if (is_file($path) && is_readable($path)) {
+                return $this->extractReadableTextFromFile($path, $fileName);
+            }
+        }
+
+        return '';
+    }
+
+    private function extractCvTextFromApplicationPath(string $applicationCvPath): string
+    {
+        $fileName = basename(trim($applicationCvPath));
+        if ($fileName === '') {
+            return '';
+        }
+
+        $projectDir = (string) $this->getParameter('kernel.project_dir');
+        $candidatePaths = [
+            $projectDir . '/public/uploads/applications/' . $fileName,
+            $projectDir . '/public/uploads/cvs/' . $fileName,
+            $projectDir . '/public/' . $fileName,
+        ];
+
+        foreach ($candidatePaths as $path) {
+            if (is_file($path) && is_readable($path)) {
+                return $this->extractReadableTextFromFile($path, $fileName);
+            }
+        }
+
+        return '';
+    }
+
+    private function extractCvTextFromUploadedFile(?UploadedFile $uploadedCv): string
+    {
+        if (!$uploadedCv instanceof UploadedFile) {
+            return '';
+        }
+
+        $realPath = $uploadedCv->getRealPath();
+        if (!is_string($realPath) || $realPath === '') {
+            $realPath = $uploadedCv->getPathname();
+        }
+
+        return $this->extractReadableTextFromFile($realPath, (string) $uploadedCv->getClientOriginalName());
+    }
+
+    private function extractReadableTextFromFile(string $absolutePath, string $fileName): string
+    {
+        if (!is_file($absolutePath) || !is_readable($absolutePath)) {
+            return '';
+        }
+
+        $extension = strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+        $rawContent = file_get_contents($absolutePath);
+        if ($rawContent === false || $rawContent === '') {
+            return '';
+        }
+
+        if (in_array($extension, ['txt', 'md', 'csv', 'json', 'xml', 'html', 'htm'], true)) {
+            return $this->normalizeCvText($rawContent);
+        }
+
+        if ($extension === 'docx' && class_exists('ZipArchive')) {
+            $zip = new \ZipArchive();
+            if ($zip->open($absolutePath) === true) {
+                $xml = $zip->getFromName('word/document.xml');
+                $zip->close();
+                if (is_string($xml) && $xml !== '') {
+                    $text = strip_tags($xml);
+
+                    return $this->normalizeCvText($text);
+                }
+            }
+        }
+
+        if ($extension === 'pdf') {
+            return $this->extractPdfText($rawContent);
+        }
+
+        return $this->normalizeCvText($rawContent);
+    }
+
+    private function extractPdfText(string $rawPdf): string
+    {
+        $chunks = [];
+        if (preg_match_all('/\(([^()]*)\)/s', $rawPdf, $matches) > 0 && isset($matches[1])) {
+            foreach ($matches[1] as $chunk) {
+                $cleanChunk = preg_replace('/\\\\[nrt]/', ' ', (string) $chunk);
+                $cleanChunk = preg_replace('/\\\\\d{3}/', ' ', (string) $cleanChunk);
+                if (!is_string($cleanChunk)) {
+                    continue;
+                }
+                $chunks[] = $cleanChunk;
+            }
+        }
+
+        if ($chunks === []) {
+            return '';
+        }
+
+        return $this->normalizeCvText(implode(' ', $chunks));
+    }
+
+    private function normalizeCvText(string $rawText): string
+    {
+        $normalized = str_replace(["\r\n", "\r", "\0"], ["\n", "\n", ' '], $rawText);
+        $normalized = strip_tags($normalized);
+        $normalized = preg_replace('/[^\PC\n\t]+/u', ' ', $normalized) ?? $normalized;
+        $normalized = preg_replace('/\s+/u', ' ', $normalized) ?? $normalized;
+        $normalized = trim($normalized);
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        return mb_substr($normalized, 0, 7000);
     }
 }
 
