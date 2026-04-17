@@ -13,6 +13,10 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 class CandidateController extends AbstractController
 {
@@ -254,5 +258,76 @@ public function delete(
 
     $this->addFlash('success', 'Skill deleted successfully!');
     return $this->redirectToRoute('app_candidate_skills');
+}
+
+
+
+
+
+
+
+#[Route('/api/skill-suggestions', name: 'api_skill_suggestions', methods: ['GET'])]
+public function skillSuggestions(
+    Request $request,
+    CacheInterface $cache
+): JsonResponse {
+
+    $query = strtolower(trim($request->query->get('q')));
+
+    if (!$query || strlen($query) < 2) {
+        return new JsonResponse([]);
+    }
+
+    $skills = $cache->get(
+
+        'skills_' . $query,
+
+        function (ItemInterface $item) use ($query) {
+
+        dump('API CALL for: ' . $query); // DEBUG
+
+            $item->expiresAfter(3600); // cache 1 hour
+
+            $client = HttpClient::create([
+                'timeout' => 3, // prevent long waits
+            ]);
+
+            try {
+
+                $response = $client->request(
+                    'GET',
+                    'https://ec.europa.eu/esco/api/search',
+                    [
+                        'query' => [
+                            'text' => $query,
+                            'type' => 'skill',
+                            'limit' => 8
+                        ]
+                    ]
+                );
+
+                $data = $response->toArray();
+
+                $skills = [];
+
+                if (isset($data['_embedded']['results'])) {
+                    foreach ($data['_embedded']['results'] as $item) {
+                        $skills[] = $item['title'];
+                    }
+                }
+
+                return $skills;
+
+            } catch (\Exception $e) {
+
+                return [];
+
+            }
+
+        }
+
+    );
+
+    return new JsonResponse($skills);
 }
 }

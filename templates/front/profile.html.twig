@@ -79,7 +79,17 @@
                             <input type="hidden" name="profile_action" value="skill_add">
                             <div class="col-12">
                                 <label class="form-label mb-1">Skill Name</label>
-                                <input type="text" name="skill_name" class="form-control" placeholder="e.g. Symfony, React, QA Automation" maxlength="100">
+                                    <input
+                                        type="text"
+                                        name="skill_name"
+                                        id="skillInput"
+                                        class="form-control"
+                                        placeholder="e.g. Symfony, React, QA Automation"
+                                        maxlength="100"
+                                        autocomplete="off"
+                                    >
+
+                                    <div id="skillSuggestions" class="list-group mt-1"></div>
                             </div>
                             <div class="col-8">
                                 <label class="form-label mb-1">Level</label>
@@ -157,4 +167,65 @@
         </div>
     </div>
 </div>
+
+
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const input = document.getElementById("skillInput");
+    const suggestionsBox = document.getElementById("skillSuggestions");
+
+    let timeout = null;
+
+    input.addEventListener("input", function () {
+
+        const query = this.value;
+
+        if (query.length < 3) {
+            suggestionsBox.innerHTML = "";
+            return;
+        }
+
+        clearTimeout(timeout);
+
+        timeout = setTimeout(() => {
+
+            fetch("/api/skill-suggestions?q=" + query)
+
+            .then(response => response.json())
+
+            .then(data => {
+
+                suggestionsBox.innerHTML = "";
+
+                data.forEach(skill => {
+
+                    const item = document.createElement("a");
+
+                    item.classList.add(
+                        "list-group-item",
+                        "list-group-item-action"
+                    );
+
+                    item.textContent = skill;
+
+                    item.onclick = () => {
+                        input.value = skill;
+                        suggestionsBox.innerHTML = "";
+                    };
+
+                    suggestionsBox.appendChild(item);
+
+                });
+
+            });
+
+        }, 800);
+
+    });
+
+});
+</script>
 {% endblock %}
