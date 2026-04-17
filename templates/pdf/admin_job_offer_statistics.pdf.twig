@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #1f2937; background: #f5f7fb; }
+        .page { background: #ffffff; border: 1px solid #e6edf7; border-radius: 10px; overflow: hidden; }
+        .header {
+            background: linear-gradient(120deg, #eef2ff 0%, #f8fafc 100%);
+            color: #0f172a;
+            padding: 18px 20px;
+            border-bottom: 1px solid #dce6f2;
+        }
+        .header-row { width: 100%; border-collapse: collapse; }
+        .header-row td { vertical-align: middle; }
+        .brand h1 { font-size: 22px; margin: 0; line-height: 1.2; color: #0b1324; }
+        .brand p { margin: 4px 0 0 0; color: #334155; font-size: 11px; }
+        .logo { text-align: right; }
+        .logo img { width: 46px; height: 46px; object-fit: contain; background: #ffffff; border-radius: 8px; padding: 4px; }
+        .meta { padding: 10px 20px; background: #f8fafc; color: #475569; border-bottom: 1px solid #e2e8f0; }
+
+        .content { padding: 16px 20px 18px 20px; }
+        .kpis { width: 100%; border-collapse: separate; border-spacing: 8px; margin: 0 0 12px 0; }
+        .kpi { border-radius: 10px; padding: 10px 12px; color: #ffffff; }
+        .kpi .label { font-size: 11px; opacity: .95; }
+        .kpi .value { font-size: 21px; font-weight: 700; margin-top: 5px; }
+        .kpi.total { background: #334155; }
+        .kpi.open { background: #0f766e; }
+        .kpi.closed { background: #be123c; }
+
+        .section-title {
+            margin-top: 12px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+            border-left: 4px solid #334155;
+            padding-left: 8px;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        th, td { border: 1px solid #dce6f2; padding: 7px 8px; text-align: left; }
+        th { background: #eef2ff; color: #0f172a; font-weight: 700; }
+        tr:nth-child(even) td { background: #f8fbff; }
+        .footer { margin-top: 8px; color: #64748b; font-size: 10px; text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="header">
+            <table class="header-row">
+                <tr>
+                    <td class="brand">
+                        <h1>Admin Offer Statistics</h1>
+                        <p>Talent Bridge - Global platform analytics snapshot</p>
+                    </td>
+                    <td class="logo">
+                        {% if logoDataUri is defined and logoDataUri %}
+                            <img src="{{ logoDataUri }}" alt="Talent Bridge logo">
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="meta">Generated at: {{ generatedAt|date('Y-m-d H:i:s') }}</div>
+
+        <div class="content">
+            <table class="kpis">
+                <tr>
+                    <td class="kpi total">
+                        <div class="label">Published Offers</div>
+                        <div class="value">{{ offerStats.total_published }}</div>
+                    </td>
+                    <td class="kpi open">
+                        <div class="label">Open Offers</div>
+                        <div class="value">{{ offerStats.total_open }} ({{ offerStats.open_percentage }}%)</div>
+                    </td>
+                    <td class="kpi closed">
+                        <div class="label">Closed Offers</div>
+                        <div class="value">{{ offerStats.total_closed }} ({{ offerStats.closed_percentage }}%)</div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="section-title">Performance by City</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>City</th>
+                        <th>Total</th>
+                        <th>Open</th>
+                        <th>Closed</th>
+                        <th>Open Rate</th>
+                        <th>Closed Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for city in offerStats.city_stats %}
+                        <tr>
+                            <td>{{ city.city }}</td>
+                            <td>{{ city.total }}</td>
+                            <td>{{ city.open }}</td>
+                            <td>{{ city.closed }}</td>
+                            <td>{{ city.open_rate }}%</td>
+                            <td>{{ city.closed_rate }}%</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6">No data.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="section-title">Distribution by Contract Type</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Total</th>
+                        <th>Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for contract in offerStats.contract_stats %}
+                        <tr>
+                            <td>{{ contract.contract_type }}</td>
+                            <td>{{ contract.total }}</td>
+                            <td>{{ contract.percentage }}%</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="3">No data.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="footer">Talent Bridge - Administrative reporting export</div>
+        </div>
+    </div>
+</body>
+</html>

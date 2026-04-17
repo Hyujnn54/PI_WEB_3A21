@@ -19,6 +19,7 @@ use App\Service\CandidateOfferMatchingService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Knp\Snappy\Pdf;
 use Spiriit\Bundle\FormFilterBundle\Filter\FilterBuilderUpdaterInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -290,6 +291,76 @@ class FrontPortalController extends AbstractController
         return $this->render('front/modules/job_offer_statistics.html.twig', [
             'authUser' => ['role' => $role],
             'offerStats' => $offerStats,
+        ]);
+    }
+
+    #[Route('/front/job-offers/statistics/export/pdf', name: 'front_job_offers_statistics_export_pdf', methods: ['GET'])]
+    public function exportJobOffersStatisticsPdf(Request $request, Job_offerRepository $jobOfferRepository, Pdf $pdf): Response
+    {
+        $role = $this->resolveSessionRole($request);
+        $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
+        if ($role !== 'recruiter') {
+            $this->addFlash('warning', 'Only recruiters can export offer statistics.');
+
+            return $this->redirectToRoute('front_job_offers', ['role' => $role]);
+        }
+
+        $offerStats = [
+            'total_published' => 0,
+            'total_closed' => 0,
+            'total_open' => 0,
+            'closed_percentage' => 0,
+            'open_percentage' => 0,
+            'city_stats' => [],
+            'contract_stats' => [],
+        ];
+
+        try {
+            $offerStats = $jobOfferRepository->buildRecruiterOfferStats($currentRecruiterId, 50);
+        } catch (\Throwable) {
+            $this->addFlash('error', 'Unable to export recruiter statistics right now.');
+
+            return $this->redirectToRoute('front_job_offers_statistics', ['role' => 'recruiter']);
+        }
+
+        $logoDataUri = null;
+        $projectDir = (string) $this->getParameter('kernel.project_dir');
+        $logoCandidates = [
+            $projectDir . '/assets/team_upload/logo.png',
+            $projectDir . '/assets/team_uploads/logo.png',
+            $projectDir . '/public/uploads/applications/logo-69d55696892a5.png',
+        ];
+        foreach ($logoCandidates as $logoPath) {
+            if (!is_file($logoPath)) {
+                continue;
+            }
+
+            $logoBinary = @file_get_contents($logoPath);
+            if ($logoBinary !== false) {
+                $logoDataUri = 'data:image/png;base64,' . base64_encode($logoBinary);
+                break;
+            }
+        }
+
+        $html = $this->renderView('pdf/recruiter_job_offer_statistics.pdf.twig', [
+            'offerStats' => $offerStats,
+            'generatedAt' => new \DateTimeImmutable(),
+            'recruiterId' => $currentRecruiterId,
+            'logoDataUri' => $logoDataUri,
+        ]);
+
+        $content = $pdf->getOutputFromHtml($html, [
+            'encoding' => 'utf-8',
+            'enable-local-file-access' => true,
+            'margin-top' => '12mm',
+            'margin-bottom' => '12mm',
+            'margin-left' => '10mm',
+            'margin-right' => '10mm',
+        ]);
+
+        return new Response($content, Response::HTTP_OK, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="recruiter_offer_statistics_' . (new \DateTimeImmutable())->format('Ymd_His') . '.pdf"',
         ]);
     }
 
