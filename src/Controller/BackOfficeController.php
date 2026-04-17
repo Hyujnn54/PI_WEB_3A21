@@ -10,10 +10,12 @@ use App\Entity\Job_offer_warning;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Entity\Users;
+use App\Form\Filter\JobOfferFilterType;
 use App\Repository\Job_offerRepository;
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Spiriit\Bundle\FormFilterBundle\Filter\FilterBuilderUpdaterInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -335,22 +337,20 @@ class BackOfficeController extends AbstractController
     }
 
     #[Route('/admin/job-offers', name: 'app_admin_job_offers')]
-    public function jobOffers(Request $request, Connection $connection, Job_offerRepository $jobOfferRepository): Response
+    public function jobOffers(
+        Request $request,
+        Connection $connection,
+        Job_offerRepository $jobOfferRepository,
+        FilterBuilderUpdaterInterface $filterBuilderUpdater
+    ): Response
     {
-        $searchQuery = trim((string) $request->query->get('search', ''));
-        $filterContractType = trim((string) $request->query->get('contract_type', ''));
-        $filterStatus = trim((string) $request->query->get('status', ''));
-        $filterDeadline = trim((string) $request->query->get('deadline', ''));
-
-        if (!in_array($filterContractType, self::CONTRACT_TYPES, true)) {
-            $filterContractType = '';
-        }
-        if (!in_array($filterStatus, self::JOB_STATUSES, true)) {
-            $filterStatus = '';
-        }
-        if ($filterDeadline !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filterDeadline)) {
-            $filterDeadline = '';
-        }
+        $filterForm = $this->createForm(JobOfferFilterType::class, null, [
+            'method' => 'GET',
+            'csrf_protection' => false,
+            'contract_types' => self::CONTRACT_TYPES,
+            'job_statuses' => self::JOB_STATUSES,
+        ]);
+        $filterForm->handleRequest($request);
 
         $offers = [];
         $expiredOffers = [];
@@ -363,29 +363,30 @@ class BackOfficeController extends AbstractController
                 // Keep read-only view available even if auto-close update fails.
             }
 
-            $offers = $jobOfferRepository->findAdminOffersForListing(
-                $searchQuery,
-                $filterContractType,
-                $filterStatus,
-                $filterDeadline,
-                300
-            );
+            $filterBuilder = $jobOfferRepository->createAdminOffersFilterQueryBuilder();
+            if ($filterForm->isSubmitted() && $filterForm->isValid()) {
+                $filterBuilderUpdater->addFilterConditions($filterForm, $filterBuilder);
+            }
+
+            $offers = $jobOfferRepository->getAdminOffersFromQueryBuilder($filterBuilder, 300);
             $expiredOffers = $this->extractExpiredOffers($offers, $now);
         } catch (\Throwable $exception) {
             // Keep admin page available if any read query fails.
             $this->addFlash('error', 'Unable to load complete job offer data right now.');
         }
 
+        $filterData = (array) $filterForm->getData();
+        $hasActiveFilters = trim((string) ($filterData['search'] ?? '')) !== ''
+            || trim((string) ($filterData['contract_type'] ?? '')) !== ''
+            || trim((string) ($filterData['status'] ?? '')) !== ''
+            || trim((string) ($filterData['deadline'] ?? '')) !== '';
+
         return $this->render('admin/job_offers.html.twig', [
             'authUser' => ['role' => 'admin'],
             'offers' => $offers,
             'expiredOffers' => $expiredOffers,
-            'searchQuery' => $searchQuery,
-            'filterContractType' => $filterContractType,
-            'filterStatus' => $filterStatus,
-            'filterDeadline' => $filterDeadline,
-            'contractTypes' => self::CONTRACT_TYPES,
-            'jobStatuses' => self::JOB_STATUSES,
+            'filterForm' => $filterForm->createView(),
+            'hasActiveFilters' => $hasActiveFilters,
             'resultCount' => count($offers),
         ]);
     }

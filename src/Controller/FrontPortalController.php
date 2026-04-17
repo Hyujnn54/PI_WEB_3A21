@@ -11,12 +11,15 @@ use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
+use App\Form\Filter\JobOfferFilterType;
 use App\Form\ProfileType;
 use App\Repository\Job_offerRepository;
 use App\Repository\UsersRepository;
+use App\Service\CandidateOfferMatchingService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Spiriit\Bundle\FormFilterBundle\Filter\FilterBuilderUpdaterInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -38,33 +41,31 @@ class FrontPortalController extends AbstractController
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
 
-    public function __construct(private readonly ManagerRegistry $doctrine)
+    public function __construct(
+        private readonly ManagerRegistry $doctrine,
+        private readonly CandidateOfferMatchingService $candidateOfferMatchingService
+    )
     {
     }
 
     #[Route('/front/job-offers', name: 'front_job_offers')]
-    public function jobOffers(Request $request, Connection $connection, Job_offerRepository $jobOfferRepository): Response
+    public function jobOffers(
+        Request $request,
+        Connection $connection,
+        Job_offerRepository $jobOfferRepository,
+        FilterBuilderUpdaterInterface $filterBuilderUpdater
+    ): Response
     {
         $role = $this->resolveSessionRole($request);
-        $currentUserId = $this->resolveCurrentUserId($request);
         $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
         $candidate = null;
-        $searchQuery = trim((string) $request->query->get('search', ''));
-        $filterContractType = trim((string) $request->query->get('contract_type', ''));
-        $filterStatus = trim((string) $request->query->get('status', ''));
-        $filterDeadline = trim((string) $request->query->get('deadline', ''));
-
-        if (!in_array($filterContractType, self::CONTRACT_TYPES, true)) {
-            $filterContractType = '';
-        }
-
-        if (!in_array($filterStatus, self::JOB_STATUSES, true)) {
-            $filterStatus = '';
-        }
-
-        if ($filterDeadline !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filterDeadline)) {
-            $filterDeadline = '';
-        }
+        $filterForm = $this->createForm(JobOfferFilterType::class, null, [
+            'method' => 'GET',
+            'csrf_protection' => false,
+            'contract_types' => self::CONTRACT_TYPES,
+            'job_statuses' => self::JOB_STATUSES,
+        ]);
+        $filterForm->handleRequest($request);
 
         $warnings = [];
         $warningStatuses = [];
@@ -104,19 +105,16 @@ class FrontPortalController extends AbstractController
                 );
             }
 
-            $rows = $jobOfferRepository->findOfferRowsForPortal(
-                $role,
-                $currentRecruiterId,
-                $searchQuery,
-                $filterContractType,
-                $filterStatus,
-                $filterDeadline,
-                25
-            );
+            $filterBuilder = $jobOfferRepository->createPortalOffersFilterQueryBuilder($role, $currentRecruiterId);
+            if ($filterForm->isSubmitted() && $filterForm->isValid()) {
+                $filterBuilderUpdater->addFilterConditions($filterForm, $filterBuilder);
+            }
+
+            $rows = $jobOfferRepository->getPortalOffersFromQueryBuilder($filterBuilder, 25);
 
             $candidateMatchData = [];
             if ($role === 'candidate' && $candidate instanceof Candidate) {
-                $candidateMatchData = $jobOfferRepository->buildCandidateOfferMatchData((string) $candidate->getId(), $rows);
+                $candidateMatchData = $this->candidateOfferMatchingService->buildCandidateOfferMatchData((string) $candidate->getId(), $rows);
             }
 
             $dbCards = array_map(function (array $row) use ($connection, $now, $appliedOfferIds, $currentRecruiterId, $candidateMatchData): array {
@@ -246,16 +244,19 @@ class FrontPortalController extends AbstractController
             $card['warning_status'] = $warningStatuses[$card['id']] ?? null;
         }
 
+        $filterData = (array) $filterForm->getData();
+        $hasActiveFilters = trim((string) ($filterData['search'] ?? '')) !== ''
+            || trim((string) ($filterData['contract_type'] ?? '')) !== ''
+            || trim((string) ($filterData['status'] ?? '')) !== ''
+            || trim((string) ($filterData['deadline'] ?? '')) !== '';
+
         return $this->render('front/modules/job_offers.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
-            'contractTypes' => self::CONTRACT_TYPES,
+            'filterForm' => $filterForm->createView(),
+            'hasActiveFilters' => $hasActiveFilters,
             'warnings' => $warnings,
             'expiredOffers' => $expiredOffers,
-            'searchQuery' => $searchQuery,
-            'filterContractType' => $filterContractType,
-            'filterStatus' => $filterStatus,
-            'filterDeadline' => $filterDeadline,
             'resultCount' => count($cards),
         ]);
     }

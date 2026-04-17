@@ -85,27 +85,48 @@
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap align-items-center gap-2" id="offerMultiFilter">
                         {% if role != 'admin' %}
-                            <form method="get" action="{{ path('front_job_offers') }}" class="d-flex flex-wrap align-items-center gap-2" id="jobOfferFilterForm">
-                                <input type="hidden" name="role" value="{{ role }}">
-                                <input type="text" class="form-control" style="max-width: 260px;" placeholder="Search title, description, location..." id="filterLocation" name="search" value="{{ searchQuery|default('') }}">
-                                <select class="form-select" style="max-width: 190px;" id="filterContractType" name="contract_type">
-                                    <option value="">All contract types</option>
-                                    {% for contractType in contractTypes|default([]) %}
-                                        <option value="{{ contractType }}" {{ filterContractType|default('') == contractType ? 'selected' : '' }}>{{ contractType }}</option>
-                                    {% endfor %}
-                                </select>
-                                <select class="form-select" style="max-width: 170px;" id="filterStatus" name="status">
-                                    <option value="">All status</option>
-                                    <option value="open" {{ filterStatus|default('') == 'open' ? 'selected' : '' }}>Open</option>
-                                    <option value="paused" {{ filterStatus|default('') == 'paused' ? 'selected' : '' }}>Paused</option>
-                                    <option value="closed" {{ filterStatus|default('') == 'closed' ? 'selected' : '' }}>Closed</option>
-                                </select>
-                                <input type="date" class="form-control" style="max-width: 180px;" id="filterDeadline" name="deadline" value="{{ filterDeadline|default('') }}">
+                            {{ form_start(filterForm, {
+                                action: path('front_job_offers'),
+                                method: 'GET',
+                                attr: {
+                                    class: 'd-flex flex-wrap align-items-center gap-2',
+                                    id: 'jobOfferFilterForm'
+                                }
+                            }) }}
+                                {{ form_widget(filterForm.search, {
+                                    attr: {
+                                        class: 'form-control',
+                                        style: 'max-width: 260px;',
+                                        placeholder: 'Search title, description, location...',
+                                        id: 'filterLocation'
+                                    }
+                                }) }}
+                                {{ form_widget(filterForm.contract_type, {
+                                    attr: {
+                                        class: 'form-select',
+                                        style: 'max-width: 190px;',
+                                        id: 'filterContractType'
+                                    }
+                                }) }}
+                                {{ form_widget(filterForm.status, {
+                                    attr: {
+                                        class: 'form-select',
+                                        style: 'max-width: 170px;',
+                                        id: 'filterStatus'
+                                    }
+                                }) }}
+                                {{ form_widget(filterForm.deadline, {
+                                    attr: {
+                                        class: 'form-control',
+                                        style: 'max-width: 180px;',
+                                        id: 'filterDeadline'
+                                    }
+                                }) }}
                                 <button type="submit" class="btn btn-primary btn-sm">Search</button>
-                                {% if searchQuery|default('') != '' or filterContractType|default('') != '' or filterStatus|default('') != '' or filterDeadline|default('') != '' %}
+                                {% if hasActiveFilters|default(false) %}
                                     <a href="{{ path('front_job_offers', {role: role}) }}" class="btn btn-outline-secondary btn-sm">Clear Search</a>
                                 {% endif %}
-                            </form>
+                            {{ form_end(filterForm) }}
                         {% endif %}
                         <button type="button" class="btn btn-outline-secondary btn-sm" id="clearOfferFilters">Reset</button>
                         <div class="small text-secondary ms-auto" id="offerFilterResults">{{ resultCount|default(cards|length) }} result(s)</div>

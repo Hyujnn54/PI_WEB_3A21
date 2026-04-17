@@ -67,25 +67,47 @@
 
     <div class="card border mb-3">
         <div class="card-body d-flex flex-wrap gap-2 align-items-center" id="adminOfferMultiFilter">
-            <form method="get" action="{{ path('app_admin_job_offers') }}" class="d-flex flex-wrap gap-2 align-items-center" id="adminOfferFilterForm">
-                <input type="text" class="form-control" style="max-width: 220px;" placeholder="Search title, location, contract, status..." id="adminSearchInput" name="search" value="{{ searchQuery|default('') }}">
-                <select class="form-select" style="max-width: 190px;" id="adminFilterContractType" name="contract_type">
-                    <option value="">All contract types</option>
-                    {% for contractType in contractTypes|default([]) %}
-                        <option value="{{ contractType }}" {{ filterContractType|default('') == contractType ? 'selected' : '' }}>{{ contractType }}</option>
-                    {% endfor %}
-                </select>
-                <select class="form-select" style="max-width: 170px;" id="adminFilterStatus" name="status">
-                    <option value="">All status</option>
-                    {% for status in jobStatuses|default([]) %}
-                        <option value="{{ status }}" {{ filterStatus|default('') == status ? 'selected' : '' }}>{{ status|capitalize }}</option>
-                    {% endfor %}
-                </select>
-                <input type="date" class="form-control" style="max-width: 170px;" id="adminFilterDeadline" name="deadline" value="{{ filterDeadline|default('') }}">
+            {{ form_start(filterForm, {
+                action: path('app_admin_job_offers'),
+                method: 'GET',
+                attr: {
+                    class: 'd-flex flex-wrap gap-2 align-items-center',
+                    id: 'adminOfferFilterForm'
+                }
+            }) }}
+                {{ form_widget(filterForm.search, {
+                    attr: {
+                        class: 'form-control',
+                        style: 'max-width: 220px;',
+                        placeholder: 'Search title, location, contract, status...',
+                        id: 'adminSearchInput'
+                    }
+                }) }}
+                {{ form_widget(filterForm.contract_type, {
+                    attr: {
+                        class: 'form-select',
+                        style: 'max-width: 190px;',
+                        id: 'adminFilterContractType'
+                    }
+                }) }}
+                {{ form_widget(filterForm.status, {
+                    attr: {
+                        class: 'form-select',
+                        style: 'max-width: 170px;',
+                        id: 'adminFilterStatus'
+                    }
+                }) }}
+                {{ form_widget(filterForm.deadline, {
+                    attr: {
+                        class: 'form-control',
+                        style: 'max-width: 170px;',
+                        id: 'adminFilterDeadline'
+                    }
+                }) }}
                 <button type="submit" class="btn btn-primary btn-sm">Search</button>
                 <a href="{{ path('app_admin_job_offers') }}" class="btn btn-outline-secondary btn-sm" id="adminClearOfferFilters">Reset</a>
                 <div class="small text-secondary ms-auto" id="adminOfferFilterResults">{{ resultCount|default(offers|length) }} result(s)</div>
-            </form>
+            {{ form_end(filterForm) }}
         </div>
     </div>
 
