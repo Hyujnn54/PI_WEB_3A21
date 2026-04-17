@@ -11,6 +11,15 @@ use App\Entity\Warning_correction;
 #[ORM\Entity]
 class Job_offer_warning
 {
+    private const ALLOWED_WARNING_TYPES = [
+        'Policy violation',
+        'Incorrect information',
+        'Missing required details',
+        'Deadline issue',
+        'Other',
+    ];
+
+    private const WARNING_TEXT_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,500}$/u';
 
     #[ORM\Id]
     #[ORM\Column(type: "bigint")]
@@ -148,4 +157,31 @@ class Job_offer_warning
 
     #[ORM\OneToMany(mappedBy: "warning_id", targetEntity: Warning_correction::class)]
     private Collection $warning_corrections;
+
+    /**
+     * @return array{ok: bool, error?: string, warningType?: string, warningText?: string}
+     */
+    public static function validateWarningInput(string $warningType, string $warningText): array
+    {
+        $type = trim($warningType);
+        $text = trim($warningText);
+
+        if ($type === '' || $text === '') {
+            return ['ok' => false, 'error' => 'Warning type and message are required.'];
+        }
+
+        if (!in_array($type, self::ALLOWED_WARNING_TYPES, true)) {
+            return ['ok' => false, 'error' => 'Please select a valid warning type.'];
+        }
+
+        if (!preg_match(self::WARNING_TEXT_REGEX, $text)) {
+            return ['ok' => false, 'error' => 'Warning message must be 10-500 chars and contain valid text.'];
+        }
+
+        return [
+            'ok' => true,
+            'warningType' => $type,
+            'warningText' => $text,
+        ];
+    }
 }

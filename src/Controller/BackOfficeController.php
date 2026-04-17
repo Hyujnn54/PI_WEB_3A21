@@ -6,6 +6,7 @@ use App\Entity\Admin;
 use App\Entity\Interview;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
+use App\Entity\Job_offer_warning;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Entity\Users;
@@ -392,13 +393,20 @@ class BackOfficeController extends AbstractController
             return $this->redirectToRoute('app_login');
         }
 
-        $warningType = trim((string) $request->request->get('warning_type', ''));
-        $warningText = trim((string) $request->request->get('warning_text', ''));
-        if ($warningType === '' || $warningText === '') {
-            $this->addFlash('error', 'Warning reason is required.');
+        $validation = Job_offer_warning::validateWarningInput(
+            (string) $request->request->get('warning_type', ''),
+            (string) $request->request->get('warning_text', '')
+        );
+        if (($validation['ok'] ?? false) !== true) {
+            $this->addFlash('warning_modal_error', (string) ($validation['error'] ?? 'Invalid warning input.'));
+            $this->addFlash('warning_modal_mode', 'warn');
+            $this->addFlash('warning_modal_type', trim((string) $request->request->get('warning_type', '')));
+            $this->addFlash('warning_modal_text', trim((string) $request->request->get('warning_text', '')));
             return $this->redirectToRoute('app_admin_job_offers');
         }
 
+        $warningType = (string) $validation['warningType'];
+        $warningText = (string) $validation['warningText'];
         $reason = sprintf('[%s] %s', $warningType, $warningText);
 
         try {
@@ -477,13 +485,20 @@ class BackOfficeController extends AbstractController
     #[Route('/admin/job-offers/{id}/reject-changes', name: 'app_admin_reject_job_offer_changes', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function rejectJobOfferWarning(string $id, Request $request, Connection $connection): Response
     {
-        $warningType = trim((string) $request->request->get('warning_type', ''));
-        $warningText = trim((string) $request->request->get('warning_text', ''));
-        if ($warningType === '' || $warningText === '') {
-            $this->addFlash('error', 'Reject reason is required.');
+        $validation = Job_offer_warning::validateWarningInput(
+            (string) $request->request->get('warning_type', ''),
+            (string) $request->request->get('warning_text', '')
+        );
+        if (($validation['ok'] ?? false) !== true) {
+            $this->addFlash('warning_modal_error', (string) ($validation['error'] ?? 'Invalid warning input.'));
+            $this->addFlash('warning_modal_mode', 'reject');
+            $this->addFlash('warning_modal_type', trim((string) $request->request->get('warning_type', '')));
+            $this->addFlash('warning_modal_text', trim((string) $request->request->get('warning_text', '')));
             return $this->redirectToRoute('app_admin_job_offers');
         }
 
+        $warningType = (string) $validation['warningType'];
+        $warningText = (string) $validation['warningText'];
         $reason = sprintf('[%s] %s', $warningType, $warningText);
 
         try {

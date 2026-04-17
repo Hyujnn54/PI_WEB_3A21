@@ -3,6 +3,15 @@
 {% block title %}Talent Bridge | Admin Job Offers{% endblock %}
 
 {% block admin_content %}
+    {% set warningModalServerErrors = app.flashes('warning_modal_error') %}
+    {% set warningModalServerModes = app.flashes('warning_modal_mode') %}
+    {% set warningModalServerTypes = app.flashes('warning_modal_type') %}
+    {% set warningModalServerTexts = app.flashes('warning_modal_text') %}
+    {% set warningModalServerError = warningModalServerErrors|first|default('') %}
+    {% set warningModalServerMode = warningModalServerModes|first|default('warn') %}
+    {% set warningModalServerType = warningModalServerTypes|first|default('') %}
+    {% set warningModalServerText = warningModalServerTexts|first|default('') %}
+
     <div class="row mb-4 align-items-center">
         <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
@@ -249,17 +258,17 @@
                             <label class="form-label">Warning Type</label>
                             <select class="form-select" name="warning_type" id="warningType" required>
                                 <option value="">Select type</option>
-                                <option value="Policy violation">Policy violation</option>
-                                <option value="Incorrect information">Incorrect information</option>
-                                <option value="Missing required details">Missing required details</option>
-                                <option value="Deadline issue">Deadline issue</option>
-                                <option value="Other">Other</option>
+                                <option value="Policy violation" {{ warningModalServerType == 'Policy violation' ? 'selected' : '' }}>Policy violation</option>
+                                <option value="Incorrect information" {{ warningModalServerType == 'Incorrect information' ? 'selected' : '' }}>Incorrect information</option>
+                                <option value="Missing required details" {{ warningModalServerType == 'Missing required details' ? 'selected' : '' }}>Missing required details</option>
+                                <option value="Deadline issue" {{ warningModalServerType == 'Deadline issue' ? 'selected' : '' }}>Deadline issue</option>
+                                <option value="Other" {{ warningModalServerType == 'Other' ? 'selected' : '' }}>Other</option>
                             </select>
                         </div>
                         <div>
                             <label class="form-label">Message</label>
-                            <textarea class="form-control" name="warning_text" id="warningText" rows="4" placeholder="Write warning details..." required></textarea>
-                            <div class="invalid-feedback d-block" id="warningModalError" style="display:none;"></div>
+                            <textarea class="form-control" name="warning_text" id="warningText" rows="4" placeholder="Write warning details..." required>{{ warningModalServerText }}</textarea>
+                            <div class="invalid-feedback d-block" id="warningModalError" style="display:{{ warningModalServerError != '' ? 'block' : 'none' }};">{{ warningModalServerError }}</div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -309,6 +318,8 @@
             const warningType = document.getElementById('warningType');
             const warningText = document.getElementById('warningText');
             const warningModalError = document.getElementById('warningModalError');
+            const serverWarningMode = '{{ warningModalServerMode }}';
+            const hasServerWarningError = {{ warningModalServerError != '' ? 'true' : 'false' }};
             const reviewModal = document.getElementById('reviewOfferModal');
             const reviewLoading = document.getElementById('reviewOfferLoading');
             const reviewContent = document.getElementById('reviewOfferContent');
@@ -474,6 +485,22 @@
                         }
                     }
                 });
+            }
+
+            if (hasServerWarningError && window.bootstrap && warningModal) {
+                if (serverWarningMode === 'reject') {
+                    warningModalTitle.textContent = 'Reject Changes & Send Warning';
+                    warningSubmitBtn.textContent = 'Reject Changes';
+                    warningSubmitBtn.classList.remove('btn-danger');
+                    warningSubmitBtn.classList.add('btn-warning');
+                } else {
+                    warningModalTitle.textContent = 'Send Warning';
+                    warningSubmitBtn.textContent = 'Send Warning';
+                    warningSubmitBtn.classList.remove('btn-warning');
+                    warningSubmitBtn.classList.add('btn-danger');
+                }
+
+                window.bootstrap.Modal.getOrCreateInstance(warningModal).show();
             }
 
             const runFilters = function () {
