@@ -7,8 +7,12 @@ use App\Entity\Job_application;
 use App\Entity\Recruiter;
 use App\Repository\Application_status_historyRepository;
 use App\Repository\Job_applicationRepository;
+use App\Service\Translation\GroqLanguageDetector;
+use App\Service\Translation\GroqTranslator;
+use App\Service\Translation\LibreTranslateClient;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -22,6 +26,12 @@ class RecruiterApplicationController extends AbstractController
         'REJECTED',
         'INTERVIEW',
         'HIRED',
+    ];
+
+    private const TRANSLATABLE_LANGUAGES = [
+        'en' => 'English',
+        'fr' => 'French',
+        'ar' => 'Arabic',
     ];
 
     #[Route('/applicationmanagement/recruiter/applications/{applicationId}/details', name: 'app_recruiter_application_details')]
@@ -133,6 +143,166 @@ class RecruiterApplicationController extends AbstractController
         }
 
         return $this->redirectToRoute('app_recruiter_application_details', ['applicationId' => $applicationId]);
+    }
+
+    #[Route('/applicationmanagement/recruiter/applications/{applicationId}/cover-letter/detect-language', name: 'app_recruiter_cover_letter_detect_language', methods: ['POST'])]
+    public function detectCoverLetterLanguage(
+        int $applicationId,
+        Request $request,
+        EntityManagerInterface $em,
+        GroqLanguageDetector $groqLanguageDetector
+    ): JsonResponse {
+        $recruiterId = (string) $request->getSession()->get('user_id', '');
+        $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
+
+        if (!$recruiter) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Recruiter not found.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $application = $em->getRepository(Job_application::class)->find($applicationId);
+        if (!$this->recruiterOwnsApplication($recruiter, $application)) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Application not found for your offers.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $coverLetter = trim((string) $application->getCover_letter());
+        if ($coverLetter === '') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Cover letter is empty and cannot be detected.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        try {
+            $sourceLanguage = $groqLanguageDetector->detectLanguageCode($coverLetter, array_keys(self::TRANSLATABLE_LANGUAGES));
+        } catch (\Throwable $exception) {
+            return $this->json([
+                'ok' => false,
+                'error' => $exception->getMessage(),
+            ], Response::HTTP_BAD_GATEWAY);
+        }
+
+        $targets = [];
+        foreach (self::TRANSLATABLE_LANGUAGES as $code => $label) {
+            if ($code === $sourceLanguage) {
+                continue;
+            }
+
+            $targets[] = [
+                'code' => $code,
+                'label' => $label,
+            ];
+        }
+
+        return $this->json([
+            'ok' => true,
+            'sourceLanguage' => $sourceLanguage,
+            'sourceLabel' => self::TRANSLATABLE_LANGUAGES[$sourceLanguage] ?? strtoupper($sourceLanguage),
+            'targets' => $targets,
+        ]);
+    }
+
+    #[Route('/applicationmanagement/recruiter/applications/{applicationId}/cover-letter/translate', name: 'app_recruiter_cover_letter_translate', methods: ['POST'])]
+    public function translateCoverLetter(
+        int $applicationId,
+        Request $request,
+        EntityManagerInterface $em,
+        LibreTranslateClient $libreTranslateClient,
+        GroqTranslator $groqTranslator
+    ): JsonResponse {
+        $recruiterId = (string) $request->getSession()->get('user_id', '');
+        $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
+
+        if (!$recruiter) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Recruiter not found.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $application = $em->getRepository(Job_application::class)->find($applicationId);
+        if (!$this->recruiterOwnsApplication($recruiter, $application)) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Application not found for your offers.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $sourceLanguage = strtolower(trim((string) $request->request->get('source_language', '')));
+        $targetLanguage = strtolower(trim((string) $request->request->get('target_language', '')));
+
+        if (!isset(self::TRANSLATABLE_LANGUAGES[$sourceLanguage])) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Unsupported source language.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (!isset(self::TRANSLATABLE_LANGUAGES[$targetLanguage])) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Unsupported target language.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if ($sourceLanguage === $targetLanguage) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Source and target languages cannot be the same.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $coverLetter = trim((string) $application->getCover_letter());
+        if ($coverLetter === '') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Cover letter is empty and cannot be translated.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $translatedText = '';
+        $translationProvider = '';
+
+        if ($this->shouldUseGroqTranslation($sourceLanguage, $targetLanguage)) {
+            try {
+                $translatedText = $groqTranslator->translate($coverLetter, $sourceLanguage, $targetLanguage);
+                $translationProvider = 'groq';
+            } catch (\Throwable $exception) {
+                return $this->json([
+                    'ok' => false,
+                    'error' => $exception->getMessage(),
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+        } else {
+            try {
+                $translatedText = $libreTranslateClient->translate($coverLetter, $sourceLanguage, $targetLanguage);
+                $translationProvider = 'libretranslate';
+            } catch (\Throwable $libreException) {
+                try {
+                    // Fallback to Groq when local LibreTranslate is temporarily unavailable.
+                    $translatedText = $groqTranslator->translate($coverLetter, $sourceLanguage, $targetLanguage);
+                    $translationProvider = 'groq_fallback';
+                } catch (\Throwable $groqException) {
+                    return $this->json([
+                        'ok' => false,
+                        'error' => 'LibreTranslate is unavailable and Groq fallback failed. ' . $groqException->getMessage(),
+                    ], Response::HTTP_BAD_GATEWAY);
+                }
+            }
+        }
+
+        return $this->json([
+            'ok' => true,
+            'translatedText' => $translatedText,
+            'targetLanguage' => $targetLanguage,
+            'targetLabel' => self::TRANSLATABLE_LANGUAGES[$targetLanguage],
+            'translationProvider' => $translationProvider,
+        ]);
     }
 
     #[Route('/applicationmanagement/recruiter/applications/bulk-status', name: 'app_recruiter_application_bulk_update_status', methods: ['POST'])]
@@ -352,6 +522,11 @@ class RecruiterApplicationController extends AbstractController
         }
 
         return (string) $historyAuthor->getId() === (string) $recruiterId;
+    }
+
+    private function shouldUseGroqTranslation(string $sourceLanguage, string $targetLanguage): bool
+    {
+        return $sourceLanguage === 'fr' || $targetLanguage === 'fr';
     }
 
     /**
