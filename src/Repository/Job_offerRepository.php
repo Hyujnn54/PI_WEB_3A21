@@ -37,25 +37,25 @@ class Job_offerRepository extends ServiceEntityRepository
         }
 
         $trimmedSearch = trim((string) $searchQuery);
-        if ($trimmedSearch !== '' && $role === 'recruiter') {
+        if ($trimmedSearch !== '' && $role !== 'admin') {
             $where[] = '(LOWER(title) LIKE :search OR LOWER(description) LIKE :search OR LOWER(location) LIKE :search OR LOWER(contract_type) LIKE :search OR LOWER(status) LIKE :search)';
             $params['search'] = '%' . strtolower($trimmedSearch) . '%';
         }
 
         $trimmedContractType = trim((string) $contractType);
-        if ($trimmedContractType !== '' && $role === 'recruiter') {
+        if ($trimmedContractType !== '' && $role !== 'admin') {
             $where[] = 'contract_type = :contract_type';
             $params['contract_type'] = $trimmedContractType;
         }
 
         $trimmedStatus = trim((string) $status);
-        if ($trimmedStatus !== '' && $role === 'recruiter') {
+        if ($trimmedStatus !== '' && $role !== 'admin') {
             $where[] = 'status = :status';
             $params['status'] = $trimmedStatus;
         }
 
         $trimmedDeadline = trim((string) $deadline);
-        if ($trimmedDeadline !== '' && $role === 'recruiter') {
+        if ($trimmedDeadline !== '' && $role !== 'admin') {
             $where[] = 'DATE(deadline) = :deadline';
             $params['deadline'] = $trimmedDeadline;
         }

@@ -222,6 +222,7 @@ class FrontPortalController extends AbstractController
             'filterContractType' => $filterContractType,
             'filterStatus' => $filterStatus,
             'filterDeadline' => $filterDeadline,
+            'resultCount' => count($cards),
         ]);
     }
 

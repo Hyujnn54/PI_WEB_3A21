@@ -84,8 +84,8 @@
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap align-items-center gap-2" id="offerMultiFilter">
-                        {% if role == 'recruiter' %}
-                            <form method="get" action="{{ path('front_job_offers') }}" class="d-flex flex-wrap align-items-center gap-2" id="recruiterSearchForm">
+                        {% if role != 'admin' %}
+                            <form method="get" action="{{ path('front_job_offers') }}" class="d-flex flex-wrap align-items-center gap-2" id="jobOfferFilterForm">
                                 <input type="hidden" name="role" value="{{ role }}">
                                 <input type="text" class="form-control" style="max-width: 260px;" placeholder="Search title, description, location..." id="filterLocation" name="search" value="{{ searchQuery|default('') }}">
                                 <select class="form-select" style="max-width: 190px;" id="filterContractType" name="contract_type">
@@ -106,24 +106,9 @@
                                     <a href="{{ path('front_job_offers', {role: role}) }}" class="btn btn-outline-secondary btn-sm">Clear Search</a>
                                 {% endif %}
                             </form>
-                        {% else %}
-                            <input type="text" class="form-control" style="max-width: 190px;" placeholder="Location" id="filterLocation">
-                            <select class="form-select" style="max-width: 190px;" id="filterContractType">
-                                <option value="">All contract types</option>
-                                {% for contractType in contractTypes|default([]) %}
-                                    <option value="{{ contractType }}">{{ contractType }}</option>
-                                {% endfor %}
-                            </select>
-                            <select class="form-select" style="max-width: 170px;" id="filterStatus">
-                                <option value="">All status</option>
-                                <option value="open">Open</option>
-                                <option value="paused">Paused</option>
-                                <option value="closed">Closed</option>
-                            </select>
-                            <input type="date" class="form-control" style="max-width: 180px;" id="filterDeadline">
                         {% endif %}
                         <button type="button" class="btn btn-outline-secondary btn-sm" id="clearOfferFilters">Reset</button>
-                        <div class="small text-secondary ms-auto" id="offerFilterResults"></div>
+                        <div class="small text-secondary ms-auto" id="offerFilterResults">{{ resultCount|default(cards|length) }} result(s)</div>
                     </div>
                 </div>
             </div>
@@ -131,7 +116,7 @@
             <div id="offerCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     {% set isPendingReview = card.warning_status|default(null) == 'RESOLVED' %}
-                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-filter-location="{{ card.location|default('')|lower }}" data-filter-contract-type="{{ card.contract_type|default('')|lower }}" data-filter-status="{{ card.status|default('')|lower }}" data-filter-deadline="{{ card.deadline|default('') }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
+                    <div class="col-lg-4 col-md-6">
                         <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : (isAdminReadOnly ? 'Read Only' : (card.already_applied ? 'Already Applied' : (card.can_apply|default(false) ? 'Apply' : 'Offer Unavailable'))) }}" data-action-primary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) : (isAdminReadOnly ? '#' : (card.can_apply|default(false) ? path('app_candidate_apply', {'offerId': card.id}) : '#')) }}" data-action-primary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : (role == 'candidate' and (card.already_applied or not card.can_apply|default(false)) ? '1' : '0')) }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete Offer' : (isAdminReadOnly ? '' : 'Save Offer') }}" data-action-secondary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) : '#' }}" data-action-secondary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0') }}" data-action-tertiary="{{ role == 'recruiter' ? 'View Applicants' : (isAdminReadOnly ? '' : 'Compare Offer') }}" data-action-tertiary-href="#" data-action-tertiary-disabled="{{ isAdminReadOnly ? '1' : '0' }}" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ card.meta|split(' | ')|last ~ '||Location: ' ~ card.meta|split(' | ')|first) }}">
                             {% if isPendingReview %}
                                 <div class="badge bg-info mb-2" style="position: absolute; top: 8px; right: 8px;">Pending Review</div>
@@ -206,53 +191,13 @@
 
 <script>
     (function () {
-        const grid = document.getElementById('offerCardsGrid');
-        if (!grid) return;
-
-        const isRecruiter = '{{ role }}' === 'recruiter';
-        const recruiterSearchForm = document.getElementById('recruiterSearchForm');
+        const filterForm = document.getElementById('jobOfferFilterForm');
         const locationInput = document.getElementById('filterLocation');
         const contractTypeInput = document.getElementById('filterContractType');
         const statusSelect = document.getElementById('filterStatus');
         const deadlineInput = document.getElementById('filterDeadline');
         const resetBtn = document.getElementById('clearOfferFilters');
-        const resultLabel = document.getElementById('offerFilterResults');
-        const items = Array.from(grid.querySelectorAll('.tb-filter-item'));
-
-        const runFilters = function () {
-            const locationQuery = ((locationInput && locationInput.value) || '').trim().toLowerCase();
-            const contractQuery = ((contractTypeInput && contractTypeInput.value) || '').trim().toLowerCase();
-            const statusQuery = ((statusSelect && statusSelect.value) || '').trim().toLowerCase();
-            const deadlineQuery = ((deadlineInput && deadlineInput.value) || '').trim();
-
-            let visibleCount = 0;
-            items.forEach(function (item) {
-                const itemLocation = (item.dataset.filterLocation || '').toLowerCase();
-                const itemContractType = (item.dataset.filterContractType || '').toLowerCase();
-                const itemStatus = (item.dataset.filterStatus || '').toLowerCase();
-                const itemDeadline = (item.dataset.filterDeadline || '').trim();
-
-                const locationMatch = isRecruiter ? true : (locationQuery === '' || itemLocation.includes(locationQuery));
-                const contractMatch = contractQuery === '' || itemContractType.includes(contractQuery);
-                const statusMatch = statusQuery === '' || itemStatus === statusQuery;
-                const deadlineMatch = deadlineQuery === '' || itemDeadline === deadlineQuery;
-
-                const isMatch = locationMatch && contractMatch && statusMatch && deadlineMatch;
-                item.classList.toggle('d-none', !isMatch);
-                if (isMatch) visibleCount += 1;
-            });
-
-            if (resultLabel) {
-                resultLabel.textContent = visibleCount + ' result(s)';
-            }
-        };
-
-        if (!isRecruiter && locationInput) locationInput.addEventListener('input', runFilters);
-        if (contractTypeInput) contractTypeInput.addEventListener('change', runFilters);
-        if (statusSelect) statusSelect.addEventListener('change', runFilters);
-        if (deadlineInput) deadlineInput.addEventListener('change', runFilters);
-
-        if (isRecruiter && recruiterSearchForm && locationInput) {
+        if (filterForm && locationInput) {
             let searchDebounceTimer = null;
 
             locationInput.addEventListener('input', function () {
@@ -261,12 +206,12 @@
                 }
 
                 searchDebounceTimer = setTimeout(function () {
-                    recruiterSearchForm.requestSubmit();
+                    filterForm.requestSubmit();
                 }, 350);
             });
 
             const autoSubmitFilter = function () {
-                recruiterSearchForm.requestSubmit();
+                filterForm.requestSubmit();
             };
 
             if (contractTypeInput) contractTypeInput.addEventListener('change', autoSubmitFilter);
@@ -281,16 +226,12 @@
                 if (statusSelect) statusSelect.value = '';
                 if (deadlineInput) deadlineInput.value = '';
 
-                if (isRecruiter && recruiterSearchForm) {
-                    recruiterSearchForm.requestSubmit();
+                if (filterForm) {
+                    filterForm.requestSubmit();
                     return;
                 }
-
-                runFilters();
             });
         }
-
-        runFilters();
     })();
 </script>
 {% endblock %}
