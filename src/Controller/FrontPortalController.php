@@ -48,6 +48,7 @@ class FrontPortalController extends AbstractController
         $role = $this->resolveSessionRole($request);
         $currentUserId = $this->resolveCurrentUserId($request);
         $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
+        $candidate = null;
         $searchQuery = trim((string) $request->query->get('search', ''));
         $filterContractType = trim((string) $request->query->get('contract_type', ''));
         $filterStatus = trim((string) $request->query->get('status', ''));
@@ -113,7 +114,12 @@ class FrontPortalController extends AbstractController
                 25
             );
 
-            $dbCards = array_map(function (array $row) use ($connection, $now, $appliedOfferIds, $currentRecruiterId): array {
+            $candidateMatchData = [];
+            if ($role === 'candidate' && $candidate instanceof Candidate) {
+                $candidateMatchData = $jobOfferRepository->buildCandidateOfferMatchData((string) $candidate->getId(), $rows);
+            }
+
+            $dbCards = array_map(function (array $row) use ($connection, $now, $appliedOfferIds, $currentRecruiterId, $candidateMatchData): array {
                 $formattedDeadline = '';
                 $isExpired = false;
                 try {
@@ -129,6 +135,20 @@ class FrontPortalController extends AbstractController
                     'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
                     ['offer_id' => (string) $row['id']]
                 );
+
+                $matchData = $candidateMatchData[(string) $row['id']] ?? null;
+                $matchScore = is_array($matchData) ? (int) ($matchData['score'] ?? 0) : null;
+                $matchLabel = is_array($matchData) ? (string) ($matchData['label'] ?? '') : '';
+                $matchDetails = is_array($matchData) ? (array) ($matchData['details'] ?? []) : [];
+                $matchSummary = is_array($matchData)
+                    ? sprintf(
+                        '%d requises, %d alignées, %d partielles, %d manquantes',
+                        (int) ($matchDetails['required_skill_count'] ?? 0),
+                        (int) ($matchDetails['matching_skill_count'] ?? 0),
+                        (int) ($matchDetails['partial_match_count'] ?? 0),
+                        (int) ($matchDetails['missing_skill_count'] ?? 0)
+                    )
+                    : '';
 
                 $detailExtra = [
                     'Type: ' . (string) $row['contract_type'],
@@ -149,6 +169,13 @@ class FrontPortalController extends AbstractController
                     $detailExtra[] = 'Skills: Not specified';
                 }
 
+                if (is_array($matchData)) {
+                    $detailExtra[] = 'Match score: ' . $matchScore . '% (' . $matchLabel . ')';
+                    $detailExtra[] = 'Matching skills: ' . (count((array) ($matchData['matching_skills'] ?? [])) > 0 ? implode(', ', (array) $matchData['matching_skills']) : 'None');
+                    $detailExtra[] = 'Missing skills: ' . (count((array) ($matchData['missing_skills'] ?? [])) > 0 ? implode(', ', (array) $matchData['missing_skills']) : 'None');
+                    $detailExtra[] = 'Explanation: ' . (string) ($matchData['explanation'] ?? 'No explanation available.');
+                }
+
                 return [
                     'id' => (string) $row['id'],
                     'meta' => sprintf('%s | %s | %s', (string) $row['location'], (string) $row['contract_type'], ucfirst((string) $row['status'])),
@@ -164,6 +191,13 @@ class FrontPortalController extends AbstractController
                     'status' => (string) $row['status'],
                     'deadline' => $formattedDeadline,
                     'is_expired' => $isExpired,
+                    'match_score' => $matchScore,
+                    'match_label' => $matchLabel,
+                    'match_summary' => $matchSummary,
+                    'match_explanation' => is_array($matchData) ? (string) ($matchData['explanation'] ?? '') : '',
+                    'match_matching_skills' => is_array($matchData) ? implode(', ', (array) ($matchData['matching_skills'] ?? [])) : '',
+                    'match_missing_skills' => is_array($matchData) ? implode(', ', (array) ($matchData['missing_skills'] ?? [])) : '',
+                    'match_details' => is_array($matchData) ? (array) ($matchData['details'] ?? []) : [],
                 ];
             }, $rows);
 
