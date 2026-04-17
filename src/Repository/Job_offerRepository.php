@@ -70,15 +70,86 @@ class Job_offerRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function findAdminOffersForListing(
+        ?string $searchQuery,
+        ?string $contractType,
+        ?string $status,
+        ?string $deadline,
+        int $limit = 300
+    ): array {
+        $connection = $this->getEntityManager()->getConnection();
+        $where = [];
+        $params = [];
+
+        $trimmedSearch = trim((string) $searchQuery);
+        if ($trimmedSearch !== '') {
+            $where[] = '(LOWER(jo.title) LIKE :search OR LOWER(jo.location) LIKE :search OR LOWER(jo.contract_type) LIKE :search OR LOWER(jo.status) LIKE :search)';
+            $params['search'] = '%' . strtolower($trimmedSearch) . '%';
+        }
+
+        $trimmedContractType = trim((string) $contractType);
+        if ($trimmedContractType !== '') {
+            $where[] = 'jo.contract_type = :contract_type';
+            $params['contract_type'] = $trimmedContractType;
+        }
+
+        $trimmedStatus = trim((string) $status);
+        if ($trimmedStatus !== '') {
+            $where[] = 'jo.status = :status';
+            $params['status'] = $trimmedStatus;
+        }
+
+        $trimmedDeadline = trim((string) $deadline);
+        if ($trimmedDeadline !== '') {
+            $where[] = 'DATE(jo.deadline) = :deadline';
+            $params['deadline'] = $trimmedDeadline;
+        }
+
+        $sql = <<<'SQL'
+SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
+       COALESCE(jw.status, NULL) AS warning_status,
+       jw.reason AS warning_reason
+FROM job_offer jo
+LEFT JOIN job_offer_warning jw
+  ON jw.job_offer_id = jo.id
+ AND jw.status IN ('SENT', 'RESOLVED')
+ AND jw.created_at = (
+       SELECT MAX(w2.created_at)
+       FROM job_offer_warning w2
+       WHERE w2.job_offer_id = jo.id
+         AND w2.status IN ('SENT', 'RESOLVED')
+ )
+SQL;
+
+        if (count($where) > 0) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $sql .= ' ORDER BY jo.created_at DESC LIMIT ' . (int) $limit;
+
+        try {
+            return $connection->fetchAllAssociative($sql, $params);
+        } catch (\Throwable) {
+            $fallbackSql = 'SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline, NULL AS warning_status, NULL AS warning_reason FROM job_offer jo';
+            if (count($where) > 0) {
+                $fallbackSql .= ' WHERE ' . implode(' AND ', $where);
+            }
+            $fallbackSql .= ' ORDER BY jo.created_at DESC LIMIT ' . (int) $limit;
+
+            return $connection->fetchAllAssociative($fallbackSql, $params);
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    public function buildRecruiterOfferStats(?string $recruiterId, int $limit = 50): array
+    public function buildAdminOfferStats(int $limit = 1000): array
     {
         $connection = $this->getEntityManager()->getConnection();
-
         $rows = $connection->fetchAllAssociative(
-            'SELECT id, recruiter_id, title, location, contract_type, status, deadline FROM job_offer WHERE recruiter_id = :recruiter_id ORDER BY created_at DESC LIMIT ' . (int) $limit,
-            ['recruiter_id' => $recruiterId]
+            'SELECT id, recruiter_id, title, location, contract_type, status, deadline FROM job_offer ORDER BY created_at DESC LIMIT ' . (int) $limit
         );
 
         return $this->buildOfferStatsFromRows($rows);
@@ -167,5 +238,20 @@ class Job_offerRepository extends ServiceEntityRepository
             'city_stats' => $cityStatsList,
             'contract_stats' => $contractStatsList,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function buildRecruiterOfferStats(?string $recruiterId, int $limit = 50): array
+    {
+        $connection = $this->getEntityManager()->getConnection();
+
+        $rows = $connection->fetchAllAssociative(
+            'SELECT id, recruiter_id, title, location, contract_type, status, deadline FROM job_offer WHERE recruiter_id = :recruiter_id ORDER BY created_at DESC LIMIT ' . (int) $limit,
+            ['recruiter_id' => $recruiterId]
+        );
+
+        return $this->buildOfferStatsFromRows($rows);
     }
 }

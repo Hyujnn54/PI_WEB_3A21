@@ -67,19 +67,25 @@
 
     <div class="card border mb-3">
         <div class="card-body d-flex flex-wrap gap-2 align-items-center" id="adminOfferMultiFilter">
-            <input type="text" class="form-control" style="max-width: 180px;" placeholder="Location" id="adminFilterLocation">
-            <select class="form-select" style="max-width: 190px;" id="adminFilterContractType">
-                <option value="">All contract types</option>
-            </select>
-            <select class="form-select" style="max-width: 170px;" id="adminFilterStatus">
-                <option value="">All status</option>
-                <option value="open">Open</option>
-                <option value="paused">Paused</option>
-                <option value="closed">Closed</option>
-            </select>
-            <input type="date" class="form-control" style="max-width: 170px;" id="adminFilterDeadline">
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="adminClearOfferFilters">Reset</button>
-            <div class="small text-secondary ms-auto" id="adminOfferFilterResults"></div>
+            <form method="get" action="{{ path('app_admin_job_offers') }}" class="d-flex flex-wrap gap-2 align-items-center" id="adminOfferFilterForm">
+                <input type="text" class="form-control" style="max-width: 220px;" placeholder="Search title, location, contract, status..." id="adminSearchInput" name="search" value="{{ searchQuery|default('') }}">
+                <select class="form-select" style="max-width: 190px;" id="adminFilterContractType" name="contract_type">
+                    <option value="">All contract types</option>
+                    {% for contractType in contractTypes|default([]) %}
+                        <option value="{{ contractType }}" {{ filterContractType|default('') == contractType ? 'selected' : '' }}>{{ contractType }}</option>
+                    {% endfor %}
+                </select>
+                <select class="form-select" style="max-width: 170px;" id="adminFilterStatus" name="status">
+                    <option value="">All status</option>
+                    {% for status in jobStatuses|default([]) %}
+                        <option value="{{ status }}" {{ filterStatus|default('') == status ? 'selected' : '' }}>{{ status|capitalize }}</option>
+                    {% endfor %}
+                </select>
+                <input type="date" class="form-control" style="max-width: 170px;" id="adminFilterDeadline" name="deadline" value="{{ filterDeadline|default('') }}">
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <a href="{{ path('app_admin_job_offers') }}" class="btn btn-outline-secondary btn-sm" id="adminClearOfferFilters">Reset</a>
+                <div class="small text-secondary ms-auto" id="adminOfferFilterResults">{{ resultCount|default(offers|length) }} result(s)</div>
+            </form>
         </div>
     </div>
 
@@ -111,11 +117,7 @@
                         data-warning-state="{{ warningStatusKey }}"
                         data-details-url="{{ path('app_admin_job_offer_details', {id: offer.id}) }}"
                         data-accept-url="{{ path('app_admin_accept_job_offer_changes', {id: offer.id}) }}"
-                        data-reject-url="{{ path('app_admin_reject_job_offer_changes', {id: offer.id}) }}"
-                        data-filter-location="{{ offer.location|default('')|lower }}"
-                        data-filter-contract-type="{{ offer.contract_type|default('')|lower }}"
-                        data-filter-status="{{ offer.status|default('')|lower }}"
-                        data-filter-deadline="{{ offer.deadline ? offer.deadline|date('Y-m-d') : '' }}">
+                        data-reject-url="{{ path('app_admin_reject_job_offer_changes', {id: offer.id}) }}">
                         <td>#{{ offer.id }}</td>
                         <td>{{ offer.title }}</td>
                         <td>{{ offer.recruiter_id }}</td>
@@ -125,6 +127,17 @@
                         <td>{{ offer.created_at ? offer.created_at|date('Y-m-d H:i') : '-' }}</td>
                         <td>{{ offer.deadline ? offer.deadline|date('Y-m-d H:i') : '-' }}</td>
                         <td style="min-width: 320px;">
+                            <div class="d-flex flex-column gap-2 mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary js-open-review"
+                                        data-offer-id="{{ offer.id }}"
+                                        data-details-url="{{ path('app_admin_job_offer_details', {id: offer.id}) }}"
+                                        data-accept-url="{{ path('app_admin_accept_job_offer_changes', {id: offer.id}) }}"
+                                        data-reject-url="{{ path('app_admin_reject_job_offer_changes', {id: offer.id}) }}"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#reviewOfferModal">
+                                    <i class="ti ti-search me-1"></i>Details
+                                </button>
+                            </div>
                             {% if isPendingReview %}
                                 <div class="small fw-semibold text-warning-emphasis mb-2 d-flex align-items-center gap-1">
                                     <i class="ti ti-bell-ringing"></i>
@@ -286,30 +299,12 @@
             if (!table) return;
 
             const rows = Array.from(table.querySelectorAll('tbody .admin-offer-row'));
-            if (rows.length === 0) return;
 
-            const locationInput = document.getElementById('adminFilterLocation');
+            const filterForm = document.getElementById('adminOfferFilterForm');
+            const searchInput = document.getElementById('adminSearchInput');
             const contractTypeSelect = document.getElementById('adminFilterContractType');
             const statusSelect = document.getElementById('adminFilterStatus');
             const deadlineInput = document.getElementById('adminFilterDeadline');
-            const resetBtn = document.getElementById('adminClearOfferFilters');
-            const resultLabel = document.getElementById('adminOfferFilterResults');
-
-            if (contractTypeSelect) {
-                const seen = new Set();
-                rows.forEach(function (row) {
-                    const value = (row.dataset.filterContractType || '').trim();
-                    if (!value) return;
-                    seen.add(value);
-                });
-
-                Array.from(seen).sort().forEach(function (value) {
-                    const option = document.createElement('option');
-                    option.value = value;
-                    option.textContent = value.charAt(0).toUpperCase() + value.slice(1);
-                    contractTypeSelect.appendChild(option);
-                });
-            }
 
             const warningModal = document.getElementById('warningModal');
             const warningModalForm = document.getElementById('warningModalForm');
@@ -503,50 +498,27 @@
                 window.bootstrap.Modal.getOrCreateInstance(warningModal).show();
             }
 
-            const runFilters = function () {
-                const locationQuery = ((locationInput && locationInput.value) || '').trim().toLowerCase();
-                const contractQuery = ((contractTypeSelect && contractTypeSelect.value) || '').trim().toLowerCase();
-                const statusQuery = ((statusSelect && statusSelect.value) || '').trim().toLowerCase();
-                const deadlineQuery = ((deadlineInput && deadlineInput.value) || '').trim();
+            if (filterForm) {
+                if (searchInput) {
+                    let searchDebounceTimer = null;
+                    searchInput.addEventListener('input', function () {
+                        if (searchDebounceTimer) {
+                            clearTimeout(searchDebounceTimer);
+                        }
 
-                let visibleCount = 0;
-                rows.forEach(function (row) {
-                    const rowLocation = (row.dataset.filterLocation || '').toLowerCase();
-                    const rowContractType = (row.dataset.filterContractType || '').toLowerCase();
-                    const rowStatus = (row.dataset.filterStatus || '').toLowerCase();
-                    const rowDeadline = (row.dataset.filterDeadline || '').trim();
-
-                    const locationMatch = locationQuery === '' || rowLocation.includes(locationQuery);
-                    const contractMatch = contractQuery === '' || rowContractType.includes(contractQuery);
-                    const statusMatch = statusQuery === '' || rowStatus === statusQuery;
-                    const deadlineMatch = deadlineQuery === '' || rowDeadline === deadlineQuery;
-
-                    const isMatch = locationMatch && contractMatch && statusMatch && deadlineMatch;
-                    row.classList.toggle('d-none', !isMatch);
-                    if (isMatch) visibleCount += 1;
-                });
-
-                if (resultLabel) {
-                    resultLabel.textContent = visibleCount + ' result(s)';
+                        searchDebounceTimer = setTimeout(function () {
+                            filterForm.requestSubmit();
+                        }, 350);
+                    });
                 }
-            };
 
-            if (locationInput) locationInput.addEventListener('input', runFilters);
-            if (contractTypeSelect) contractTypeSelect.addEventListener('change', runFilters);
-            if (statusSelect) statusSelect.addEventListener('change', runFilters);
-            if (deadlineInput) deadlineInput.addEventListener('change', runFilters);
-
-            if (resetBtn) {
-                resetBtn.addEventListener('click', function () {
-                    if (locationInput) locationInput.value = '';
-                    if (contractTypeSelect) contractTypeSelect.value = '';
-                    if (statusSelect) statusSelect.value = '';
-                    if (deadlineInput) deadlineInput.value = '';
-                    runFilters();
-                });
+                const autoSubmitFilter = function () {
+                    filterForm.requestSubmit();
+                };
+                if (contractTypeSelect) contractTypeSelect.addEventListener('change', autoSubmitFilter);
+                if (statusSelect) statusSelect.addEventListener('change', autoSubmitFilter);
+                if (deadlineInput) deadlineInput.addEventListener('change', autoSubmitFilter);
             }
-
-            runFilters();
         })();
     </script>
 {% endblock %}

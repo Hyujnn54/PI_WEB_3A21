@@ -10,6 +10,7 @@ use App\Entity\Job_offer_warning;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Entity\Users;
+use App\Repository\Job_offerRepository;
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,6 +24,9 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/offermanagement')]
 class BackOfficeController extends AbstractController
 {
+    private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
+    private const JOB_STATUSES = ['open', 'paused', 'closed'];
+
     #[Route('/admin', name: 'back_dashboard')]
     #[Route('/admin', name: 'app_admin')]
     public function index(UsersRepository $userRepo, EntityManagerInterface $entityManager): Response
@@ -331,8 +335,23 @@ class BackOfficeController extends AbstractController
     }
 
     #[Route('/admin/job-offers', name: 'app_admin_job_offers')]
-    public function jobOffers(Connection $connection): Response
+    public function jobOffers(Request $request, Connection $connection, Job_offerRepository $jobOfferRepository): Response
     {
+        $searchQuery = trim((string) $request->query->get('search', ''));
+        $filterContractType = trim((string) $request->query->get('contract_type', ''));
+        $filterStatus = trim((string) $request->query->get('status', ''));
+        $filterDeadline = trim((string) $request->query->get('deadline', ''));
+
+        if (!in_array($filterContractType, self::CONTRACT_TYPES, true)) {
+            $filterContractType = '';
+        }
+        if (!in_array($filterStatus, self::JOB_STATUSES, true)) {
+            $filterStatus = '';
+        }
+        if ($filterDeadline !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filterDeadline)) {
+            $filterDeadline = '';
+        }
+
         $offers = [];
         $expiredOffers = [];
         $now = new \DateTimeImmutable();
@@ -344,7 +363,13 @@ class BackOfficeController extends AbstractController
                 // Keep read-only view available even if auto-close update fails.
             }
 
-            $offers = $this->fetchAdminOffers($connection);
+            $offers = $jobOfferRepository->findAdminOffersForListing(
+                $searchQuery,
+                $filterContractType,
+                $filterStatus,
+                $filterDeadline,
+                300
+            );
             $expiredOffers = $this->extractExpiredOffers($offers, $now);
         } catch (\Throwable $exception) {
             // Keep admin page available if any read query fails.
@@ -355,14 +380,28 @@ class BackOfficeController extends AbstractController
             'authUser' => ['role' => 'admin'],
             'offers' => $offers,
             'expiredOffers' => $expiredOffers,
+            'searchQuery' => $searchQuery,
+            'filterContractType' => $filterContractType,
+            'filterStatus' => $filterStatus,
+            'filterDeadline' => $filterDeadline,
+            'contractTypes' => self::CONTRACT_TYPES,
+            'jobStatuses' => self::JOB_STATUSES,
+            'resultCount' => count($offers),
         ]);
     }
 
     #[Route('/admin/job-offers/statistics', name: 'app_admin_job_offers_statistics')]
-    public function jobOffersStatistics(Connection $connection): Response
+    public function jobOffersStatistics(Connection $connection, Job_offerRepository $jobOfferRepository): Response
     {
-        $offers = [];
-        $offerStats = $this->buildOfferStats([]);
+        $offerStats = [
+            'total_published' => 0,
+            'total_closed' => 0,
+            'total_open' => 0,
+            'closed_percentage' => 0,
+            'open_percentage' => 0,
+            'city_stats' => [],
+            'contract_stats' => [],
+        ];
         $now = new \DateTimeImmutable();
 
         try {
@@ -372,8 +411,7 @@ class BackOfficeController extends AbstractController
                 // Keep read-only statistics available even if auto-close update fails.
             }
 
-            $offers = $this->fetchAdminOffers($connection);
-            $offerStats = $this->buildOfferStats($offers);
+            $offerStats = $jobOfferRepository->buildAdminOfferStats(1000);
         } catch (\Throwable $exception) {
             $this->addFlash('error', 'Unable to load job offer statistics right now.');
         }
