@@ -4,7 +4,9 @@ namespace App\Repository;
 
 use App\Entity\Admin;
 use App\Entity\Application_status_history;
+use App\Entity\Candidate;
 use App\Entity\Job_application;
+use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
@@ -75,6 +77,31 @@ class Job_applicationRepository extends ServiceEntityRepository
         $this->getEntityManager()->flush();
 
         return 'unarchived';
+    }
+
+    /**
+     * @return Job_application[]
+     */
+    public function findAllForStatistics(): array
+    {
+        return $this->findBy([]);
+    }
+
+    public function findActiveByOfferAndCandidate(Job_offer $offer, Candidate $candidate): ?Job_application
+    {
+        return $this->findOneBy([
+            'offer_id' => $offer,
+            'candidate_id' => $candidate,
+            'is_archived' => false,
+        ]);
+    }
+
+    public function findForCandidate(int $applicationId, Candidate $candidate): ?Job_application
+    {
+        return $this->findOneBy([
+            'id' => $applicationId,
+            'candidate_id' => $candidate,
+        ]);
     }
 
     /**

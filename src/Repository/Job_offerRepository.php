@@ -13,5 +13,11 @@ class Job_offerRepository extends ServiceEntityRepository
         parent::__construct($registry, Job_offer::class);
     }
 
-    // Add custom methods as needed
+    /**
+     * @return Job_offer[]
+     */
+    public function findAllOrderedByCreatedAtDesc(): array
+    {
+        return $this->findBy([], ['created_at' => 'DESC']);
+    }
 }

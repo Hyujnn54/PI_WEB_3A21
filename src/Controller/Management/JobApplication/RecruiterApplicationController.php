@@ -5,6 +5,7 @@ namespace App\Controller\Management\JobApplication;
 use App\Entity\Application_status_history;
 use App\Entity\Job_application;
 use App\Entity\Recruiter;
+use App\Repository\Application_status_historyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -23,7 +24,12 @@ class RecruiterApplicationController extends AbstractController
     ];
 
     #[Route('/applicationmanagement/recruiter/applications/{applicationId}/details', name: 'app_recruiter_application_details')]
-    public function details(int $applicationId, Request $request, EntityManagerInterface $em): Response
+    public function details(
+        int $applicationId,
+        Request $request,
+        EntityManagerInterface $em,
+        Application_status_historyRepository $historyRepository
+    ): Response
     {
         $recruiterId = (string) $request->getSession()->get('user_id', '');
         $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
@@ -41,10 +47,7 @@ class RecruiterApplicationController extends AbstractController
             return $this->redirectToRoute('front_job_applications', ['role' => 'recruiter']);
         }
 
-        $historyEntries = $em->getRepository(Application_status_history::class)->findBy(
-            ['application_id' => $application],
-            ['changed_at' => 'DESC']
-        );
+        $historyEntries = $historyRepository->findForApplication($application);
 
         $editableHistoryIds = [];
         foreach ($historyEntries as $entry) {
@@ -136,7 +139,8 @@ class RecruiterApplicationController extends AbstractController
         int $applicationId,
         int $historyId,
         Request $request,
-        EntityManagerInterface $em
+        EntityManagerInterface $em,
+        Application_status_historyRepository $historyRepository
     ): Response {
         $recruiterId = (string) $request->getSession()->get('user_id', '');
         $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
@@ -154,8 +158,8 @@ class RecruiterApplicationController extends AbstractController
             return $this->redirectToRoute('front_job_applications', ['role' => 'recruiter']);
         }
 
-        $history = $em->getRepository(Application_status_history::class)->find($historyId);
-        if (!$history || $history->getApplication_id() !== $application) {
+        $history = $historyRepository->findForApplicationById($application, $historyId);
+        if (!$history) {
             $this->addFlash('error', 'History entry not found.');
 
             return $this->redirectToRoute('app_recruiter_application_details', ['applicationId' => $applicationId]);

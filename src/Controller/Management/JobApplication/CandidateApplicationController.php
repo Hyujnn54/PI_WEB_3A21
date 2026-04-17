@@ -7,6 +7,8 @@ use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use App\Entity\Candidate;
 use App\Form\JobApplicationType;
+use App\Repository\Application_status_historyRepository;
+use App\Repository\Job_applicationRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,7 +27,8 @@ class CandidateApplicationController extends AbstractController
         int $offerId,
         Request $request,
         EntityManagerInterface $em,
-        SluggerInterface $slugger
+        SluggerInterface $slugger,
+        Job_applicationRepository $jobApplicationRepository
     ): Response {
         $roles = (array) $request->getSession()->get('user_roles', []);
         if (!in_array('ROLE_CANDIDATE', $roles, true)) {
@@ -51,11 +54,7 @@ class CandidateApplicationController extends AbstractController
             return $this->redirectToRoute('front_job_offers', ['role' => 'candidate']);
         }
 
-        $existingApplication = $em->getRepository(Job_application::class)->findOneBy([
-            'offer_id' => $jobOffer,
-            'candidate_id' => $candidate,
-            'is_archived' => false,
-        ]);
+        $existingApplication = $jobApplicationRepository->findActiveByOfferAndCandidate($jobOffer, $candidate);
 
         if ($existingApplication) {
             $this->addFlash('warning', 'You have already applied for this job offer.');
@@ -161,7 +160,8 @@ class CandidateApplicationController extends AbstractController
     public function withdraw(
         int $applicationId,
         Request $request,
-        EntityManagerInterface $em
+        EntityManagerInterface $em,
+        Job_applicationRepository $jobApplicationRepository
     ): Response {
         $roles = (array) $request->getSession()->get('user_roles', []);
         if (!in_array('ROLE_CANDIDATE', $roles, true)) {
@@ -178,8 +178,8 @@ class CandidateApplicationController extends AbstractController
             return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
         }
 
-        $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$application || $application->getCandidate_id() !== $candidate) {
+        $application = $jobApplicationRepository->findForCandidate($applicationId, $candidate);
+        if (!$application) {
             $this->addFlash('error', 'Application not found.');
 
             return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
@@ -204,7 +204,9 @@ class CandidateApplicationController extends AbstractController
     public function details(
         int $applicationId,
         Request $request,
-        EntityManagerInterface $em
+        EntityManagerInterface $em,
+        Job_applicationRepository $jobApplicationRepository,
+        Application_status_historyRepository $historyRepository
     ): Response {
         $roles = (array) $request->getSession()->get('user_roles', []);
         if (!in_array('ROLE_CANDIDATE', $roles, true)) {
@@ -221,17 +223,14 @@ class CandidateApplicationController extends AbstractController
             return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
         }
 
-        $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$application || $application->getCandidate_id() !== $candidate) {
+        $application = $jobApplicationRepository->findForCandidate($applicationId, $candidate);
+        if (!$application) {
             $this->addFlash('error', 'Application not found.');
 
             return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
         }
 
-        $historyEntries = $em->getRepository(Application_status_history::class)->findBy(
-            ['application_id' => $application],
-            ['changed_at' => 'DESC']
-        );
+        $historyEntries = $historyRepository->findForApplication($application);
 
         return $this->render('management/job_application/details.html.twig', [
             'application' => $application,
@@ -246,7 +245,8 @@ class CandidateApplicationController extends AbstractController
         int $applicationId,
         Request $request,
         EntityManagerInterface $em,
-        SluggerInterface $slugger
+        SluggerInterface $slugger,
+        Job_applicationRepository $jobApplicationRepository
     ): Response {
         $roles = (array) $request->getSession()->get('user_roles', []);
         if (!in_array('ROLE_CANDIDATE', $roles, true)) {
@@ -263,8 +263,8 @@ class CandidateApplicationController extends AbstractController
             return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
         }
 
-        $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$application || $application->getCandidate_id() !== $candidate) {
+        $application = $jobApplicationRepository->findForCandidate($applicationId, $candidate);
+        if (!$application) {
             $this->addFlash('error', 'Application not found.');
 
             return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);

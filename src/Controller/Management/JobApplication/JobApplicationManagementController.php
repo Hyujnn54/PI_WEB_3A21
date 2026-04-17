@@ -5,8 +5,9 @@ namespace App\Controller\Management\JobApplication;
 use App\Entity\Admin;
 use App\Entity\Application_status_history;
 use App\Entity\Job_application;
-use App\Entity\Job_offer;
+use App\Repository\Application_status_historyRepository;
 use App\Repository\Job_applicationRepository;
+use App\Repository\Job_offerRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,10 +27,10 @@ class JobApplicationManagementController extends AbstractController
     ];
 
     #[Route('/applicationmanagement/admin/applications-statistics', name: 'management_job_applications_statistics')]
-    public function statistics(EntityManagerInterface $em): Response
+    public function statistics(Job_offerRepository $jobOfferRepository, Job_applicationRepository $jobApplicationRepository): Response
     {
-        $offers = $em->getRepository(Job_offer::class)->findBy([], ['created_at' => 'DESC']);
-        $applications = $em->getRepository(Job_application::class)->findBy([]);
+        $offers = $jobOfferRepository->findAllOrderedByCreatedAtDesc();
+        $applications = $jobApplicationRepository->findAllForStatistics();
 
         $offerRows = [];
         foreach ($offers as $offer) {
@@ -236,7 +237,11 @@ class JobApplicationManagementController extends AbstractController
     }
 
     #[Route('/applicationmanagement/admin/job-applications/{applicationId}/details', name: 'management_job_applications_details')]
-    public function details(int $applicationId, EntityManagerInterface $em): Response
+    public function details(
+        int $applicationId,
+        EntityManagerInterface $em,
+        Application_status_historyRepository $historyRepository
+    ): Response
     {
         $application = $em->getRepository(Job_application::class)->find($applicationId);
         if (!$application) {
@@ -245,10 +250,7 @@ class JobApplicationManagementController extends AbstractController
             return $this->redirectToRoute('management_job_applications');
         }
 
-        $historyEntries = $em->getRepository(Application_status_history::class)->findBy(
-            ['application_id' => $application],
-            ['changed_at' => 'DESC']
-        );
+        $historyEntries = $historyRepository->findForApplication($application);
 
         $statusOptions = [
             ['value' => 'SUBMITTED', 'label' => 'Submitted'],
@@ -372,7 +374,13 @@ class JobApplicationManagementController extends AbstractController
     }
 
     #[Route('/applicationmanagement/admin/job-applications/{applicationId}/history/{historyId}/note', name: 'management_job_applications_history_note_update', methods: ['POST'])]
-    public function updateHistoryNote(int $applicationId, int $historyId, Request $request, EntityManagerInterface $em): Response
+    public function updateHistoryNote(
+        int $applicationId,
+        int $historyId,
+        Request $request,
+        EntityManagerInterface $em,
+        Application_status_historyRepository $historyRepository
+    ): Response
     {
         $application = $em->getRepository(Job_application::class)->find($applicationId);
         if (!$application) {
@@ -381,8 +389,8 @@ class JobApplicationManagementController extends AbstractController
             return $this->redirectToRoute('management_job_applications');
         }
 
-        $history = $em->getRepository(Application_status_history::class)->find($historyId);
-        if (!$history || $history->getApplication_id() !== $application) {
+        $history = $historyRepository->findForApplicationById($application, $historyId);
+        if (!$history) {
             $this->addFlash('error', 'History entry not found.');
 
             return $this->redirectToRoute('management_job_applications_details', ['applicationId' => $applicationId]);
@@ -410,7 +418,12 @@ class JobApplicationManagementController extends AbstractController
     }
 
     #[Route('/applicationmanagement/admin/job-applications/{applicationId}/history/{historyId}/delete', name: 'management_job_applications_history_delete', methods: ['POST'])]
-    public function deleteHistory(int $applicationId, int $historyId, EntityManagerInterface $em): Response
+    public function deleteHistory(
+        int $applicationId,
+        int $historyId,
+        EntityManagerInterface $em,
+        Application_status_historyRepository $historyRepository
+    ): Response
     {
         $application = $em->getRepository(Job_application::class)->find($applicationId);
         if (!$application) {
@@ -419,8 +432,8 @@ class JobApplicationManagementController extends AbstractController
             return $this->redirectToRoute('management_job_applications');
         }
 
-        $history = $em->getRepository(Application_status_history::class)->find($historyId);
-        if (!$history || $history->getApplication_id() !== $application) {
+        $history = $historyRepository->findForApplicationById($application, $historyId);
+        if (!$history) {
             $this->addFlash('error', 'History entry not found.');
 
             return $this->redirectToRoute('management_job_applications_details', ['applicationId' => $applicationId]);
