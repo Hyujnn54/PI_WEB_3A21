@@ -12,6 +12,7 @@ use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Form\ProfileType;
+use App\Repository\Job_offerRepository;
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -42,11 +43,28 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/job-offers', name: 'front_job_offers')]
-    public function jobOffers(Request $request, Connection $connection): Response
+    public function jobOffers(Request $request, Connection $connection, Job_offerRepository $jobOfferRepository): Response
     {
         $role = $this->resolveSessionRole($request);
         $currentUserId = $this->resolveCurrentUserId($request);
         $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
+        $searchQuery = trim((string) $request->query->get('search', ''));
+        $filterContractType = trim((string) $request->query->get('contract_type', ''));
+        $filterStatus = trim((string) $request->query->get('status', ''));
+        $filterDeadline = trim((string) $request->query->get('deadline', ''));
+
+        if (!in_array($filterContractType, self::CONTRACT_TYPES, true)) {
+            $filterContractType = '';
+        }
+
+        if (!in_array($filterStatus, self::JOB_STATUSES, true)) {
+            $filterStatus = '';
+        }
+
+        if ($filterDeadline !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filterDeadline)) {
+            $filterDeadline = '';
+        }
+
         $warnings = [];
         $warningStatuses = [];
         $expiredOffers = [];
@@ -85,15 +103,15 @@ class FrontPortalController extends AbstractController
                 );
             }
 
-            $rowsSql = 'SELECT id, recruiter_id, title, description, location, contract_type, status, deadline FROM job_offer';
-            $rowsParams = [];
-            if ($role === 'recruiter') {
-                $rowsSql .= ' WHERE recruiter_id = :recruiter_id';
-                $rowsParams['recruiter_id'] = $currentRecruiterId;
-            }
-            $rowsSql .= ' ORDER BY created_at DESC LIMIT 25';
-
-            $rows = $connection->fetchAllAssociative($rowsSql, $rowsParams);
+            $rows = $jobOfferRepository->findOfferRowsForPortal(
+                $role,
+                $currentRecruiterId,
+                $searchQuery,
+                $filterContractType,
+                $filterStatus,
+                $filterDeadline,
+                25
+            );
 
             $dbCards = array_map(function (array $row) use ($connection, $now, $appliedOfferIds, $currentRecruiterId): array {
                 $formattedDeadline = '';
@@ -200,11 +218,15 @@ class FrontPortalController extends AbstractController
             'contractTypes' => self::CONTRACT_TYPES,
             'warnings' => $warnings,
             'expiredOffers' => $expiredOffers,
+            'searchQuery' => $searchQuery,
+            'filterContractType' => $filterContractType,
+            'filterStatus' => $filterStatus,
+            'filterDeadline' => $filterDeadline,
         ]);
     }
 
     #[Route('/front/job-offers/statistics', name: 'front_job_offers_statistics')]
-    public function jobOffersStatistics(Request $request, Connection $connection): Response
+    public function jobOffersStatistics(Request $request, Job_offerRepository $jobOfferRepository): Response
     {
         $role = $this->resolveSessionRole($request);
         $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
@@ -213,15 +235,18 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_job_offers', ['role' => $role]);
         }
 
-        $rows = [];
-        $offerStats = $this->buildOfferStats([]);
+        $offerStats = [
+            'total_published' => 0,
+            'total_closed' => 0,
+            'total_open' => 0,
+            'closed_percentage' => 0,
+            'open_percentage' => 0,
+            'city_stats' => [],
+            'contract_stats' => [],
+        ];
 
         try {
-            $rows = $connection->fetchAllAssociative(
-                'SELECT id, recruiter_id, title, location, contract_type, status, deadline FROM job_offer WHERE recruiter_id = :recruiter_id ORDER BY created_at DESC LIMIT 50',
-                ['recruiter_id' => $currentRecruiterId]
-            );
-            $offerStats = $this->buildOfferStats($rows);
+            $offerStats = $jobOfferRepository->buildRecruiterOfferStats($currentRecruiterId, 50);
         } catch (\Throwable) {
             $this->addFlash('error', 'Unable to load offer statistics right now.');
         }
