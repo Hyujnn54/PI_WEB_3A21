@@ -12,11 +12,15 @@ use App\Repository\Candidate_skillRepository;
 use App\Repository\Job_applicationRepository;
 use App\Service\JobApplication\GroqCoverLetterGenerator;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\Form\FormError;
@@ -163,7 +167,9 @@ class CandidateApplicationController extends AbstractController
         Request $request,
         EntityManagerInterface $em,
         SluggerInterface $slugger,
-        Job_applicationRepository $jobApplicationRepository
+        Job_applicationRepository $jobApplicationRepository,
+        MailerInterface $mailer,
+        LoggerInterface $logger
     ): Response {
         $roles = (array) $request->getSession()->get('user_roles', []);
         if (!in_array('ROLE_CANDIDATE', $roles, true)) {
@@ -279,6 +285,8 @@ class CandidateApplicationController extends AbstractController
 
             $em->persist($application);
             $em->flush();
+
+            $this->sendApplicationConfirmationEmail($mailer, $logger, $candidate, $jobOffer, $application);
 
             return $this->redirectToRoute('front_job_offers', ['role' => 'candidate']);
         }
@@ -594,6 +602,60 @@ class CandidateApplicationController extends AbstractController
         $fullName = trim($firstName . ' ' . $lastName);
 
         return $fullName !== '' ? $fullName : 'Candidate';
+    }
+
+    private function sendApplicationConfirmationEmail(
+        MailerInterface $mailer,
+        LoggerInterface $logger,
+        Candidate $candidate,
+        Job_offer $jobOffer,
+        Job_application $application
+    ): void {
+        $recipient = trim((string) $candidate->getEmail());
+        if ($recipient === '') {
+            return;
+        }
+
+        $fromAddress = trim((string) ($_ENV['MAILER_FROM_ADDRESS'] ?? $_SERVER['MAILER_FROM_ADDRESS'] ?? 'no-reply@talent-bridge.local'));
+        $fromName = trim((string) ($_ENV['MAILER_FROM_NAME'] ?? $_SERVER['MAILER_FROM_NAME'] ?? 'Talent Bridge Recrutement'));
+        $candidateName = $this->resolveCandidateDisplayName($candidate);
+        $offerTitle = trim((string) $jobOffer->getTitle());
+        $appliedAt = $application->getApplied_at();
+        $appliedAtText = $appliedAt instanceof \DateTimeInterface
+            ? $appliedAt->format('F j, Y \\a\\t H:i')
+            : (new \DateTimeImmutable())->format('F j, Y \\a\\t H:i');
+
+        $body = $this->renderView('emails/application_confirmation.txt.twig', [
+            'candidateName' => $candidateName,
+            'offerTitle' => $offerTitle,
+            'appliedAtText' => $appliedAtText,
+        ]);
+
+        try {
+            $email = (new Email())
+                ->from(new Address($fromAddress, $fromName))
+                ->to($recipient)
+                ->subject(sprintf('Application received for "%s"', $offerTitle !== '' ? $offerTitle : 'your selected position'))
+                ->text($body);
+
+            $mailer->send($email);
+        } catch (\Throwable $exception) {
+            $logger->error('Candidate application confirmation email failed to send.', [
+                'candidate_id' => $candidate->getId(),
+                'candidate_email' => $recipient,
+                'offer_id' => $jobOffer->getId(),
+                'offer_title' => $offerTitle,
+                'error_message' => $exception->getMessage(),
+            ]);
+
+            $appEnv = strtolower((string) ($_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? 'dev'));
+            if ($appEnv === 'dev') {
+                $this->addFlash('warning', 'Your application was submitted, but the confirmation email failed: ' . $exception->getMessage());
+                return;
+            }
+
+            $this->addFlash('warning', 'Your application was submitted, but we could not send the confirmation email right now.');
+        }
     }
 
     private function extractCvTextFromProfilePath(string $profileCvPath): string
