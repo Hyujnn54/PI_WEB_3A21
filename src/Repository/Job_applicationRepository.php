@@ -105,6 +105,32 @@ class Job_applicationRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param int[] $applicationIds
+     *
+     * @return Job_application[]
+     */
+    public function findForRecruiterByIds(Recruiter $recruiter, array $applicationIds): array
+    {
+        $normalizedIds = array_values(array_unique(array_filter(array_map('intval', $applicationIds), static fn (int $id): bool => $id > 0)));
+        if ($normalizedIds === []) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('application')
+            ->leftJoin('application.offer_id', 'offer')
+            ->leftJoin('application.candidate_id', 'candidate')
+            ->addSelect('offer', 'candidate')
+            ->andWhere('application.id IN (:ids)')
+            ->andWhere('offer.recruiter_id = :recruiter')
+            ->andWhere('application.is_archived = :isArchived')
+            ->setParameter('ids', $normalizedIds)
+            ->setParameter('recruiter', $recruiter)
+            ->setParameter('isArchived', false)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * @return Job_application[]
      */
     public function findForRecruiterListing(Recruiter $recruiter, string $search = '', string $status = 'all', string $sort = 'date_desc'): array

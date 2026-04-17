@@ -71,6 +71,29 @@
                             <a href="{{ path('front_job_applications', {role: 'recruiter'}) }}" class="btn btn-outline-secondary"><i class="ti ti-rotate-clockwise-2 me-1"></i>Reset</a>
                             <div class="small text-secondary ms-auto">{{ cards|length }} result(s)</div>
                         </form>
+                        <form id="recruiterBulkStatusForm" method="post" action="{{ path('app_recruiter_application_bulk_update_status') }}" class="d-flex flex-wrap align-items-center gap-2 mt-2 pt-2 border-top">
+                            <input type="hidden" name="search" value="{{ filters.search|default('') }}">
+                            <input type="hidden" name="status_filter" value="{{ filters.status|default('all') }}">
+                            <input type="hidden" name="sort" value="{{ filters.sort|default('date_desc') }}">
+                            <div class="form-check m-0">
+                                <input class="form-check-input" type="checkbox" id="recruiterBulkSelectAll">
+                                <label class="form-check-label small" for="recruiterBulkSelectAll">Select all</label>
+                            </div>
+                            <select id="recruiterBulkStatusSelect" name="status" class="form-select" style="max-width: 220px;" required>
+                                <option value="">Bulk status...</option>
+                                <option value="SUBMITTED">Submitted</option>
+                                <option value="IN_REVIEW">In Review</option>
+                                <option value="SHORTLISTED">Shortlisted</option>
+                                <option value="REJECTED">Rejected</option>
+                                <option value="INTERVIEW">Interview</option>
+                                <option value="HIRED">Hired</option>
+                            </select>
+                            <input type="text" name="note" class="form-control" style="max-width: 340px;" placeholder="Optional note for all selected applications">
+                            <button id="recruiterBulkSubmitBtn" type="submit" class="btn btn-primary" disabled>
+                                <i class="ti ti-checks me-1"></i>Apply to selected
+                            </button>
+                            <span class="small text-secondary" id="recruiterBulkCount">0 selected</span>
+                        </form>
                     {% else %}
                         <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#applicationCardsGrid">
                             <div class="input-icon">
@@ -128,6 +151,19 @@
                                 data-details-url="{{ card.details_url|default('#') }}"
                             {% endif %}
                             data-detail-extra="Status: {{ card.meta }}||{{ card.title }}{% if role == 'admin' %}||Inspect URL: {{ card.details_url|default('#') }}{% endif %}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already created for this application.') }}{% endif %}">
+                            {% if role == 'recruiter' %}
+                                <div class="form-check mb-2" onclick="event.stopPropagation();">
+                                    <input
+                                        class="form-check-input tb-bulk-app-checkbox"
+                                        type="checkbox"
+                                        name="application_ids[]"
+                                        value="{{ card.id|default(0) }}"
+                                        form="recruiterBulkStatusForm"
+                                        id="bulkApplication{{ loop.index }}"
+                                    >
+                                    <label class="form-check-label small text-secondary" for="bulkApplication{{ loop.index }}">Select</label>
+                                </div>
+                            {% endif %}
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
@@ -284,7 +320,90 @@
         const onsiteField = formEl.querySelector('[data-onsite-field]');
         const notesInput = formEl.querySelector('textarea[name="notes"]');
         const notesCount = formEl.querySelector('[data-notes-count]');
+        const bulkForm = document.getElementById('recruiterBulkStatusForm');
+        const bulkSelectAll = document.getElementById('recruiterBulkSelectAll');
+        const bulkStatusSelect = document.getElementById('recruiterBulkStatusSelect');
+        const bulkSubmitBtn = document.getElementById('recruiterBulkSubmitBtn');
+        const bulkCount = document.getElementById('recruiterBulkCount');
+        const bulkCheckboxes = Array.from(document.querySelectorAll('.tb-bulk-app-checkbox'));
         let selectedCard = null;
+
+        const syncBulkSelection = function () {
+            if (!bulkCheckboxes.length) {
+                return;
+            }
+
+            const selectedCount = bulkCheckboxes.filter(function (checkbox) {
+                return checkbox.checked;
+            }).length;
+
+            if (bulkCount) {
+                bulkCount.textContent = selectedCount + ' selected';
+            }
+
+            if (bulkSelectAll) {
+                bulkSelectAll.checked = selectedCount > 0 && selectedCount === bulkCheckboxes.length;
+                bulkSelectAll.indeterminate = selectedCount > 0 && selectedCount < bulkCheckboxes.length;
+            }
+
+            if (bulkSubmitBtn) {
+                const hasStatus = bulkStatusSelect && bulkStatusSelect.value !== '';
+                bulkSubmitBtn.disabled = !(selectedCount > 0 && hasStatus);
+            }
+        };
+
+        if (bulkCheckboxes.length) {
+            bulkCheckboxes.forEach(function (checkbox) {
+                checkbox.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                });
+
+                checkbox.addEventListener('change', function () {
+                    syncBulkSelection();
+                });
+            });
+        }
+
+        if (bulkSelectAll && bulkCheckboxes.length) {
+            bulkSelectAll.addEventListener('change', function () {
+                bulkCheckboxes.forEach(function (checkbox) {
+                    checkbox.checked = bulkSelectAll.checked;
+                });
+                syncBulkSelection();
+            });
+        }
+
+        if (bulkStatusSelect) {
+            bulkStatusSelect.addEventListener('change', function () {
+                syncBulkSelection();
+            });
+        }
+
+        if (bulkForm) {
+            bulkForm.addEventListener('submit', function (event) {
+                const selectedCount = bulkCheckboxes.filter(function (checkbox) {
+                    return checkbox.checked;
+                }).length;
+
+                if (selectedCount === 0) {
+                    event.preventDefault();
+                    alert('Please select at least one application.');
+                    return;
+                }
+
+                if (!bulkStatusSelect || bulkStatusSelect.value === '') {
+                    event.preventDefault();
+                    alert('Please select a status for bulk update.');
+                    return;
+                }
+
+                if (!confirm('Apply this status to ' + selectedCount + ' selected application(s)?')) {
+                    event.preventDefault();
+                }
+            });
+
+            syncBulkSelection();
+        }
 
         const now = new Date();
         const minValue = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);

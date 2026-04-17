@@ -6,6 +6,7 @@ use App\Entity\Application_status_history;
 use App\Entity\Job_application;
 use App\Entity\Recruiter;
 use App\Repository\Application_status_historyRepository;
+use App\Repository\Job_applicationRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -132,6 +133,78 @@ class RecruiterApplicationController extends AbstractController
         }
 
         return $this->redirectToRoute('app_recruiter_application_details', ['applicationId' => $applicationId]);
+    }
+
+    #[Route('/applicationmanagement/recruiter/applications/bulk-status', name: 'app_recruiter_application_bulk_update_status', methods: ['POST'])]
+    public function bulkUpdateStatus(
+        Request $request,
+        EntityManagerInterface $em,
+        Job_applicationRepository $jobApplicationRepository
+    ): Response {
+        $recruiterId = (string) $request->getSession()->get('user_id', '');
+        $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
+
+        if (!$recruiter) {
+            $this->addFlash('error', 'Recruiter not found.');
+
+            return $this->redirectToRoute('front_job_applications', ['role' => 'recruiter']);
+        }
+
+        $newStatus = strtoupper(trim((string) $request->request->get('status', '')));
+        if (!in_array($newStatus, self::APPLICATION_STATUSES, true)) {
+            $this->addFlash('error', 'Invalid status selected for bulk update.');
+
+            return $this->redirectToRoute('front_job_applications', $this->buildRecruiterListRouteParams($request));
+        }
+
+        $applicationIds = array_values(array_unique(array_filter(
+            array_map('intval', (array) $request->request->all('application_ids')),
+            static fn (int $id): bool => $id > 0
+        )));
+
+        if ($applicationIds === []) {
+            $this->addFlash('warning', 'Please select at least one application.');
+
+            return $this->redirectToRoute('front_job_applications', $this->buildRecruiterListRouteParams($request));
+        }
+
+        $applications = $jobApplicationRepository->findForRecruiterByIds($recruiter, $applicationIds);
+        if ($applications === []) {
+            $this->addFlash('warning', 'No eligible applications were found for bulk update.');
+
+            return $this->redirectToRoute('front_job_applications', $this->buildRecruiterListRouteParams($request));
+        }
+
+        $manualNote = trim((string) $request->request->get('note', ''));
+        $recruiterName = $this->resolveRecruiterDisplayName($recruiter);
+        $updatedCount = 0;
+
+        foreach ($applications as $application) {
+            $oldStatus = strtoupper(trim((string) $application->getCurrent_status()));
+            $application->setCurrent_status($newStatus);
+
+            $history = new Application_status_history();
+            $history->setApplication_id($application);
+            $history->setStatus($newStatus);
+            $history->setChanged_at(new \DateTime());
+            $history->setChanged_by($recruiter);
+            $history->setNote($manualNote !== '' ? $manualNote : $this->generateAutoRecruiterNote($recruiterName, $oldStatus, $newStatus));
+
+            $em->persist($history);
+            $updatedCount++;
+        }
+
+        $em->flush();
+
+        $skippedCount = count($applicationIds) - count($applications);
+        $message = $updatedCount . ' application(s) updated to ' . $newStatus . '.';
+        if ($skippedCount > 0) {
+            $message .= ' ' . $skippedCount . ' skipped (not found, archived, or not yours).';
+        }
+
+        $this->addFlash('success', $message);
+
+        return $this->redirectToRoute('front_job_applications', $this->buildRecruiterListRouteParams($request));
     }
 
     #[Route('/applicationmanagement/recruiter/applications/{applicationId}/history/{historyId}/note', name: 'app_recruiter_history_note_update', methods: ['POST'])]
@@ -279,5 +352,18 @@ class RecruiterApplicationController extends AbstractController
         }
 
         return (string) $historyAuthor->getId() === (string) $recruiterId;
+    }
+
+    /**
+     * @return array{role: string, search: string, status: string, sort: string}
+     */
+    private function buildRecruiterListRouteParams(Request $request): array
+    {
+        return [
+            'role' => 'recruiter',
+            'search' => trim((string) $request->request->get('search', '')),
+            'status' => strtolower(trim((string) $request->request->get('status_filter', 'all'))),
+            'sort' => strtolower(trim((string) $request->request->get('sort', 'date_desc'))),
+        ];
     }
 }
