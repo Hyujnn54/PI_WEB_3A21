@@ -15,6 +15,12 @@
 
                 <div class="card card-md auth-card tb-auth-card">
                     <div class="card-body p-4 p-md-4">
+                        {% if error %}
+                            <div class="alert alert-danger tb-auth-alert" role="alert">
+                                <i class="ti ti-alert-circle me-2"></i>{{ error.messageKey|trans(error.messageData, 'security') }}
+                            </div>
+                        {% endif %}
+
                         {% for message in app.flashes('error') %}
                             <div class="alert alert-danger tb-auth-alert" role="alert">
                                 <i class="ti ti-alert-circle me-2"></i>{{ message }}
@@ -22,11 +28,12 @@
                         {% endfor %}
 
                         <form method="post" action="{{ path('app_login') }}" novalidate>
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
                             <div class="mb-3">
                                 <label class="form-label">Email Address</label>
                                 <div class="input-icon">
                                     <span class="input-icon-addon"><i class="ti ti-mail"></i></span>
-                                    <input type="email" name="email" class="form-control tb-auth-input" placeholder="your@email.com" required>
+                                    <input type="email" name="email" class="form-control tb-auth-input" placeholder="your@email.com" value="{{ last_username|default('') }}" autocomplete="email" required>
                                 </div>
                             </div>
 
@@ -34,7 +41,7 @@
                                 <label class="form-label">Password</label>
                                 <div class="input-icon">
                                     <span class="input-icon-addon"><i class="ti ti-lock"></i></span>
-                                    <input type="password" name="password" class="form-control tb-auth-input" placeholder="Your password" required>
+                                    <input type="password" name="password" class="form-control tb-auth-input" placeholder="Your password" autocomplete="current-password" required>
                                 </div>
                             </div>
 

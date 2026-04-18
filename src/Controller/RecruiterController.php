@@ -7,6 +7,7 @@ use App\Entity\Interview;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use App\Entity\Recruiter;
+use App\Entity\Users;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,20 +19,19 @@ class RecruiterController extends AbstractController
     #[Route('/recruiter/home', name: 'recruiter_home')]
     public function home(Request $request, EntityManagerInterface $em): Response
     {
-        $session = $request->getSession();
-        $userId = (string) $session->get('user_id', '');
-        $roles = (array) $session->get('user_roles', []);
-
-        if ($userId === '') {
+        $user = $this->getUser();
+        if (!$user instanceof Users) {
             return $this->redirectToRoute('app_login');
         }
 
-        if (!in_array('ROLE_RECRUITER', $roles, true)) {
+        if (!$this->isGranted('ROLE_RECRUITER')) {
             $this->addFlash('warning', 'This area is reserved for recruiters.');
 
             return $this->redirectToRoute('front_home');
         }
 
+        $session = $request->getSession();
+        $userId = (string) $user->getId();
         $recruiter = $em->getRepository(Recruiter::class)->find($userId);
         if (!$recruiter instanceof Recruiter) {
             $this->addFlash('error', 'Recruiter profile not found.');

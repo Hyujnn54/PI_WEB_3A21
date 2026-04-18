@@ -172,60 +172,107 @@
 
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+(() => {
+    const endpoint = "{{ path('api_skill_suggestions') }}";
 
-    const input = document.getElementById("skillInput");
-    const suggestionsBox = document.getElementById("skillSuggestions");
-
-    let timeout = null;
-
-    input.addEventListener("input", function () {
-
-        const query = this.value;
-
-        if (query.length < 3) {
-            suggestionsBox.innerHTML = "";
+    const initSkillSuggestions = () => {
+        const input = document.getElementById("skillInput");
+        const suggestionsBox = document.getElementById("skillSuggestions");
+        if (!input || !suggestionsBox || input.dataset.suggestBound === "1") {
             return;
         }
 
-        clearTimeout(timeout);
+        input.dataset.suggestBound = "1";
 
-        timeout = setTimeout(() => {
+        let debounceTimer = null;
+        let abortController = null;
+        const localCache = new Map();
 
-            fetch("/api/skill-suggestions?q=" + query)
+        const clearSuggestions = () => {
+            suggestionsBox.innerHTML = "";
+            suggestionsBox.classList.add("d-none");
+        };
 
-            .then(response => response.json())
+        const renderSuggestions = (skills) => {
+            suggestionsBox.innerHTML = "";
 
-            .then(data => {
+            if (!Array.isArray(skills) || skills.length === 0) {
+                clearSuggestions();
+                return;
+            }
 
-                suggestionsBox.innerHTML = "";
-
-                data.forEach(skill => {
-
-                    const item = document.createElement("a");
-
-                    item.classList.add(
-                        "list-group-item",
-                        "list-group-item-action"
-                    );
-
-                    item.textContent = skill;
-
-                    item.onclick = () => {
-                        input.value = skill;
-                        suggestionsBox.innerHTML = "";
-                    };
-
-                    suggestionsBox.appendChild(item);
-
+            skills.forEach((skill) => {
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className = "list-group-item list-group-item-action";
+                item.textContent = skill;
+                item.addEventListener("click", () => {
+                    input.value = skill;
+                    clearSuggestions();
+                    input.focus();
                 });
-
+                suggestionsBox.appendChild(item);
             });
 
-        }, 800);
+            suggestionsBox.classList.remove("d-none");
+        };
 
-    });
+        input.addEventListener("input", () => {
+            const query = input.value.trim();
 
-});
+            if (query.length < 2) {
+                clearTimeout(debounceTimer);
+                if (abortController) {
+                    abortController.abort();
+                }
+                clearSuggestions();
+                return;
+            }
+
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const normalized = query.toLowerCase();
+                if (localCache.has(normalized)) {
+                    renderSuggestions(localCache.get(normalized));
+                    return;
+                }
+
+                if (abortController) {
+                    abortController.abort();
+                }
+                abortController = new AbortController();
+
+                fetch(endpoint + "?q=" + encodeURIComponent(query), {
+                    signal: abortController.signal,
+                    headers: { "X-Requested-With": "XMLHttpRequest" }
+                })
+                    .then((response) => response.ok ? response.json() : [])
+                    .then((data) => {
+                        localCache.set(normalized, data);
+                        renderSuggestions(data);
+                    })
+                    .catch((error) => {
+                        if (error.name !== "AbortError") {
+                            clearSuggestions();
+                        }
+                    });
+            }, 220);
+        });
+
+        input.addEventListener("blur", () => {
+            setTimeout(clearSuggestions, 120);
+        });
+
+        input.addEventListener("focus", () => {
+            const query = input.value.trim().toLowerCase();
+            if (query.length >= 2 && localCache.has(query)) {
+                renderSuggestions(localCache.get(query));
+            }
+        });
+    };
+
+    document.addEventListener("DOMContentLoaded", initSkillSuggestions);
+    document.addEventListener("turbo:load", initSkillSuggestions);
+})();
 </script>
 {% endblock %}

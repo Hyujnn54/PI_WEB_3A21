@@ -7,6 +7,7 @@ use App\Entity\Candidate_skill;
 use App\Entity\Interview;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
+use App\Entity\Users;
 use App\Repository\Candidate_skillRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -14,7 +15,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 
@@ -23,20 +24,19 @@ class CandidateController extends AbstractController
     #[Route('/candidate/home', name: 'candidate_home')]
     public function home(Request $request, EntityManagerInterface $em): Response
     {
-        $session = $request->getSession();
-        $userId = (string) $session->get('user_id', '');
-        $roles = (array) $session->get('user_roles', []);
-
-        if ($userId === '') {
+        $user = $this->getUser();
+        if (!$user instanceof Users) {
             return $this->redirectToRoute('app_login');
         }
 
-        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+        if (!$this->isGranted('ROLE_CANDIDATE')) {
             $this->addFlash('warning', 'This area is reserved for candidates.');
 
             return $this->redirectToRoute('front_home');
         }
 
+        $session = $request->getSession();
+        $userId = (string) $user->getId();
         $candidate = $em->getRepository(Candidate::class)->find($userId);
         if (!$candidate instanceof Candidate) {
             $this->addFlash('error', 'Candidate profile not found.');
@@ -182,12 +182,12 @@ class CandidateController extends AbstractController
     #[Route('/candidate/skills', name: 'app_candidate_skills', methods: ['GET', 'POST'])]
     public function index(Request $request, Candidate_skillRepository $skillRepo, EntityManagerInterface $em): Response
     {
-        $session = $request->getSession();
-        $userId = $session->get('user_id');
-
-        if (!$userId) {
+        $user = $this->getUser();
+        if (!$user instanceof Users) {
             return $this->redirectToRoute('app_login');
         }
+
+        $userId = (string) $user->getId();
 
         $skills = $skillRepo->findBy(['candidate' => $userId]);
 
@@ -215,8 +215,12 @@ class CandidateController extends AbstractController
     #[Route('/candidate/skills/edit/{id}', name: 'app_candidate_skill_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Candidate_skill $skill, EntityManagerInterface $em): Response
     {
-        $session = $request->getSession();
-        $userId = $session->get('user_id');
+        $user = $this->getUser();
+        if (!$user instanceof Users) {
+            return $this->redirectToRoute('app_login');
+        }
+
+        $userId = (string) $user->getId();
 
         // Security: Make sure the skill belongs to the logged-in candidate
         if ($skill->getCandidate()->getId() !== $userId) {
@@ -246,8 +250,8 @@ public function delete(
     EntityManagerInterface $em
 ): Response
 {
-    $session = $request->getSession();
-    $userId = $session->get('user_id');
+    $user = $this->getUser();
+    $userId = $user instanceof Users ? (string) $user->getId() : '';
 
     if (!$userId || $skill->getCandidate()->getId() !== $userId) {
         throw $this->createAccessDeniedException();
@@ -269,35 +273,33 @@ public function delete(
 #[Route('/api/skill-suggestions', name: 'api_skill_suggestions', methods: ['GET'])]
 public function skillSuggestions(
     Request $request,
-    CacheInterface $cache
+    CacheInterface $cache,
+    HttpClientInterface $httpClient
 ): JsonResponse {
 
-    $query = strtolower(trim($request->query->get('q')));
+    $query = mb_strtolower(trim((string) $request->query->get('q', '')));
 
-    if (!$query || strlen($query) < 2) {
+    if ($query === '' || mb_strlen($query) < 2) {
         return new JsonResponse([]);
+    }
+
+    if (mb_strlen($query) > 100) {
+        $query = mb_substr($query, 0, 100);
     }
 
     $skills = $cache->get(
 
         'skills_' . $query,
 
-        function (ItemInterface $item) use ($query) {
-
-        dump('API CALL for: ' . $query); // DEBUG
-
-            $item->expiresAfter(3600); // cache 1 hour
-
-            $client = HttpClient::create([
-                'timeout' => 3, // prevent long waits
-            ]);
+        function (ItemInterface $item) use ($query, $httpClient) {
+            $item->expiresAfter(7200);
 
             try {
-
-                $response = $client->request(
+                $response = $httpClient->request(
                     'GET',
                     'https://ec.europa.eu/esco/api/search',
                     [
+                        'timeout' => 1.8,
                         'query' => [
                             'text' => $query,
                             'type' => 'skill',
@@ -312,14 +314,17 @@ public function skillSuggestions(
 
                 if (isset($data['_embedded']['results'])) {
                     foreach ($data['_embedded']['results'] as $item) {
-                        $skills[] = $item['title'];
+                        $title = trim((string) ($item['title'] ?? ''));
+                        if ($title !== '') {
+                            $skills[] = $title;
+                        }
                     }
                 }
 
-                return $skills;
+                return array_values(array_unique($skills));
 
             } catch (\Exception $e) {
-
+                // Keep UX responsive even if remote provider is slow/down.
                 return [];
 
             }

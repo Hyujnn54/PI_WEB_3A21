@@ -11,6 +11,7 @@ use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
+use App\Entity\Users;
 use App\Form\ProfileType;
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
@@ -1628,7 +1629,7 @@ class FrontPortalController extends AbstractController
     public function profile(Request $request, UsersRepository $userRepo, EntityManagerInterface $entityManager, UserPasswordHasherInterface $passwordHasher): Response
     {
         $role = $this->resolveSessionRole($request);
-        $userId = $request->getSession()->get('user_id');
+        $userId = $this->resolveCurrentUserId($request);
         $user = $userRepo->find($userId);
 
         if (!$user) {
@@ -1762,12 +1763,26 @@ class FrontPortalController extends AbstractController
 
     private function resolveCurrentUserId(Request $request): string
     {
+        $user = $this->getUser();
+        if ($user instanceof Users) {
+            return (string) $user->getId();
+        }
+
         return (string) $request->getSession()->get('user_id', '');
     }
 
     private function resolveSessionRole(Request $request): string
     {
-        $roles = (array) $request->getSession()->get('user_roles', []);
+        $roles = [];
+        $user = $this->getUser();
+        if ($user instanceof Users) {
+            $roles = $user->getRoles();
+        }
+
+        if ($roles === []) {
+            $roles = (array) $request->getSession()->get('user_roles', []);
+        }
+
         if (in_array('ROLE_RECRUITER', $roles, true)) {
             return 'recruiter';
         }

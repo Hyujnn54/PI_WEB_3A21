@@ -165,7 +165,8 @@ class BackOfficeController extends AbstractController
     #[Route('/admin/profile', name: 'app_admin_profile')]
     public function profile(Request $request, UsersRepository $userRepo): Response
     {
-        $userId = (string) $request->getSession()->get('user_id', '');
+        $user = $this->getUser();
+        $userId = $user instanceof Users ? (string) $user->getId() : '';
         if ($userId === '') {
             return $this->redirectToRoute('app_login');
         }
@@ -386,7 +387,8 @@ class BackOfficeController extends AbstractController
     #[Route('/admin/job-offers/{id}/warning', name: 'app_admin_job_offer_warning', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function sendJobOfferWarning(string $id, Request $request, Connection $connection): Response
     {
-        $currentAdminId = (string) $request->getSession()->get('user_id', '');
+        $user = $this->getUser();
+        $currentAdminId = $user instanceof Users ? (string) $user->getId() : '';
         if ($currentAdminId === '') {
             $this->addFlash('error', 'You must be logged in as admin to send warnings.');
             return $this->redirectToRoute('app_login');
@@ -1011,7 +1013,8 @@ SQL;
 
     private function resolveCurrentRecruiter(Request $request, EntityManagerInterface $entityManager): ?Recruiter
     {
-        $userId = (string) $request->getSession()->get('user_id', '');
+        $user = $this->getUser();
+        $userId = $user instanceof Users ? (string) $user->getId() : '';
         if ($userId === '') {
             return null;
         }
