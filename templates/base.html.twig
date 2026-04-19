@@ -38,7 +38,7 @@
             {% set currentRole = 'admin' %}
         {% endif %}
         <div class="page tb-page-shell">
-            {% if not isAdminPage and routeName != 'app_login' and routeName != 'app_register' %}
+            {% if not isAdminPage and routeName != 'app_login' and routeName != 'app_register' and routeName != 'app_forgot_password' and routeName != 'app_forgot_password_verify' %}
             <header class="navbar navbar-expand-md navbar-light d-print-none tb-topbar">
                 <div class="container-xl">
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#tbMainNav" aria-controls="tbMainNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -52,6 +52,7 @@
                     <div class="collapse navbar-collapse" id="tbMainNav">
                         <ul class="navbar-nav tb-main-nav me-auto">
                             {% if isAdminPage %}
+                        (function () {
                                 <li class="nav-item"><a class="nav-link" href="{{ path('management_users') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('back_dashboard') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span><span class="nav-link-title">Admin Dashboard</span></a></li>
                             {% else %}
@@ -379,6 +380,7 @@
             });
 
             disableClientValidation(document);
+            })();
         </script>
     </body>
 </html>

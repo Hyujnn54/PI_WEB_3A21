@@ -5,8 +5,10 @@ namespace App\Entity;
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Validator\Constraints as Assert;
 
 
 #[ORM\Entity(repositoryClass: UsersRepository::class)]
@@ -14,6 +16,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 #[ORM\InheritanceType("JOINED")]
 #[ORM\DiscriminatorColumn(name: "discr", type: "string")]
 #[ORM\DiscriminatorMap(["admin" => Admin::class, "candidate" => Candidate::class, "recruiter" => Recruiter::class])]
+#[UniqueEntity(fields: ['email'], message: 'This email is already in use.')]
 class Users implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
@@ -22,6 +25,9 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface
     protected ?string $id = null;
 
     #[ORM\Column(length: 255, unique: true)]
+    #[Assert\NotBlank(message: 'Email is required.', normalizer: 'trim')]
+    #[Assert\Email(message: 'Please enter a valid email address.')]
+    #[Assert\Length(max: 255)]
     protected ?string $email = null;
 
     #[ORM\Column(type: "json")]
@@ -31,25 +37,45 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface
     protected ?string $password = null;
 
     #[ORM\Column(name: "first_name", length: 100, nullable: true)]
+    #[Assert\NotBlank(message: 'First name is required.')]
+    #[Assert\Length(max: 100)]
     protected ?string $firstName = null;
 
     #[ORM\Column(name: "last_name", length: 100, nullable: true)]
+    #[Assert\NotBlank(message: 'Last name is required.')]
+    #[Assert\Length(max: 100)]
     protected ?string $lastName = null;
 
     #[ORM\Column(length: 30, nullable: true)]
+    #[Assert\NotBlank(message: 'Phone number is required.')]
+    #[Assert\Regex(
+        pattern: '/^\+?[0-9 ]{8,15}$/',
+        message: 'Phone number must contain 8 to 15 digits (optional leading +).'
+    )]
     protected ?string $phone = null;
+
+    #[Assert\Length(
+        min: 8,
+        max: 4096,
+        minMessage: 'Password must be at least {{ limit }} characters.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^(?=.*[A-Za-z])(?=.*\d).+$/',
+        message: 'Password must contain at least one letter and one number.'
+    )]
+    private ?string $plainPassword = null;
 
     #[ORM\Column(name: "is_active")]
     protected bool $isActive = true;
 
     #[ORM\Column(name: "created_at", type: Types::DATETIME_MUTABLE)]
-    protected ?\DateTimeInterface $createdAt = null;
+    protected $createdAt = null;
 
     #[ORM\Column(name: "forget_code", length: 10, nullable: true)]
     protected ?string $forgetCode = null;
 
     #[ORM\Column(name: "forget_code_expires", type: Types::DATETIME_MUTABLE, nullable: true)]
-    protected ?\DateTimeInterface $forgetCodeExpires = null;
+    protected $forgetCodeExpires = null;
 
     #[ORM\Column(name: "face_person_id", length: 128, nullable: true)]
     protected ?string $facePersonId = null;
@@ -59,7 +85,8 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function __construct()
     {
-        $this->createdAt = new \DateTime();
+        $createdAt = date_create();
+        $this->createdAt = $createdAt === false ? null : $createdAt;
     }
 
     public function getId(): ?string { return $this->id; }
@@ -74,6 +101,18 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPassword(string $password): self
     {
         $this->password = $password;
+
+        return $this;
+    }
+
+    public function getPlainPassword(): ?string
+    {
+        return $this->plainPassword;
+    }
+
+    public function setPlainPassword(?string $plainPassword): self
+    {
+        $this->plainPassword = $plainPassword;
 
         return $this;
     }
@@ -108,14 +147,14 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface
     public function isActive(): bool { return $this->isActive; }
     public function setIsActive(bool $isActive): self { $this->isActive = $isActive; return $this; }
 
-    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
-    public function setCreatedAt(\DateTimeInterface $createdAt): self { $this->createdAt = $createdAt; return $this; }
+    public function getCreatedAt() { return $this->createdAt; }
+    public function setCreatedAt($createdAt): self { $this->createdAt = $createdAt; return $this; }
 
     public function getForgetCode(): ?string { return $this->forgetCode; }
     public function setForgetCode(?string $forgetCode): self { $this->forgetCode = $forgetCode; return $this; }
 
-    public function getForgetCodeExpires(): ?\DateTimeInterface { return $this->forgetCodeExpires; }
-    public function setForgetCodeExpires(?\DateTimeInterface $forgetCodeExpires): self { $this->forgetCodeExpires = $forgetCodeExpires; return $this; }
+    public function getForgetCodeExpires() { return $this->forgetCodeExpires; }
+    public function setForgetCodeExpires($forgetCodeExpires): self { $this->forgetCodeExpires = $forgetCodeExpires; return $this; }
 
     public function getFacePersonId(): ?string { return $this->facePersonId; }
     public function setFacePersonId(?string $facePersonId): self { $this->facePersonId = $facePersonId; return $this; }

@@ -45,7 +45,7 @@ class CandidateController extends AbstractController
         }
 
         $candidateName = $this->resolveCandidateName($candidate, (string) $session->get('user_name', 'Candidate'));
-        $now = new \DateTimeImmutable();
+        $now = date_create();
 
         $offers = $em->getRepository(Job_offer::class)
             ->createQueryBuilder('offer')

@@ -41,6 +41,8 @@ class SessionAccessSubscriber implements EventSubscriberInterface
         $publicRoutes = [
             'app_login',
             'app_register',
+            'app_forgot_password',
+            'app_forgot_password_verify',
         ];
 
         if (in_array($route, $publicRoutes, true)) {

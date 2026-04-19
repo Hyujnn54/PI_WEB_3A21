@@ -11,6 +11,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class RegistrationController extends AbstractController
 {
@@ -19,42 +20,17 @@ class RegistrationController extends AbstractController
         Request $request, 
         UserPasswordHasherInterface $hasher, 
         EntityManagerInterface $em,
-        UsersRepository $userRepository
+        UsersRepository $userRepository,
+        ValidatorInterface $validator
     ): Response {
         if ($request->isMethod('POST')) {
             // 1. DATA COLLECTION
-            $email = $request->request->get('email');
-            $password = $request->request->get('password');
-            $phone = $request->request->get('phone');
-            $role = $request->request->get('role');
-            $firstName = $request->request->get('first_name');
-            $lastName = $request->request->get('last_name');
-
-            // 2. PHP VALIDATION (Contrôle de saisie)
-            $errors = [];
-
-            // Unique Email Check
-            if ($userRepository->findOneBy(['email' => $email])) {
-                $errors[] = "This email is already in use.";
-            }
-
-            // Phone Validation (8 Digits)
-            if (!preg_match('/^[0-9]{8}$/', $phone)) {
-                $errors[] = "The phone number must be exactly 8 digits.";
-            }
-
-            // Strong Password (Min 8 chars, 1 letter, 1 number)
-            if (strlen($password) < 8 || !preg_match('/[A-Za-z]/', $password) || !preg_match('/[0-9]/', $password)) {
-                $errors[] = "Password must be at least 8 characters and contain both letters and numbers.";
-            }
-
-            // Redirect back if there are errors
-            if (!empty($errors)) {
-                foreach ($errors as $error) {
-                    $this->addFlash('error', $error);
-                }
-                return $this->render('auth/register.html.twig');
-            }
+            $email = trim((string) $request->request->get('email', ''));
+            $password = (string) $request->request->get('password', '');
+            $phone = trim((string) $request->request->get('phone', ''));
+            $role = trim((string) $request->request->get('role', 'candidate'));
+            $firstName = trim((string) $request->request->get('first_name', ''));
+            $lastName = trim((string) $request->request->get('last_name', ''));
 
             // 3. CREATE OBJECT BASED ON ROLE
             // This step automatically handles the "discr" column for the database
@@ -65,17 +41,18 @@ class RegistrationController extends AbstractController
             $user->setFirstName($firstName);
             $user->setLastName($lastName);
             $user->setPhone($phone);
-            $user->setPassword($hasher->hashPassword($user, $password));
+            $user->setPlainPassword((string) $password);
 
             // 5. ROLE-SPECIFIC LOGIC (instanceof)
             if ($user instanceof Recruiter) {
-                $user->setCompanyName($request->request->get('company_name'));
-                $user->setCompanyLocation($request->request->get('company_location'));
+                $user->setCompanyName(trim((string) $request->request->get('company_name', '')));
+                $user->setCompanyLocation(trim((string) $request->request->get('company_location', '')));
                 $user->setRoles(['ROLE_RECRUITER']);
             } else {
-                $user->setLocation($request->request->get('location'));
-                $user->setEducationLevel($request->request->get('education_level'));
-                $user->setExperienceYears((int)$request->request->get('experience_years'));
+                $user->setLocation(trim((string) $request->request->get('location', '')));
+                $user->setEducationLevel(trim((string) $request->request->get('education_level', '')));
+                $experienceInput = trim((string) $request->request->get('experience_years', ''));
+                $user->setExperienceYears($experienceInput === '' ? null : (int) $experienceInput);
                 $user->setRoles(['ROLE_CANDIDATE']);
 
                 // Handle CV Upload
@@ -88,7 +65,26 @@ class RegistrationController extends AbstractController
                 }
             }
 
-            // 6. SAVE TO DATABASE
+            // 6. Validate all business rules in PHP through entity constraints.
+            $violations = $validator->validate($user);
+            if (count($violations) > 0) {
+                $messages = [];
+                foreach ($violations as $violation) {
+                    $messages[] = $violation->getMessage();
+                }
+
+                foreach (array_unique($messages) as $message) {
+                    $this->addFlash('error', $message);
+                }
+
+                return $this->render('auth/register.html.twig');
+            }
+
+            $plainPassword = (string) $user->getPlainPassword();
+            $user->setPassword($hasher->hashPassword($user, $plainPassword));
+            $user->setPlainPassword(null);
+
+            // 7. SAVE TO DATABASE
             $em->persist($user);
             $em->flush();
 

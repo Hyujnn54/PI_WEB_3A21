@@ -39,7 +39,7 @@ class RecruiterController extends AbstractController
             return $this->redirectToRoute('front_home');
         }
 
-        $now = new \DateTimeImmutable();
+        $now = date_create();
         $recruiterName = $this->resolveRecruiterName($recruiter, (string) $session->get('user_name', 'Recruiter'));
         $companyName = trim((string) ($recruiter->getCompanyName() ?? ''));
 
@@ -66,7 +66,7 @@ class RecruiterController extends AbstractController
 
             $status = strtolower(trim((string) $offer->getStatus()));
             $deadline = $offer->getDeadline();
-            $isExpired = $deadline instanceof \DateTimeInterface && $deadline < $now;
+            $isExpired = is_object($deadline) && method_exists($deadline, 'getTimestamp') && $deadline < $now;
             $isActive = $status === 'open' && !$isExpired;
 
             if ($isActive) {

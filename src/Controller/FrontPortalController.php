@@ -51,7 +51,7 @@ class FrontPortalController extends AbstractController
         $warnings = [];
         $warningStatuses = [];
         $expiredOffers = [];
-        $now = new \DateTimeImmutable();
+        $now = date_create();
         $cards = [];
 
         $appliedOfferIds = [];
@@ -100,7 +100,7 @@ class FrontPortalController extends AbstractController
                 $formattedDeadline = '';
                 $isExpired = false;
                 try {
-                    $deadlineAt = new \DateTimeImmutable((string) ($row['deadline'] ?? ''));
+                    $deadlineAt = date_create((string) ($row['deadline'] ?? ''));
                     $formattedDeadline = $deadlineAt->format('Y-m-d');
                     $isExpired = $deadlineAt < $now;
                 } catch (\Throwable $exception) {
@@ -296,10 +296,10 @@ class FrontPortalController extends AbstractController
             if ($formData['deadline'] === '') {
                 $fieldErrors['deadline'] = 'Deadline is required.';
             } else {
-                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                $deadline = date_create_from_format('Y-m-d\\TH:i', $formData['deadline']);
                 if (!$deadline) {
                     $fieldErrors['deadline'] = 'Invalid deadline format.';
-                } elseif ($deadline <= new \DateTimeImmutable()) {
+                } elseif ($deadline <= date_create()) {
                     $fieldErrors['deadline'] = 'Deadline must be greater than today.';
                 }
             }
@@ -315,9 +315,9 @@ class FrontPortalController extends AbstractController
             }
 
             if (empty($fieldErrors)) {
-                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                $deadline = date_create_from_format('Y-m-d\\TH:i', $formData['deadline']);
                 if ($deadline) {
-                    $now = new \DateTimeImmutable();
+                    $now = date_create();
                     $newId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
                     try {
                         $connection->beginTransaction();
@@ -460,10 +460,10 @@ class FrontPortalController extends AbstractController
             if ($formData['deadline'] === '') {
                 $fieldErrors['deadline'] = 'Deadline is required.';
             } else {
-                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                $deadline = date_create_from_format('Y-m-d\\TH:i', $formData['deadline']);
                 if (!$deadline) {
                     $fieldErrors['deadline'] = 'Invalid deadline format.';
-                } elseif ($deadline <= new \DateTimeImmutable()) {
+                } elseif ($deadline <= date_create()) {
                     $fieldErrors['deadline'] = 'Deadline must be greater than today.';
                 }
             }
@@ -480,7 +480,7 @@ class FrontPortalController extends AbstractController
             }
 
             if (empty($fieldErrors)) {
-                $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
+                $deadline = date_create_from_format('Y-m-d\\TH:i', $formData['deadline']);
                 if ($deadline) {
                     try {
                         $connection->beginTransaction();
@@ -857,7 +857,7 @@ class FrontPortalController extends AbstractController
                 }
                 $registration->setCandidate_name((string) $candidateName);
                 $registration->setCandidate_email((string) $candidateEmail);
-                $registration->setRegistered_at(new \DateTime());
+                $registration->setRegistered_at(date_create());
                 $registration->setAttendance_status('registered');
 
                 $entityManager->persist($registration);
@@ -1418,7 +1418,7 @@ class FrontPortalController extends AbstractController
                 $interview->setLocation($validation['location']);
                 $interview->setNotes($validation['notes']);
                 $interview->setStatus('scheduled');
-                $interview->setCreated_at(new \DateTime());
+                $interview->setCreated_at(date_create());
                 $interview->setReminder_sent(false);
 
                 try {
@@ -1613,7 +1613,7 @@ class FrontPortalController extends AbstractController
         $feedback->setOverall_score($score);
         $feedback->setDecision($decision);
         $feedback->setComment((string) $commentValidation['value']);
-        $feedback->setCreated_at(new \DateTime());
+        $feedback->setCreated_at(date_create());
 
         $interview->setStatus('completed');
         $application = $interview->getApplication_id();
@@ -1742,10 +1742,12 @@ class FrontPortalController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $plainPassword = (string) $form->get('plainPassword')->getData();
+            $plainPassword = trim((string) $user->getPlainPassword());
             if ($plainPassword !== '') {
                 $user->setPassword($passwordHasher->hashPassword($user, $plainPassword));
             }
+
+            $user->setPlainPassword(null);
 
             $entityManager->flush();
             $request->getSession()->set('user_name', $user->getFirstName());
@@ -1757,6 +1759,7 @@ class FrontPortalController extends AbstractController
         return $this->render('front/profile.html.twig', [
             'form' => $form->createView(),
             'authUser' => ['role' => $role],
+            'profileUser' => $user,
             'candidateSkills' => $candidateSkills,
         ]);
     }
@@ -1846,12 +1849,12 @@ class FrontPortalController extends AbstractController
     private function validateInterviewPayload(array $data): array
     {
         try {
-            $scheduledAt = new \DateTime((string) ($data['scheduled_at'] ?? ''));
+            $scheduledAt = date_create((string) ($data['scheduled_at'] ?? ''));
         } catch (Throwable) {
             return ['ok' => false, 'error' => 'Invalid interview date/time.'];
         }
 
-        $now = new \DateTimeImmutable();
+        $now = date_create();
         if ($scheduledAt <= $now) {
             return ['ok' => false, 'error' => 'Interview date/time must be in the future.'];
         }
@@ -1946,7 +1949,7 @@ class FrontPortalController extends AbstractController
     {
         try {
             $lockTime = (clone $interview->getScheduled_at())->modify('-' . self::EDIT_LOCK_HOURS . ' hours');
-            return new \DateTime() < $lockTime;
+            return date_create() < $lockTime;
         } catch (Throwable) {
             return false;
         }
@@ -1956,7 +1959,7 @@ class FrontPortalController extends AbstractController
     {
         try {
             $endTime = (clone $interview->getScheduled_at())->modify('+' . $interview->getDuration_minutes() . ' minutes');
-            return new \DateTime() >= $endTime;
+            return date_create() >= $endTime;
         } catch (Throwable) {
             return false;
         }
@@ -1965,7 +1968,7 @@ class FrontPortalController extends AbstractController
     private function computeCandidateInterviewStatus(Interview $interview, ?Interview_feedback $latestFeedback = null): array
     {
         try {
-            $now = new \DateTime();
+            $now = date_create();
             $start = $interview->getScheduled_at();
             $end = (clone $start)->modify('+' . $interview->getDuration_minutes() . ' minutes');
             if (!$latestFeedback instanceof Interview_feedback) {
@@ -2013,7 +2016,7 @@ class FrontPortalController extends AbstractController
             }
 
             $endTime = (clone $interview->getScheduled_at())->modify('+' . $interview->getDuration_minutes() . ' minutes');
-            if (new \DateTime() >= $endTime) {
+            if (date_create() >= $endTime) {
                 return ['Pending', 'bg-orange-lt', 'pending'];
             }
         } catch (Throwable) {
