@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | Enable 2FA{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="page-body auth-body">
+        <div class="container container-tight py-4 py-md-5">
+            <div class="tb-auth-shell mx-auto" style="max-width: 620px;">
+                <div class="text-center mb-4">
+                    <h1 class="h2 mb-1">Enable Two-Factor Authentication</h1>
+                    <div class="text-secondary">Scan the QR code with Google Authenticator, Authy, or Microsoft Authenticator.</div>
+                </div>
+
+                <div class="card card-md auth-card tb-auth-card">
+                    <div class="card-body p-4 p-md-4">
+                        {% for message in app.flashes('error') %}
+                            <div class="alert alert-danger tb-auth-alert" role="alert">
+                                <i class="ti ti-alert-circle me-2"></i>{{ message }}
+                            </div>
+                        {% endfor %}
+                        {% for message in app.flashes('success') %}
+                            <div class="alert alert-success tb-auth-alert" role="alert">
+                                <i class="ti ti-circle-check me-2"></i>{{ message }}
+                            </div>
+                        {% endfor %}
+
+                        <div class="row g-4 align-items-center">
+                            <div class="col-md-5 text-center">
+                                <img src="{{ qrCodeDataUri }}" alt="2FA QR code" class="img-fluid rounded border p-2 bg-white">
+                            </div>
+                            <div class="col-md-7">
+                                <div class="mb-3">
+                                    <div class="fw-bold mb-1">Account</div>
+                                    <div class="text-secondary">{{ email }}</div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="fw-bold mb-1">Manual secret</div>
+                                    <code class="d-block text-break">{{ secret }}</code>
+                                </div>
+                                <div class="text-secondary small">
+                                    If the QR scan fails, enter the secret manually in your authenticator app.
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <form method="post" action="{{ path('app_2fa_setup') }}" novalidate>
+                            <div class="mb-3">
+                                <label class="form-label">Verification Code</label>
+                                <input type="text" name="verification_code" class="form-control tb-auth-input" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" required>
+                            </div>
+
+                            <div class="form-footer pt-2">
+                                <button type="submit" class="btn btn-primary w-100 tb-auth-btn">Enable 2FA</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

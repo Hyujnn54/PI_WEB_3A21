@@ -38,7 +38,7 @@
             {% set currentRole = 'admin' %}
         {% endif %}
         <div class="page tb-page-shell">
-            {% if not isAdminPage and routeName != 'app_login' and routeName != 'app_register' and routeName != 'app_forgot_password' and routeName != 'app_forgot_password_verify' %}
+            {% if not isAdminPage and routeName != 'app_login' and routeName != 'app_register' and routeName != 'app_forgot_password' and routeName != 'app_forgot_password_verify' and routeName != '2fa_login' and routeName != 'app_2fa_setup' %}
             <header class="navbar navbar-expand-md navbar-light d-print-none tb-topbar">
                 <div class="container-xl">
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#tbMainNav" aria-controls="tbMainNav" aria-expanded="false" aria-label="Toggle navigation">

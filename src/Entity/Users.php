@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Repository\UsersRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Scheb\TwoFactorBundle\Model\Google\TwoFactorInterface as GoogleTwoFactorInterface;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -17,7 +18,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\DiscriminatorColumn(name: "discr", type: "string")]
 #[ORM\DiscriminatorMap(["admin" => Admin::class, "candidate" => Candidate::class, "recruiter" => Recruiter::class])]
 #[UniqueEntity(fields: ['email'], message: 'This email is already in use.')]
-class Users implements UserInterface, PasswordAuthenticatedUserInterface
+class Users implements UserInterface, PasswordAuthenticatedUserInterface, GoogleTwoFactorInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -82,6 +83,12 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(name: "face_enabled")]
     protected bool $faceEnabled = false;
+
+    #[ORM\Column(name: "google_authenticator_secret", length: 255, nullable: true)]
+    protected ?string $googleAuthenticatorSecret = null;
+
+    #[ORM\Column(name: "google_authenticator_enabled", type: Types::BOOLEAN)]
+    protected bool $googleAuthenticatorEnabled = false;
 
     public function __construct()
     {
@@ -161,6 +168,35 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function isFaceEnabled(): bool { return $this->faceEnabled; }
     public function setFaceEnabled(bool $faceEnabled): self { $this->faceEnabled = $faceEnabled; return $this; }
+
+    public function isGoogleAuthenticatorEnabled(): bool
+    {
+        return $this->googleAuthenticatorEnabled && !empty($this->googleAuthenticatorSecret);
+    }
+
+    public function setGoogleAuthenticatorEnabled(bool $googleAuthenticatorEnabled): self
+    {
+        $this->googleAuthenticatorEnabled = $googleAuthenticatorEnabled;
+
+        return $this;
+    }
+
+    public function getGoogleAuthenticatorUsername(): string
+    {
+        return (string) $this->email;
+    }
+
+    public function getGoogleAuthenticatorSecret(): ?string
+    {
+        return $this->googleAuthenticatorSecret;
+    }
+
+    public function setGoogleAuthenticatorSecret(?string $googleAuthenticatorSecret): self
+    {
+        $this->googleAuthenticatorSecret = $googleAuthenticatorSecret;
+
+        return $this;
+    }
 
     /**
      * @see UserInterface
