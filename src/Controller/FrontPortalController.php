@@ -28,6 +28,7 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Throwable;
 
 #[Route('/offermanagement')]
@@ -41,6 +42,7 @@ class FrontPortalController extends AbstractController
     private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
+    private const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
     public function __construct(
         private readonly ManagerRegistry $doctrine,
@@ -469,6 +471,84 @@ class FrontPortalController extends AbstractController
             'formData' => $formData,
             'fieldErrors' => $fieldErrors,
         ]);
+    }
+
+    #[Route('/front/job-offers/ai-generate', name: 'front_job_offer_ai_generate', methods: ['POST'])]
+    public function generateJobOfferWithAi(Request $request, HttpClientInterface $httpClient): JsonResponse
+    {
+        $role = $this->resolveSessionRole($request);
+        if ($role !== 'recruiter') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Only recruiters can generate AI suggestions.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        $title = trim((string) ($payload['title'] ?? ''));
+        if ($title === '') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Job title is required.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $apiKey = $this->resolveGeminiApiKey();
+        if ($apiKey === '') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'AI service is not configured. Add GEMINI_API_KEY in your environment.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $prompt = "You are an expert HR assistant.\n"
+            . "Based on the following job title, generate a complete and professional job offer.\n\n"
+            . "INPUT:\n"
+            . "Job Title: {$title}\n\n"
+            . "OUTPUT (JSON format only):\n"
+            . "{\n"
+            . "  \"description\": \"Professional and detailed job description (5-8 lines)\",\n"
+            . "  \"required_skills\": [\"skill1\", \"skill2\", \"skill3\", \"skill4\"],\n"
+            . "  \"soft_skills\": [\"skill1\", \"skill2\"],\n"
+            . "  \"experience_level\": \"Junior | Mid | Senior\",\n"
+            . "  \"contract_type\": \"CDI | CDD | Stage | Freelance\",\n"
+            . "  \"suggested_location\": \"City name\",\n"
+            . "  \"keywords\": [\"tag1\", \"tag2\", \"tag3\"]\n"
+            . "}\n\n"
+            . "RULES:\n"
+            . "- Make the description clear and professional\n"
+            . "- Use realistic HR vocabulary\n"
+            . "- Skills must be relevant to the job title\n"
+            . "- Return ONLY valid JSON\n";
+
+        try {
+            $aiResult = $this->requestGeminiGenerateContent($httpClient, $apiKey, $prompt);
+            if (($aiResult['ok'] ?? false) !== true) {
+                return $this->json([
+                    'ok' => false,
+                    'error' => (string) ($aiResult['error'] ?? 'AI service is currently unavailable.'),
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            $rawText = trim((string) ($aiResult['text'] ?? ''));
+            $decoded = $this->decodeAiJsonPayload($rawText);
+            if (!is_array($decoded)) {
+                return $this->json([
+                    'ok' => false,
+                    'error' => 'AI response format is invalid.',
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            return $this->json([
+                'ok' => true,
+                'data' => $this->normalizeAiJobOfferPayload($decoded, $title),
+            ]);
+        } catch (\Throwable) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Failed to generate offer suggestions. Please try again.',
+            ], Response::HTTP_BAD_GATEWAY);
+        }
     }
 
     #[Route('/front/job-offers/{id}/edit', name: 'front_job_offer_edit', requirements: ['id' => '\\d+'], methods: ['GET', 'POST'])]
@@ -2151,6 +2231,200 @@ class FrontPortalController extends AbstractController
         }
 
         return $skills;
+    }
+
+    private function resolveGeminiApiKey(): string
+    {
+        $candidates = [
+            $_ENV['GEMINI_API_KEY'] ?? null,
+            $_SERVER['GEMINI_API_KEY'] ?? null,
+            getenv('GEMINI_API_KEY') ?: null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $value = trim((string) $candidate);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function requestGeminiGenerateContent(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
+    {
+        $lastError = 'AI service is currently unavailable.';
+
+        foreach (self::GEMINI_MODELS as $model) {
+            try {
+                $response = $httpClient->request('POST', 'https://generativelanguage.googleapis.com/v1beta/models/' . $model . ':generateContent', [
+                    'query' => ['key' => $apiKey],
+                    'json' => [
+                        'contents' => [
+                            [
+                                'parts' => [
+                                    ['text' => $prompt],
+                                ],
+                            ],
+                        ],
+                        'generationConfig' => [
+                            'temperature' => 0.4,
+                            'responseMimeType' => 'application/json',
+                        ],
+                    ],
+                    'timeout' => 25,
+                ]);
+
+                $statusCode = $response->getStatusCode();
+                $body = $response->toArray(false);
+
+                if ($statusCode >= 400) {
+                    $lastError = $this->extractGeminiErrorMessage($body, $lastError);
+                    if ($statusCode === 404) {
+                        continue;
+                    }
+
+                    return ['ok' => false, 'error' => $lastError];
+                }
+
+                $text = trim((string) ($body['candidates'][0]['content']['parts'][0]['text'] ?? ''));
+                if ($text === '') {
+                    $lastError = 'AI returned an empty response.';
+                    continue;
+                }
+
+                return ['ok' => true, 'text' => $text, 'model' => $model];
+            } catch (\Throwable) {
+                $lastError = 'Failed to contact AI provider.';
+            }
+        }
+
+        return ['ok' => false, 'error' => $lastError];
+    }
+
+    private function extractGeminiErrorMessage(array $body, string $fallback): string
+    {
+        $message = trim((string) ($body['error']['message'] ?? ''));
+        if ($message === '') {
+            return $fallback;
+        }
+
+        if (mb_strlen($message) > 180) {
+            return mb_substr($message, 0, 180) . '...';
+        }
+
+        return $message;
+    }
+
+    private function decodeAiJsonPayload(string $rawPayload): ?array
+    {
+        $payload = trim($rawPayload);
+        if ($payload === '') {
+            return null;
+        }
+
+        $payload = preg_replace('/^```(?:json)?\s*/i', '', $payload) ?? $payload;
+        $payload = preg_replace('/\s*```$/', '', $payload) ?? $payload;
+        $payload = trim($payload);
+
+        $decoded = json_decode($payload, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        $firstBrace = strpos($payload, '{');
+        $lastBrace = strrpos($payload, '}');
+        if ($firstBrace === false || $lastBrace === false || $lastBrace <= $firstBrace) {
+            return null;
+        }
+
+        $jsonChunk = substr($payload, $firstBrace, $lastBrace - $firstBrace + 1);
+        $decodedChunk = json_decode($jsonChunk, true);
+
+        return is_array($decodedChunk) ? $decodedChunk : null;
+    }
+
+    private function normalizeAiJobOfferPayload(array $payload, string $title): array
+    {
+        $description = trim((string) ($payload['description'] ?? ''));
+        if ($description === '') {
+            $description = 'We are hiring a ' . $title . ' to join our team and deliver high-impact work in a collaborative environment.';
+        }
+
+        if (strlen($description) > 1000) {
+            $description = substr($description, 0, 1000);
+        }
+
+        $requiredSkills = $this->normalizeAiTextList($payload['required_skills'] ?? [], 8);
+        if (count($requiredSkills) === 0) {
+            $requiredSkills = [$title . ' fundamentals'];
+        }
+
+        $experienceLevel = strtolower(trim((string) ($payload['experience_level'] ?? 'mid')));
+        $defaultLevel = 'intermediate';
+        if ($experienceLevel === 'junior') {
+            $defaultLevel = 'beginner';
+        } elseif ($experienceLevel === 'senior') {
+            $defaultLevel = 'advanced';
+        }
+
+        $skills = array_map(static function (string $name) use ($defaultLevel): array {
+            return ['name' => $name, 'level' => $defaultLevel];
+        }, $requiredSkills);
+
+        $contractType = $this->mapAiContractType((string) ($payload['contract_type'] ?? ''));
+        $location = trim((string) ($payload['suggested_location'] ?? ''));
+        if ($location === '') {
+            $location = 'Tunis';
+        }
+
+        return [
+            'title' => $title,
+            'description' => $description,
+            'contract_type' => $contractType,
+            'location' => $location,
+            'skills' => $skills,
+        ];
+    }
+
+    private function normalizeAiTextList(mixed $value, int $maxItems = 8): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($value as $rawItem) {
+            $item = trim((string) $rawItem);
+            if ($item === '') {
+                continue;
+            }
+
+            $items[] = $item;
+            if (count($items) >= $maxItems) {
+                break;
+            }
+        }
+
+        return array_values(array_unique($items));
+    }
+
+    private function mapAiContractType(string $rawContractType): string
+    {
+        $contractType = strtoupper(trim($rawContractType));
+        if ($contractType === '') {
+            return 'CDI';
+        }
+
+        return match ($contractType) {
+            'CDI' => 'CDI',
+            'CDD' => 'CDD',
+            'STAGE', 'INTERNSHIP' => 'Internship',
+            'FREELANCE' => 'Freelance',
+            'PART-TIME', 'PART TIME' => 'Part-time',
+            'REMOTE', 'REMOTE CONTRACT' => 'Remote Contract',
+            default => in_array($rawContractType, self::CONTRACT_TYPES, true) ? $rawContractType : 'CDI',
+        };
     }
 
     private function buildOfferStats(array $offers): array
