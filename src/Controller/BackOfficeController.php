@@ -23,12 +23,22 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/offermanagement')]
 class BackOfficeController extends AbstractController
 {
     private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
+    private const WARNING_TYPES = [
+        'Policy violation',
+        'Incorrect information',
+        'Missing required details',
+        'Deadline issue',
+        'Description trompeuse',
+        'Other',
+    ];
+    private const XAI_MODELS = ['grok-3-mini', 'grok-2-latest', 'grok-beta'];
 
     #[Route('/admin', name: 'back_dashboard')]
     #[Route('/admin', name: 'app_admin')]
@@ -588,6 +598,93 @@ class BackOfficeController extends AbstractController
         }
 
         return $this->redirectToRoute('app_admin_job_offers');
+    }
+
+    #[Route('/admin/job-offers/warning/ai-generate', name: 'app_admin_job_offer_warning_ai_generate', methods: ['POST'])]
+    public function generateWarningMessageWithAi(Request $request, Connection $connection, HttpClientInterface $httpClient): JsonResponse
+    {
+        $currentAdminId = (string) $request->getSession()->get('user_id', '');
+        if ($currentAdminId === '') {
+            return new JsonResponse(['ok' => false, 'error' => 'Admin session is required.'], 403);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        $offerId = trim((string) ($payload['offer_id'] ?? ''));
+        $warningType = trim((string) ($payload['warning_type'] ?? ''));
+
+        if ($offerId === '' || $warningType === '') {
+            return new JsonResponse(['ok' => false, 'error' => 'Offer ID and warning type are required.'], 400);
+        }
+
+        if (!in_array($warningType, self::WARNING_TYPES, true)) {
+            return new JsonResponse(['ok' => false, 'error' => 'Please select a valid warning type.'], 400);
+        }
+
+        $offer = $connection->fetchAssociative(
+            'SELECT id, title, description, location, contract_type FROM job_offer WHERE id = :id LIMIT 1',
+            ['id' => $offerId]
+        );
+        if (!$offer) {
+            return new JsonResponse(['ok' => false, 'error' => 'Job offer not found.'], 404);
+        }
+
+        $skills = $connection->fetchAllAssociative(
+            'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
+            ['offer_id' => $offerId]
+        );
+
+        $skillsList = 'None';
+        if (count($skills) > 0) {
+            $parts = [];
+            foreach ($skills as $skill) {
+                $parts[] = sprintf('%s (%s)', (string) ($skill['skill_name'] ?? '-'), (string) ($skill['level_required'] ?? '-'));
+            }
+            $skillsList = implode(', ', $parts);
+        }
+
+        $prompt = "Tu es un assistant RH senior.\n"
+            . "Rédige un message de warning professionnel, clair et actionnable pour un recruteur.\n"
+            . "Le message doit rester respectueux mais ferme, expliquer le problème, demander des corrections précises,"
+            . " et indiquer qu'une mise à jour est attendue rapidement.\n"
+            . "Retourne uniquement le texte du message (sans markdown, sans puces).\n\n"
+            . "Raison sélectionnée: {$warningType}\n"
+            . "Titre offre: " . (string) ($offer['title'] ?? '') . "\n"
+            . "Location: " . (string) ($offer['location'] ?? '') . "\n"
+            . "Contract type: " . (string) ($offer['contract_type'] ?? '') . "\n"
+            . "Description: " . (string) ($offer['description'] ?? '') . "\n"
+            . "Skills: {$skillsList}\n";
+
+        $apiKey = $this->resolveXaiApiKey();
+        $warningMessage = '';
+        $source = 'fallback';
+
+        if ($apiKey !== '') {
+            $aiResult = $this->requestXaiWarningMessage($httpClient, $apiKey, $prompt);
+            if (($aiResult['ok'] ?? false) === true) {
+                $warningMessage = $this->normalizeWarningMessage((string) ($aiResult['message'] ?? ''));
+                $source = 'ai';
+            }
+        }
+
+        if ($warningMessage === '') {
+            $warningMessage = $this->normalizeWarningMessage(sprintf(
+                'Following the review of your job offer "%s", we identified the following issue: %s. Please update the description and related fields so the content is accurate, complete, and aligned with platform standards. Submit the corrected version for admin review as soon as possible.',
+                (string) ($offer['title'] ?? 'this position'),
+                $warningType
+            ));
+            $source = 'fallback';
+        }
+
+        $validation = Job_offer_warning::validateWarningInput($warningType, $warningMessage);
+        if (($validation['ok'] ?? false) !== true) {
+            $warningMessage = $this->normalizeWarningMessage('Please revise this job offer. The content currently does not meet platform quality and compliance standards. Update the listing with clear, accurate, and complete information, then resubmit for review.');
+        }
+
+        return new JsonResponse([
+            'ok' => true,
+            'message' => $warningMessage,
+            'source' => $source,
+        ]);
     }
 
     #[Route('/admin/job-offers/{id}/reject-changes', name: 'app_admin_reject_job_offer_changes', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -1160,5 +1257,80 @@ SQL;
         }
 
         return null;
+    }
+
+    private function resolveXaiApiKey(): string
+    {
+        $candidates = [
+            $_ENV['XAI_API_KEY'] ?? null,
+            $_SERVER['XAI_API_KEY'] ?? null,
+            getenv('XAI_API_KEY') ?: null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $value = trim((string) $candidate);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function requestXaiWarningMessage(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
+    {
+        foreach (self::XAI_MODELS as $model) {
+            try {
+                $response = $httpClient->request('POST', 'https://api.x.ai/v1/chat/completions', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $apiKey,
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => [
+                        'model' => $model,
+                        'messages' => [
+                            ['role' => 'system', 'content' => 'You write concise, professional HR compliance messages.'],
+                            ['role' => 'user', 'content' => $prompt],
+                        ],
+                        'temperature' => 0.3,
+                    ],
+                    'timeout' => 25,
+                ]);
+
+                if ($response->getStatusCode() >= 400) {
+                    continue;
+                }
+
+                $body = $response->toArray(false);
+                $text = trim((string) ($body['choices'][0]['message']['content'] ?? ''));
+                if ($text === '') {
+                    continue;
+                }
+
+                return ['ok' => true, 'message' => $text, 'model' => $model];
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return ['ok' => false, 'message' => 'xAI generation unavailable'];
+    }
+
+    private function normalizeWarningMessage(string $raw): string
+    {
+        $message = trim($raw);
+        if ($message === '') {
+            return '';
+        }
+
+        $message = preg_replace('/\s+/u', ' ', $message) ?? $message;
+        $message = preg_replace('/[^\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]/u', ' ', $message) ?? $message;
+        $message = trim($message);
+
+        if (mb_strlen($message) > 500) {
+            $message = trim(mb_substr($message, 0, 500));
+        }
+
+        return $message;
     }
 }

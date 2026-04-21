@@ -16,6 +16,7 @@ class Job_offer_warning
         'Incorrect information',
         'Missing required details',
         'Deadline issue',
+        'Description trompeuse',
         'Other',
     ];
 
