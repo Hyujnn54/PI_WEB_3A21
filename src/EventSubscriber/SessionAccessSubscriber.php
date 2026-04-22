@@ -40,6 +40,7 @@ class SessionAccessSubscriber implements EventSubscriberInterface
 
         $publicRoutes = [
             'app_login',
+            'app_login_face',
             'app_register',
             'app_forgot_password',
             'app_forgot_password_verify',

@@ -105,6 +105,38 @@
                             Profile form not ready yet.
                         </div>
                     {% endif %}
+
+                    {% if profileUser is defined %}
+                            <div class="col-12 mt-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h4 class="h5 mb-2">Face Login</h4>
+                                        <p class="text-secondary mb-3">Enable face authentication using Luxand by uploading a clear face photo.</p>
+
+                                        {% if profileUser.faceEnabled %}
+                                            <div class="alert alert-success py-2 mb-3">Face login is enabled for your account.</div>
+                                        {% else %}
+                                            <div class="alert alert-warning py-2 mb-3">Face login is currently disabled.</div>
+                                        {% endif %}
+
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <form method="post" action="{{ path('app_face_enable') }}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('face_enable') }}">
+                                                <input type="file" name="face_photo" accept="image/png,image/jpeg" class="form-control" style="min-width:260px;" required>
+                                                <button type="submit" class="btn btn-outline-primary">Enable / Update Face</button>
+                                            </form>
+
+                                            {% if profileUser.faceEnabled %}
+                                                <form method="post" action="{{ path('app_face_disable') }}">
+                                                    <input type="hidden" name="_token" value="{{ csrf_token('face_disable') }}">
+                                                    <button type="submit" class="btn btn-outline-danger">Disable Face Login</button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

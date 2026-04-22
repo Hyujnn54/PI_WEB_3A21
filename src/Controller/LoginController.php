@@ -71,8 +71,10 @@ class LoginController extends AbstractController
             $entityManager->flush();
 
             try {
+                $fromAddress = (string) ($_ENV['MAIL_FROM_ADDRESS'] ?? 'talentbridge.app@gmail.com');
+
                 $message = (new Email())
-                    ->from('talentbridge.app@gmail.com')
+                    ->from($fromAddress)
                     ->to($emailValue)
                     ->subject('Talent Bridge password recovery code')
                     ->text(

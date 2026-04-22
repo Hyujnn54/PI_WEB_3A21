@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/moham/Downloads/Talent-Bridge-user/Talent-Bridge-user/src/main/java//**)",
+      "Bash(grep -v \"^$\")"
+    ]
+  }
+}

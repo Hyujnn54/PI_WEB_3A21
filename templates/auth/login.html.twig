@@ -51,7 +51,13 @@
                             <div class="form-footer pt-2">
                                 <button type="submit" class="btn btn-primary w-100 tb-auth-btn">Sign In</button>
                             </div>
+
+                            <div class="form-footer pt-2">
+                                <button type="button" id="faceLoginBtn" class="btn btn-outline-primary w-100 tb-auth-btn">Login With Face</button>
+                            </div>
                         </form>
+
+                        <div id="faceLoginError" class="alert alert-danger tb-auth-alert mt-3 d-none" role="alert"></div>
                     </div>
                 </div>
 
@@ -62,5 +68,138 @@
         </div>
     </div>
 </div>
+
+<div id="faceCameraModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;">
+    <div style="width:min(92vw,800px);margin:3rem auto;background:#fff;border-radius:14px;padding:1rem;">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h3 class="h4 mb-0">Face Login</h3>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="closeFaceModal">Close</button>
+        </div>
+        <video id="faceVideo" autoplay playsinline style="width:100%;border-radius:10px;background:#111;"></video>
+        <div class="d-flex gap-2 mt-3">
+            <button type="button" id="captureFaceLogin" class="btn btn-primary">Capture And Login</button>
+            <span class="text-secondary align-self-center" id="faceLoginStatus"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const faceBtn = document.getElementById('faceLoginBtn');
+    const modal = document.getElementById('faceCameraModal');
+    const closeBtn = document.getElementById('closeFaceModal');
+    const captureBtn = document.getElementById('captureFaceLogin');
+    const status = document.getElementById('faceLoginStatus');
+    const video = document.getElementById('faceVideo');
+    const errorBox = document.getElementById('faceLoginError');
+    const endpoint = "{{ path('app_login_face') }}";
+    const csrf = "{{ csrf_token('face_login') }}";
+
+    if (!faceBtn || !modal || !closeBtn || !captureBtn || !video || !status || !errorBox) {
+        return;
+    }
+
+    let mediaStream = null;
+
+    const hideError = () => {
+        errorBox.classList.add('d-none');
+        errorBox.textContent = '';
+    };
+
+    const showError = (message) => {
+        errorBox.textContent = message || 'Face login failed.';
+        errorBox.classList.remove('d-none');
+    };
+
+    const stopCamera = () => {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach((track) => track.stop());
+            mediaStream = null;
+        }
+        video.srcObject = null;
+    };
+
+    const openModal = async () => {
+        hideError();
+        status.textContent = '';
+
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+                audio: false
+            });
+
+            video.srcObject = mediaStream;
+            modal.style.display = 'block';
+        } catch (e) {
+            showError('Camera access denied. Please allow camera permission.');
+        }
+    };
+
+    const closeModal = () => {
+        modal.style.display = 'none';
+        stopCamera();
+    };
+
+    const captureShots = async (count, delayMs) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        const files = [];
+
+        for (let i = 0; i < count; i += 1) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+            if (blob) {
+                files.push(blob);
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+
+        return files;
+    };
+
+    faceBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+
+    captureBtn.addEventListener('click', async () => {
+        hideError();
+        captureBtn.disabled = true;
+        status.textContent = 'Capturing 5 frames...';
+
+        try {
+            const shots = await captureShots(5, 250);
+            if (!shots.length) {
+                throw new Error('No image captured from camera.');
+            }
+
+            const formData = new FormData();
+            formData.append('_token', csrf);
+            shots.forEach((shot, index) => formData.append('shots[]', shot, `shot_${index}.jpg`));
+
+            status.textContent = 'Verifying face...';
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+
+            const payload = await response.json();
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || 'Face login failed.');
+            }
+
+            window.location.href = payload.redirect || "{{ path('app_entry') }}";
+        } catch (e) {
+            showError(e.message || 'Face login failed.');
+            status.textContent = '';
+        } finally {
+            captureBtn.disabled = false;
+        }
+    });
+})();
+</script>
 {% endblock %}
 
