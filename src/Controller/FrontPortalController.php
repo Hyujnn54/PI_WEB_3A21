@@ -14,6 +14,7 @@ use App\Entity\Recruitment_event;
 use App\Form\ProfileType;
 use App\Repository\Job_applicationRepository;
 use App\Repository\UsersRepository;
+use App\Service\JobApplication\ApplicationAiRankingService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
@@ -38,7 +39,10 @@ class FrontPortalController extends AbstractController
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
 
-    public function __construct(private readonly ManagerRegistry $doctrine)
+    public function __construct(
+        private readonly ManagerRegistry $doctrine,
+        private readonly ApplicationAiRankingService $applicationAiRankingService
+    )
     {
     }
 
@@ -586,10 +590,12 @@ class FrontPortalController extends AbstractController
     {
         $role = $this->resolveSessionRole($request);
         $cards = [];
+        $rankingEnabled = false;
         $applicationFilters = [
             'search' => '',
             'status' => 'all',
             'sort' => 'date_desc',
+            'ai_rank' => false,
         ];
 
         if ($role === 'recruiter') {
@@ -600,6 +606,8 @@ class FrontPortalController extends AbstractController
                 $search = trim((string) $request->query->get('search', ''));
                 $status = strtolower(trim((string) $request->query->get('status', 'all')));
                 $sort = strtolower(trim((string) $request->query->get('sort', 'date_desc')));
+                $aiRankFlag = strtolower(trim((string) $request->query->get('ai_rank', '0')));
+                $rankingEnabled = in_array($aiRankFlag, ['1', 'true', 'yes', 'on'], true);
 
                 $allowedStatuses = ['all', 'submitted', 'in_review', 'shortlisted', 'rejected', 'interview', 'hired'];
                 if (!in_array($status, $allowedStatuses, true)) {
@@ -615,12 +623,44 @@ class FrontPortalController extends AbstractController
                     'search' => $search,
                     'status' => $status,
                     'sort' => $sort,
+                    'ai_rank' => $rankingEnabled,
                 ];
 
                 $statusForQuery = $status === 'all' ? 'all' : strtoupper($status);
                 /** @var Job_applicationRepository $applicationRepository */
                 $applicationRepository = $this->doctrine->getRepository(Job_application::class);
                 $applications = $applicationRepository->findForRecruiterListing($recruiter, $search, $statusForQuery, $sort);
+                $rankingsByApplicationId = [];
+
+                if ($rankingEnabled && count($applications) > 0) {
+                    try {
+                        $rankingPayload = $this->applicationAiRankingService->rankApplications($applications);
+                        $rankingsByApplicationId = is_array($rankingPayload['results'] ?? null)
+                            ? $rankingPayload['results']
+                            : [];
+
+                        usort($applications, static function (Job_application $left, Job_application $right) use ($rankingsByApplicationId): int {
+                            $leftScore = (int) ($rankingsByApplicationId[(string) $left->getId()]['score'] ?? -1);
+                            $rightScore = (int) ($rankingsByApplicationId[(string) $right->getId()]['score'] ?? -1);
+
+                            return $rightScore <=> $leftScore;
+                        });
+
+                        $errors = is_array($rankingPayload['errors'] ?? null) ? $rankingPayload['errors'] : [];
+                        if ($errors !== []) {
+                            $this->addFlash('warning', sprintf(
+                                'AI ranking completed with %d fallback case(s). %s',
+                                count($errors),
+                                $errors[0]
+                            ));
+                        }
+                    } catch (Throwable $exception) {
+                        $rankingEnabled = false;
+                        $applicationFilters['ai_rank'] = false;
+                        $rankingsByApplicationId = [];
+                        $this->addFlash('error', 'AI ranking is unavailable right now. ' . $exception->getMessage());
+                    }
+                }
 
                 foreach ($applications as $application) {
                     $offer = $application->getOffer_id();
@@ -654,12 +694,66 @@ class FrontPortalController extends AbstractController
                         'role' => $role
                     ] + $request->query->all());
 
+                    $applicationId = (string) $application->getId();
+                    $ranking = $rankingsByApplicationId[$applicationId] ?? null;
+                    $score = is_array($ranking) && isset($ranking['score']) ? (int) $ranking['score'] : null;
+                    $rationale = is_array($ranking) ? trim((string) ($ranking['rationale'] ?? '')) : '';
+                    $breakdown = is_array($ranking) && is_array($ranking['breakdown'] ?? null) ? $ranking['breakdown'] : [];
+                    $matchedSkills = is_array($ranking) && is_array($ranking['matched_skills'] ?? null)
+                        ? $ranking['matched_skills']
+                        : [];
+                    $missingSkills = is_array($ranking) && is_array($ranking['missing_skills'] ?? null)
+                        ? $ranking['missing_skills']
+                        : [];
+
+                    $detailExtra = [
+                        'Status: ' . (string) $application->getCurrent_status(),
+                        'Offer: ' . ($offer ? (string) $offer->getTitle() : 'Unknown Offer'),
+                        'Candidate: ' . $candidateName,
+                        'Applied At: ' . $application->getApplied_at()->format('d M Y H:i'),
+                        'Phone: ' . (string) $application->getPhone(),
+                    ];
+
+                    if ($score !== null) {
+                        $detailExtra[] = 'AI Score: ' . $score . '/100';
+                        if ($rationale !== '') {
+                            $detailExtra[] = 'AI Rationale: ' . $rationale;
+                        }
+                        $detailExtra[] = sprintf(
+                            'AI Breakdown: Skills %d | Experience %d | Education %d | Cover Letter %d | CV %d',
+                            (int) ($breakdown['skill_match'] ?? 0),
+                            (int) ($breakdown['experience_relevance'] ?? 0),
+                            (int) ($breakdown['education_fit'] ?? 0),
+                            (int) ($breakdown['cover_letter_relevance'] ?? 0),
+                            (int) ($breakdown['cv_relevance'] ?? 0)
+                        );
+
+                        if ($matchedSkills !== []) {
+                            $detailExtra[] = 'Matched Skills: ' . implode(', ', array_slice(array_map('strval', $matchedSkills), 0, 8));
+                        }
+
+                        if ($missingSkills !== []) {
+                            $detailExtra[] = 'Missing Skills: ' . implode(', ', array_slice(array_map('strval', $missingSkills), 0, 8));
+                        }
+
+                        $detailExtra[] = 'Inputs Used: job title, job description, required skills, candidate skills, experience years, education level, cover letter text, cv extracted text';
+                    }
+
+                    $meta = (string) $application->getCurrent_status();
+                    if ($score !== null) {
+                        $meta .= ' | AI ' . $score . '/100';
+                    }
+
                     $cards[] = [
-                        'id' => (string) $application->getId(),
-                        'meta' => (string) $application->getCurrent_status(),
+                        'id' => $applicationId,
+                        'meta' => $meta,
                         'title' => 'Offer: ' . ($offer ? $offer->getTitle() : 'Unknown Offer'),
                         'text' => $candidateName . ' | Applied on ' . $application->getApplied_at()->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
                         'status' => (string) $application->getCurrent_status(),
+                        'detail_extra' => $detailExtra,
+                        'ai_score' => $score,
+                        'ai_rationale' => $rationale,
+                        'ai_breakdown' => $breakdown,
                         // From application-mangement: recruiter details
                         'details_url' => $this->generateUrl('app_recruiter_application_details', ['applicationId' => $application->getId()]),
                         'shortlist_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
@@ -750,6 +844,7 @@ class FrontPortalController extends AbstractController
             'authUser' => ['role' => $role],
             'cards' => $cards,
             'applicationFilters' => $applicationFilters,
+            'aiRankingEnabled' => $rankingEnabled,
         ]);
     }
 

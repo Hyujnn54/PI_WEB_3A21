@@ -46,6 +46,7 @@
                     {% if role == 'recruiter' %}
                         <form method="get" action="{{ path('front_job_applications') }}" class="d-flex flex-wrap align-items-center gap-2">
                             <input type="hidden" name="role" value="recruiter">
+                            <input type="hidden" name="ai_rank" value="{{ filters.ai_rank|default(false) ? '1' : '0' }}">
                             <div class="input-icon">
                                 <span class="input-icon-addon"><i class="ti ti-search"></i></span>
                                 <input type="text" name="search" class="form-control" value="{{ filters.search|default('') }}" placeholder="Search by offer, candidate, phone, status...">
@@ -67,8 +68,12 @@
                                 <option value="status_asc" {{ (filters.sort|default('date_desc')) == 'status_asc' ? 'selected' : '' }}>Status A-Z</option>
                                 <option value="status_desc" {{ (filters.sort|default('date_desc')) == 'status_desc' ? 'selected' : '' }}>Status Z-A</option>
                             </select>
-                            <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Apply</button>
+                            <button type="submit" class="btn btn-primary" onclick="this.form.querySelector('input[name=ai_rank]').value='{{ filters.ai_rank|default(false) ? '1' : '0' }}';"><i class="ti ti-filter me-1"></i>Apply</button>
+                            <button type="submit" class="btn btn-outline-primary" onclick="this.form.querySelector('input[name=ai_rank]').value='1';"><i class="ti ti-robot me-1"></i>Ranking using AI</button>
                             <a href="{{ path('front_job_applications', {role: 'recruiter'}) }}" class="btn btn-outline-secondary"><i class="ti ti-rotate-clockwise-2 me-1"></i>Reset</a>
+                            {% if filters.ai_rank|default(false) %}
+                                <span class="badge bg-purple-lt text-purple">AI ranking enabled</span>
+                            {% endif %}
                             <div class="small text-secondary ms-auto">{{ cards|length }} result(s)</div>
                         </form>
                         <form id="recruiterBulkStatusForm" method="post" action="{{ path('app_recruiter_application_bulk_update_status') }}" class="d-flex flex-wrap align-items-center gap-2 mt-2 pt-2 border-top">
@@ -122,6 +127,16 @@
             <div id="applicationCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     {% set canCreateInterview = card.can_create_interview|default(true) %}
+                    {% set detailExtra = card.detail_extra|default([]) %}
+                    {% if detailExtra is empty %}
+                        {% set detailExtra = ['Status: ' ~ card.meta, card.title] %}
+                    {% endif %}
+                    {% if role == 'admin' %}
+                        {% set detailExtra = detailExtra|merge(['Inspect URL: ' ~ card.details_url|default('#')]) %}
+                    {% endif %}
+                    {% if role == 'recruiter' and not canCreateInterview %}
+                        {% set detailExtra = detailExtra|merge(['Reason: ' ~ card.interview_block_reason|default('Interview already created for this application.')]) %}
+                    {% endif %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
                         <div class="tb-module-card h-100" 
                             data-application-id="{{ card.id|default(0) }}" 
@@ -150,7 +165,7 @@
                             {% if role == 'admin' %}
                                 data-details-url="{{ card.details_url|default('#') }}"
                             {% endif %}
-                            data-detail-extra="Status: {{ card.meta }}||{{ card.title }}{% if role == 'admin' %}||Inspect URL: {{ card.details_url|default('#') }}{% endif %}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already created for this application.') }}{% endif %}">
+                            data-detail-extra="{{ detailExtra|join('||')|e('html_attr') }}">
                             {% if role == 'recruiter' %}
                                 <div class="form-check mb-2" onclick="event.stopPropagation();">
                                     <input
@@ -167,6 +182,11 @@
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
+                            {% if role == 'recruiter' and card.ai_score is not null %}
+                                <div class="mt-2">
+                                    <span class="badge bg-purple text-white">AI {{ card.ai_score }}/100</span>
+                                </div>
+                            {% endif %}
                             {# Recruiter inline buttons for quick actions #}
                             {% if role == 'recruiter' %}
                                 <div class="d-flex flex-wrap gap-2 mt-3">
