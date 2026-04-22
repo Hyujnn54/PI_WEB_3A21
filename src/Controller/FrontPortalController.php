@@ -596,7 +596,7 @@ class FrontPortalController extends AbstractController
         $cards = [];
         $rankingEnabled = false;
         $page = max(1, (int) $request->query->get('page', 1));
-        $perPage = 9;
+        $perPage = 6;
         $pagination = [
             'enabled' => false,
             'current_page' => 1,
