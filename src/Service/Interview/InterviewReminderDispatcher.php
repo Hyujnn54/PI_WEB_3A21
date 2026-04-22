@@ -114,7 +114,7 @@ class InterviewReminderDispatcher
                         $context['placeLabel'],
                         $context['notes'],
                         $context['mapsUrl'],
-                        $context['locationQrCodeDataUri']
+                        $context['locationQrCodeImageUrl']
                     );
 
                     $emailSent = $this->emailSender->send($email, $recipientName, $subject, $emailTextBody, $emailHtmlBody);
@@ -123,11 +123,12 @@ class InterviewReminderDispatcher
                     }
 
                     $smsText = $this->messageBuilder->buildSmsText(
+                        $recipient['role'],
+                        $recipientName,
                         $context['offerTitle'],
                         $context['scheduledAt'],
                         $context['modeLabel'],
-                        $context['placeLabel'],
-                        $context['mapsUrl']
+                        $context['placeLabel']
                     );
 
                     $smsSent = $this->smsSender->send($phone, $smsText);
@@ -192,12 +193,12 @@ class InterviewReminderDispatcher
             $meetingLink = trim((string) $interview->getMeeting_link());
             $location = trim((string) $interview->getLocation());
             $mapsUrl = '';
-            $locationQrCodeDataUri = '';
+            $locationQrCodeImageUrl = '';
 
             if ($mode === 'onsite') {
                 $locationPayload = $this->locationQrCodeService->buildOnsiteLocationPayload($location);
                 $mapsUrl = (string) ($locationPayload['mapsUrl'] ?? '');
-                $locationQrCodeDataUri = (string) ($locationPayload['qrCodeDataUri'] ?? '');
+                $locationQrCodeImageUrl = (string) ($locationPayload['qrCodeImageUrl'] ?? '');
             }
 
             $placeLabel = $mode === 'onsite'
@@ -213,7 +214,7 @@ class InterviewReminderDispatcher
                 'placeLabel' => $placeLabel,
                 'notes' => trim((string) $interview->getNotes()),
                 'mapsUrl' => $mapsUrl,
-                'locationQrCodeDataUri' => $locationQrCodeDataUri,
+                'locationQrCodeImageUrl' => $locationQrCodeImageUrl,
                 'recipients' => [$candidateRecipient, $recruiterRecipient],
             ];
         } catch (Throwable) {
@@ -223,6 +224,10 @@ class InterviewReminderDispatcher
 
     private function resolveUserEntity(object $actor): ?Users
     {
+        if ($actor instanceof Users) {
+            return $actor;
+        }
+
         if (method_exists($actor, 'getId')) {
             $idValue = $actor->getId();
             if ($idValue instanceof Users) {
@@ -245,8 +250,8 @@ class InterviewReminderDispatcher
 
     private function buildRecipient(string $role, ?Users $user, string $fallbackPhone): array
     {
-        $firstName = $user instanceof Users ? trim((string) $user->getFirst_name()) : '';
-        $lastName = $user instanceof Users ? trim((string) $user->getLast_name()) : '';
+        $firstName = $user instanceof Users ? trim((string) $user->getFirstName()) : '';
+        $lastName = $user instanceof Users ? trim((string) $user->getLastName()) : '';
         $fullName = trim($firstName . ' ' . $lastName);
 
         $email = $user instanceof Users ? trim((string) $user->getEmail()) : '';

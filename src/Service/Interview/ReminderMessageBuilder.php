@@ -60,7 +60,7 @@ class ReminderMessageBuilder
         string $placeLabel,
         string $notes,
         string $mapsUrl = '',
-        string $locationQrCodeDataUri = ''
+        string $locationQrCodeImageUrl = ''
     ): string {
         $isOnline = strtoupper($modeLabel) === 'ONLINE';
         $safeName = $this->escapeHtml($recipientName);
@@ -72,9 +72,8 @@ class ReminderMessageBuilder
         $safePlaceLabel = $this->escapeHtml($placeLabel);
         $hasMapsUrl = (bool) filter_var($mapsUrl, FILTER_VALIDATE_URL);
         $safeMapsUrl = $hasMapsUrl ? $this->escapeHtml($mapsUrl) : '';
-        $hasQrCodeDataUri = str_starts_with($locationQrCodeDataUri, 'data:image/')
-            && str_contains($locationQrCodeDataUri, ';base64,');
-        $safeQrCodeDataUri = $hasQrCodeDataUri ? $this->escapeHtml($locationQrCodeDataUri) : '';
+        $hasQrCodeImageUrl = (bool) filter_var($locationQrCodeImageUrl, FILTER_VALIDATE_URL);
+        $safeQrCodeImageUrl = $hasQrCodeImageUrl ? $this->escapeHtml($locationQrCodeImageUrl) : '';
 
         $placeRow = '';
         if ($isOnline) {
@@ -107,11 +106,11 @@ class ReminderMessageBuilder
         }
 
         $qrCodeBlock = '';
-        if (!$isOnline && $safeQrCodeDataUri !== '') {
+        if (!$isOnline && $safeQrCodeImageUrl !== '') {
             $qrCodeBlock = '<tr>'
                 . '<td style="padding: 0 24px 18px 24px;">'
                 . '<div style="font-size:14px;color:#44506a;margin-bottom:10px;"><strong>Quick check-in map</strong><br>Scan this QR code to open the interview location.</div>'
-                . '<img src="' . $safeQrCodeDataUri . '" alt="Interview location QR code" width="180" height="180" style="display:block;border:1px solid #dbe5f5;border-radius:10px;background:#ffffff;padding:8px;">'
+                . '<img src="' . $safeQrCodeImageUrl . '" alt="Interview location QR code" width="180" height="180" style="display:block;border:1px solid #dbe5f5;border-radius:10px;background:#ffffff;padding:8px;">'
                 . '</td>'
                 . '</tr>';
         }
@@ -169,19 +168,33 @@ class ReminderMessageBuilder
             . '</html>';
     }
 
-    public function buildSmsText(string $offerTitle, string $scheduledAt, string $modeLabel, string $placeLabel, string $mapsUrl = ''): string
+    public function buildSmsText(
+        string $recipientRole,
+        string $recipientName,
+        string $offerTitle,
+        string $scheduledAt,
+        string $modeLabel,
+        string $placeLabel
+    ): string
     {
-        $base = sprintf('Reminder: Interview for %s in 24h. %s, %s.', $offerTitle, $scheduledAt, $modeLabel);
+        $normalizedRole = strtolower(trim($recipientRole));
+        $safeName = trim($recipientName);
 
-        if ($modeLabel === 'ONLINE') {
-            return $base . ' Link: ' . $placeLabel;
+        if ($normalizedRole === 'candidate') {
+            $message = 'Hello';
+            if ($safeName !== '') {
+                $message .= ' ' . $safeName;
+            }
+            $message .= ', don\'t forget your interview for ' . $offerTitle . ' on ' . $scheduledAt . '.';
+        } else {
+            $message = 'Reminder: upcoming interview for ' . $offerTitle . ' on ' . $scheduledAt . '.';
         }
 
-        if (filter_var($mapsUrl, FILTER_VALIDATE_URL)) {
-            return $base . ' Location: ' . $placeLabel . ' Map: ' . $mapsUrl;
+        if (strtoupper($modeLabel) === 'ONLINE') {
+            return $message . ' Mode: online. Meeting link: ' . $placeLabel;
         }
 
-        return $base . ' Location: ' . $placeLabel;
+        return $message . ' Mode: onsite. Location: ' . $placeLabel;
     }
 
     private function escapeHtml(string $value): string

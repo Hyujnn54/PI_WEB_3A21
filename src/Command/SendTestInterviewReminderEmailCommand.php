@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Service\Interview\BrevoEmailSender;
+use App\Service\Interview\InterviewLocationQrCodeService;
 use App\Service\Interview\ReminderMessageBuilder;
 use DateTimeImmutable;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -22,6 +23,7 @@ class SendTestInterviewReminderEmailCommand extends Command
     public function __construct(
         private readonly BrevoEmailSender $emailSender,
         private readonly ReminderMessageBuilder $messageBuilder,
+        private readonly InterviewLocationQrCodeService $locationQrCodeService,
     ) {
         parent::__construct();
     }
@@ -82,6 +84,14 @@ class SendTestInterviewReminderEmailCommand extends Command
         $placeLabel = $mode === 'online'
             ? ($meetingLink !== '' ? $meetingLink : 'Meeting link not provided')
             : ($location !== '' ? $location : 'Location not provided');
+        $mapsUrl = '';
+        $locationQrCodeImageUrl = '';
+
+        if ($mode === 'onsite') {
+            $locationPayload = $this->locationQrCodeService->buildOnsiteLocationPayload($placeLabel);
+            $mapsUrl = (string) ($locationPayload['mapsUrl'] ?? '');
+            $locationQrCodeImageUrl = (string) ($locationPayload['qrCodeImageUrl'] ?? '');
+        }
 
         $subject = $this->messageBuilder->buildSubject($offerTitle);
         $textBody = $this->messageBuilder->buildEmailText(
@@ -92,7 +102,8 @@ class SendTestInterviewReminderEmailCommand extends Command
             $durationMinutes,
             $modeLabel,
             $placeLabel,
-            $notes
+            $notes,
+            $mapsUrl
         );
         $htmlBody = $this->messageBuilder->buildEmailHtml(
             $recipientName,
@@ -102,7 +113,9 @@ class SendTestInterviewReminderEmailCommand extends Command
             $durationMinutes,
             $modeLabel,
             $placeLabel,
-            $notes
+            $notes,
+            $mapsUrl,
+            $locationQrCodeImageUrl
         );
 
         if (!$this->emailSender->isEnabled()) {

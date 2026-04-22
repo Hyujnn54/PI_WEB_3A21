@@ -185,10 +185,10 @@
                                     <div class="col-md-6" data-onsite-field>
                                         <label class="form-label">Location (onsite)</label>
                                         <div class="input-group">
-                                            <input type="text" name="location" class="form-control" placeholder="Room / Office location" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
+                                            <input type="text" name="location" class="form-control" placeholder="Google HQ, Restaurant Bla Bla, 1600 Amphitheatre Pkwy..." minlength="3" maxlength="120">
                                             <button type="button" class="btn btn-outline-primary" data-edit-map-picker-trigger>Select on Map</button>
                                         </div>
-                                        <div class="form-hint">Use map picker to save as Place (lat,lng). 3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
+                                        <div class="form-hint">Click Select on Map, choose a place, and we will fill this field with a readable location name for the reminder QR code.</div>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label">Additional Notes</label>
@@ -244,8 +244,13 @@
     </div>
 </div>
 
+{% include 'front/modules/_interview_map_picker.html.twig' %}
 <script>
-    const initInterviewsPage = function () {
+    const ensureMapPickerService = async function () {
+        return window.tbInterviewMapPickerService || null;
+    };
+
+    const initInterviewsPage = async function () {
         const pageRoot = document.querySelector('.tb-interviews-page');
         if (!pageRoot) {
             return;
@@ -257,7 +262,7 @@
         pageRoot.dataset.tbInterviewsInitialized = '1';
 
         const params = new URLSearchParams(window.location.search);
-        const mapPickerService = window.tbInterviewMapPickerService || null;
+        const mapPickerService = await ensureMapPickerService();
         const calendarRoot = document.getElementById('tbInterviewCalendar');
         const dayDetails = document.getElementById('tbCalendarDayDetails');
         const calendarModalEl = document.getElementById('interviewCalendarModal');
@@ -654,10 +659,11 @@
 
             if (locationInput) {
                 locationInput.addEventListener('input', function () {
-                    if (!locationInput.value || locationInput.checkValidity()) {
+                    const value = locationInput.value.trim();
+                    if (value === '' || (value.length >= 3 && value.length <= 120 && !/[<>]/.test(value))) {
                         locationInput.setCustomValidity('');
                     } else {
-                        locationInput.setCustomValidity('Use 3-120 chars: letters, numbers and , . / # ( ) - only.');
+                        locationInput.setCustomValidity('Use 3-120 visible characters and avoid angle brackets.');
                     }
                 });
             }

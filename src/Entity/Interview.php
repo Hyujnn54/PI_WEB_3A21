@@ -11,7 +11,7 @@ use App\Entity\Interview_feedback;
 #[ORM\Entity]
 class Interview
 {
-    private const LOCATION_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,120}$/u';
+    private const LOCATION_REGEX = '/^(?=.{3,120}$)[^\p{Cc}\p{Cf}<>]+$/u';
     private const NOTES_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{0,1000}$/u';
 
 
@@ -240,7 +240,7 @@ class Interview
         }
 
         if ($mode === 'onsite' && !self::isValidLocation($location)) {
-            return ['ok' => false, 'error' => 'Location can contain letters, numbers and common punctuation (3-120 chars).'];
+            return ['ok' => false, 'error' => 'Location must be 3-120 characters and cannot contain angle brackets or hidden control characters.'];
         }
 
         if (!self::isValidNotes($notes)) {

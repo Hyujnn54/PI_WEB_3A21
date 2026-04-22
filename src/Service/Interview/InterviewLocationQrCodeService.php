@@ -4,12 +4,14 @@ namespace App\Service\Interview;
 
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\ErrorCorrectionLevel;
+use Endroid\QrCode\Writer\SvgWriter;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
 class InterviewLocationQrCodeService
 {
     private const MAPS_BASE_URL = 'https://www.google.com/maps/search/?api=1&query=';
+    private const EMAIL_QR_IMAGE_BASE_URL = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&format=png&data=';
     private const COORDINATE_PATTERN = '/\((-?\d{1,3}(?:\.\d+)?),\s*(-?\d{1,3}(?:\.\d+)?)\)\s*$/';
 
     public function __construct(private readonly LoggerInterface $logger)
@@ -23,13 +25,16 @@ class InterviewLocationQrCodeService
             return [
                 'mapsUrl' => '',
                 'qrCodeDataUri' => '',
+                'qrCodeImageUrl' => '',
             ];
         }
 
         $mapsUrl = $this->buildMapsUrl($normalizedLocation);
+        $qrCodeImageUrl = $this->buildEmailQrImageUrl($mapsUrl);
 
         try {
             $result = (new Builder())->build(
+                writer: new SvgWriter(),
                 data: $mapsUrl,
                 size: 280,
                 margin: 10,
@@ -39,6 +44,7 @@ class InterviewLocationQrCodeService
             return [
                 'mapsUrl' => $mapsUrl,
                 'qrCodeDataUri' => $result->getDataUri(),
+                'qrCodeImageUrl' => $qrCodeImageUrl,
             ];
         } catch (Throwable $exception) {
             $this->logger->warning('Failed to generate interview location QR code.', [
@@ -49,6 +55,7 @@ class InterviewLocationQrCodeService
             return [
                 'mapsUrl' => $mapsUrl,
                 'qrCodeDataUri' => '',
+                'qrCodeImageUrl' => $qrCodeImageUrl,
             ];
         }
     }
@@ -68,5 +75,14 @@ class InterviewLocationQrCodeService
         }
 
         return self::MAPS_BASE_URL . rawurlencode($normalizedLocation);
+    }
+
+    private function buildEmailQrImageUrl(string $mapsUrl): string
+    {
+        if (!(bool) filter_var($mapsUrl, FILTER_VALIDATE_URL)) {
+            return '';
+        }
+
+        return self::EMAIL_QR_IMAGE_BASE_URL . rawurlencode($mapsUrl);
     }
 }
