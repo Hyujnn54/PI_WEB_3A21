@@ -11,7 +11,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class ApplicationAiRankingService
 {
-    private const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+    private const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+    private const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+    private const OPENROUTER_MAX_TOKENS = 700;
+    private const GROQ_MAX_TOKENS = 320;
 
     private const WEIGHTS = [
         'skill_match' => 0.50,
@@ -107,46 +110,159 @@ class ApplicationAiRankingService
      */
     private function callModel(array $context): string
     {
-        $apiKey = trim($this->openRouterApiKey);
-        if ($apiKey === '') {
-            throw new \RuntimeException('OPENROUTER_API_KEY is missing. Configure it in .env.local.');
+        $prompt = $this->buildPrompt($context);
+        $systemInstruction = 'You are an objective recruiter assistant. Always return valid JSON only. No markdown, no prose around JSON.';
+        $providerErrors = [];
+
+        $openRouterKey = trim($this->openRouterApiKey);
+        if ($openRouterKey !== '') {
+            try {
+                return $this->callProvider(
+                    'OpenRouter',
+                    self::OPENROUTER_ENDPOINT,
+                    $openRouterKey,
+                    trim($this->openRouterModel),
+                    $systemInstruction,
+                    $prompt,
+                    self::OPENROUTER_MAX_TOKENS,
+                    1
+                );
+            } catch (\Throwable $exception) {
+                $providerErrors[] = 'OpenRouter failed: ' . $exception->getMessage();
+            }
+        } else {
+            $providerErrors[] = 'OpenRouter skipped: OPENROUTER_API_KEY is missing.';
         }
 
-        $response = $this->httpClient->request('POST', self::ENDPOINT, [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type' => 'application/json',
-            ],
-            'json' => [
-                'model' => $this->model,
-                'temperature' => 0.1,
-                'max_tokens' => 700,
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'You are an objective recruiter assistant. Always return valid JSON only. No markdown, no prose around JSON.',
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => $this->buildPrompt($context),
+        $groqKey = trim($this->groqApiKey);
+        if ($groqKey !== '') {
+            try {
+                $groqPrompt = $this->buildPrompt($this->reduceContextForGroq($context));
+
+                return $this->callProvider(
+                    'Groq',
+                    self::GROQ_ENDPOINT,
+                    $groqKey,
+                    trim($this->groqModel),
+                    $systemInstruction,
+                    $groqPrompt,
+                    self::GROQ_MAX_TOKENS,
+                    3
+                );
+            } catch (\Throwable $exception) {
+                $providerErrors[] = 'Groq failed: ' . $exception->getMessage();
+            }
+        } else {
+            $providerErrors[] = 'Groq skipped: GROQ_API_KEY is missing.';
+        }
+
+        throw new \RuntimeException(implode(' ', $providerErrors));
+    }
+
+    private function callProvider(
+        string $providerName,
+        string $endpoint,
+        string $apiKey,
+        string $model,
+        string $systemInstruction,
+        string $prompt,
+        int $maxTokens,
+        int $maxAttempts
+    ): string {
+        if ($model === '') {
+            throw new \RuntimeException($providerName . ' model is missing.');
+        }
+
+        $attempt = 0;
+        $lastError = $providerName . ' request failed for an unknown reason.';
+
+        while ($attempt < $maxAttempts) {
+            $attempt++;
+
+            $response = $this->httpClient->request('POST', $endpoint, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => [
+                    'model' => $model,
+                    'temperature' => 0.1,
+                    'max_tokens' => $maxTokens,
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => $systemInstruction,
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => $prompt,
+                        ],
                     ],
                 ],
-            ],
-            'timeout' => 45,
-        ]);
+                'timeout' => 45,
+            ]);
 
-        $payload = $response->toArray(false);
-        $errorMessage = trim((string) ($payload['error']['message'] ?? ''));
-        if ($errorMessage !== '') {
-            throw new \RuntimeException('OpenRouter API error: ' . $errorMessage);
+            $payload = $response->toArray(false);
+            $statusCode = $response->getStatusCode();
+            $errorMessage = trim((string) ($payload['error']['message'] ?? ''));
+
+            if ($errorMessage === '') {
+                $content = trim((string) ($payload['choices'][0]['message']['content'] ?? ''));
+                if ($content !== '') {
+                    return $content;
+                }
+
+                $errorMessage = $providerName . ' returned an empty completion.';
+            }
+
+            $lastError = $providerName . ' API error: ' . $errorMessage;
+
+            if ($attempt < $maxAttempts && $this->isRateLimitError($statusCode, $errorMessage)) {
+                $waitSeconds = $this->extractRetryAfterSeconds($errorMessage);
+                usleep((int) round($waitSeconds * 1_000_000));
+                continue;
+            }
+
+            throw new \RuntimeException($lastError);
         }
 
-        $content = trim((string) ($payload['choices'][0]['message']['content'] ?? ''));
-        if ($content === '') {
-            throw new \RuntimeException('OpenRouter returned an empty completion.');
+        throw new \RuntimeException($lastError);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     *
+     * @return array<string, mixed>
+     */
+    private function reduceContextForGroq(array $context): array
+    {
+        $reduced = $context;
+        $reduced['job_description'] = $this->limit((string) ($context['job_description'] ?? ''), 1400);
+        $reduced['cover_letter'] = $this->limit((string) ($context['cover_letter'] ?? ''), 1200);
+        $reduced['cv_text'] = $this->limit((string) ($context['cv_text'] ?? ''), 1300);
+
+        return $reduced;
+    }
+
+    private function isRateLimitError(int $statusCode, string $errorMessage): bool
+    {
+        if ($statusCode === 429) {
+            return true;
         }
 
-        return $content;
+        return preg_match('/rate\s*limit|tokens\s*per\s*minute|try\s*again\s*in/i', $errorMessage) === 1;
+    }
+
+    private function extractRetryAfterSeconds(string $errorMessage): float
+    {
+        if (preg_match('/try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s/i', $errorMessage, $matches) === 1) {
+            $seconds = (float) ($matches[1] ?? 0.0);
+            if ($seconds > 0) {
+                return min(max($seconds, 1.0), 12.0);
+            }
+        }
+
+        return 2.0;
     }
 
     /**
@@ -659,8 +775,12 @@ class ApplicationAiRankingService
         private readonly string $projectDir,
         #[Autowire('%env(string:OPENROUTER_API_KEY)%')]
         private readonly string $openRouterApiKey,
+        #[Autowire('%env(string:GROQ_API_KEY)%')]
+        private readonly string $groqApiKey,
         #[Autowire('%env(string:OPENROUTER_RANKING_MODEL)%')]
-        private readonly string $model
+        private readonly string $openRouterModel,
+        #[Autowire('%env(string:GROQ_RANKING_MODEL)%')]
+        private readonly string $groqModel
     ) {
     }
 }
