@@ -135,7 +135,7 @@
                                             </form>
                                         </div>
                                         <div class="d-flex flex-column align-items-end gap-2">
-                                            <div class="small text-muted">{{ entry.changed_at|date('d M Y H:i') }}</div>
+                                            <div class="small text-muted">{{ entry.changed_at|date('d M Y H:i') }} ({{ entry.changed_at|time_diff }})</div>
                                             <form method="post" action="{{ path('management_job_applications_history_delete', {'applicationId': application.id, 'historyId': entry.id}) }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                             </form>

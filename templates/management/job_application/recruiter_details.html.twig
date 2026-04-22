@@ -155,7 +155,7 @@
                                                         <div class="small text-muted mt-1">Not editable (auto-generated or created by another user)</div>
                                                     {% endif %}
                                                 </div>
-                                                <div class="small text-secondary">{{ entry.changed_at|date('d M Y H:i') }}</div>
+                                                <div class="small text-secondary">{{ entry.changed_at|date('d M Y H:i') }} ({{ entry.changed_at|time_diff }})</div>
                                             </div>
                                         </div>
                                     {% endfor %}

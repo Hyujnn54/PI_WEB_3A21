@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Gedmo\Mapping\Annotation as Gedmo;
 use Symfony\Component\Validator\Constraints as Assert;
 
 use App\Entity\Users;
@@ -32,6 +33,7 @@ class Application_status_history
     private string $status;
 
     #[ORM\Column(type: "datetime")]
+        #[Gedmo\Timestampable(on: "create")]
         #[Assert\NotNull(message: 'Change date is required.')]
         #[Assert\Type(type: \DateTimeInterface::class, message: 'Invalid change date.')]
     private \DateTimeInterface $changed_at;
