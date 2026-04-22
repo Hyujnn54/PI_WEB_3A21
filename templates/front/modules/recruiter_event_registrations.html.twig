@@ -18,19 +18,52 @@
     </div>
     <div class="page-body">
         <div class="container-xl">
+            {% if role == 'recruiter' and urgentNotifications is defined and urgentNotifications is not empty %}
+                <div class="alert alert-danger mb-4" role="alert">
+                    <div class="d-flex align-items-start gap-2">
+                        <i class="ti ti-alert-triangle fs-3"></i>
+                        <div>
+                            <h4 class="alert-title mb-2">Urgent Pending Event Decisions</h4>
+                            <div class="small">Some events are approaching and still have candidate registrations waiting for your action.</div>
+                            <ul class="mb-0 mt-2 ps-3">
+                                {% for item in urgentNotifications %}
+                                    <li>
+                                        <strong>{{ item.title }}</strong>
+                                        : {{ item.pending_count }} pending {{ item.pending_count > 1 ? 'registrations' : 'registration' }} | starts {{ item.event_date|time_diff }} ({{ item.event_date|date('d M Y H:i') }})
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
             {% if events is not empty %}
                 {% for event in events %}
-                    <div class="card mb-4">
-                        <div class="card-header bg-light">
+                    <div class="card mb-4 {{ role == 'recruiter' and event.is_urgent ? 'border-danger shadow-sm' : '' }}">
+                        <div class="card-header {{ role == 'recruiter' and event.is_urgent ? 'bg-danger-lt' : 'bg-light' }}">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     <h4 class="card-title mb-1">{{ event.title }}</h4>
                                     <p class="text-muted mb-0">{{ event.meta }}</p>
                                 </div>
-                                <span class="badge bg-light text-dark border">{{ event.event_type }}</span>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <span class="badge bg-light text-dark border">{{ event.event_type }}</span>
+                                    {% if role == 'recruiter' and event.is_urgent %}
+                                        <span class="badge bg-danger">Urgent</span>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                         <div class="card-body">
+                            {% if role == 'recruiter' and event.is_urgent %}
+                                <div class="alert alert-danger mb-3 py-2" role="alert">
+                                    <i class="ti ti-bell-ringing me-2"></i>
+                                    This event starts <strong>{{ event.date|time_diff }}</strong> and still has
+                                    <strong>{{ event.pending_actions_count }}</strong> pending {{ event.pending_actions_count > 1 ? 'registrations' : 'registration' }} to review.
+                                </div>
+                            {% endif %}
+
                             <div class="row mb-3">
                                 <div class="col-md-3">
                                     <dl class="small">
@@ -48,6 +81,10 @@
                                     <div class="alert alert-info mb-0">
                                         <i class="ti ti-users me-2"></i>
                                         <strong>Registered Candidates:</strong> {{ event.registration_count }} / {{ event.capacity }}
+                                        {% if role == 'recruiter' %}
+                                            <br>
+                                            <strong>Pending Actions:</strong> {{ event.pending_actions_count }}
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -104,6 +141,12 @@
                         </div>
                     </div>
                 {% endfor %}
+
+                {% if eventsPagination is defined and eventsPagination.getPageCount() > 1 %}
+                    <div class="d-flex justify-content-center mt-4">
+                        {{ knp_pagination_render(eventsPagination) }}
+                    </div>
+                {% endif %}
             {% else %}
                 <div class="card">
                     <div class="card-body text-center text-secondary">

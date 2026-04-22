@@ -5,10 +5,17 @@ namespace App\Controller;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+<<<<<<< Updated upstream
 use Symfony\Component\Routing\Attribute\Route;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\Recruitment_event;
 use App\Entity\Recruiter;
+=======
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
+>>>>>>> Stashed changes
 
 class BackOfficeController extends AbstractController
 {
@@ -36,9 +43,10 @@ class BackOfficeController extends AbstractController
     }
 
     #[Route('/recruiter/create-event', name: 'recruiter_create_event', methods: ['GET', 'POST'])]
-    public function createEvent(Request $request, EntityManagerInterface $entityManager): Response
+    public function createEvent(Request $request, EntityManagerInterface $entityManager, ValidatorInterface $validator): Response
     {
         $errors = [];
+<<<<<<< Updated upstream
         
         if ($request->isMethod('POST')) {
             // Collect and validate input
@@ -87,10 +95,47 @@ class BackOfficeController extends AbstractController
                         $errors['event_date'] = 'Event date must be in the future.';
                     }
                 } catch (\Exception $e) {
+=======
+        $formData = [
+            'title' => '',
+            'description' => '',
+            'event_type' => '',
+            'location' => '',
+            'event_date' => '',
+            'capacity' => '50',
+            'meet_link' => '',
+        ];
+
+        if ($request->isMethod('POST')) {
+            $formData = [
+                'title' => trim((string) $request->request->get('title', '')),
+                'description' => trim((string) $request->request->get('description', '')),
+                'event_type' => trim((string) $request->request->get('event_type', '')),
+                'location' => trim((string) $request->request->get('location', '')),
+                'event_date' => (string) $request->request->get('event_date', ''),
+                'capacity' => trim((string) $request->request->get('capacity', '')),
+                'meet_link' => trim((string) $request->request->get('meet_link', '')),
+            ];
+
+            $event = new Recruitment_event();
+            $event->setRecruiter_id($currentRecruiter);
+            $event->setTitle($formData['title']);
+            $event->setDescription($formData['description']);
+            $event->setEvent_type($formData['event_type']);
+            $event->setLocation($formData['location']);
+            $event->setMeet_link($formData['meet_link']);
+            $event->setCreated_at(new \DateTime());
+
+            if ($formData['event_date'] !== '') {
+                try {
+                    $event->setEvent_date(new \DateTime($formData['event_date']));
+                } catch (\Exception) {
+>>>>>>> Stashed changes
                     $errors['event_date'] = 'Invalid date format.';
                 }
             }
 
+<<<<<<< Updated upstream
             if (empty($capacity)) {
                 $errors['capacity'] = 'Capacity is required.';
             } else {
@@ -126,6 +171,20 @@ class BackOfficeController extends AbstractController
                 $event->setMeet_link($meetLink);
                 $event->setCreated_at(new \DateTime());
 
+=======
+            if ($formData['capacity'] !== '' && ctype_digit($formData['capacity'])) {
+                $event->setCapacity((int) $formData['capacity']);
+            }
+
+            foreach ($validator->validate($event) as $violation) {
+                $field = (string) $violation->getPropertyPath();
+                if (!isset($errors[$field])) {
+                    $errors[$field] = (string) $violation->getMessage();
+                }
+            }
+
+            if ($errors === []) {
+>>>>>>> Stashed changes
                 $entityManager->persist($event);
                 $entityManager->flush();
 
@@ -137,7 +196,188 @@ class BackOfficeController extends AbstractController
         return $this->render('back/create_event.html.twig', [
             'authUser' => ['role' => 'recruiter'],
             'errors' => $errors,
+<<<<<<< Updated upstream
+=======
+            'isEdit' => false,
+            'formData' => $formData,
+>>>>>>> Stashed changes
         ]);
+    }
+
+    #[Route('/recruiter/events/generate-description', name: 'recruiter_generate_event_description', methods: ['POST'])]
+    public function generateEventDescription(Request $request, EntityManagerInterface $entityManager, HttpClientInterface $httpClient): JsonResponse
+    {
+        $currentRecruiter = $this->resolveCurrentRecruiter($request, $entityManager);
+        if (!$currentRecruiter instanceof Recruiter) {
+            return $this->json([
+                'error' => 'No recruiter account is linked to your current session.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        if (!is_array($payload)) {
+            return $this->json([
+                'error' => 'Invalid request payload.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $title = trim((string) ($payload['title'] ?? ''));
+        $eventType = trim((string) ($payload['event_type'] ?? ''));
+        $location = trim((string) ($payload['location'] ?? ''));
+        $eventDate = trim((string) ($payload['event_date'] ?? ''));
+        $capacity = trim((string) ($payload['capacity'] ?? ''));
+
+        if ($title === '' || $eventType === '' || $location === '' || $eventDate === '') {
+            return $this->json([
+                'error' => 'Please provide title, event type, location, and event date before generating.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $explicitAiApiKey = trim((string) ($_ENV['AI_API_KEY'] ?? $_SERVER['AI_API_KEY'] ?? ''));
+        $apiKey = trim((string) (
+            $explicitAiApiKey
+            ?: ($_ENV['OPENAI_API_KEY'] ?? $_SERVER['OPENAI_API_KEY'] ?? '')
+        ));
+
+        $apiUrl = trim((string) (
+            $_ENV['AI_CHAT_COMPLETIONS_URL']
+            ?? $_SERVER['AI_CHAT_COMPLETIONS_URL']
+            ?? ''
+        ));
+
+        if ($apiUrl === '') {
+            // If a generic AI key is provided, default to OpenRouter's OpenAI-compatible endpoint.
+            $hasGenericAiKey = trim((string) ($_ENV['AI_API_KEY'] ?? $_SERVER['AI_API_KEY'] ?? '')) !== '';
+            $apiUrl = $hasGenericAiKey
+                ? 'https://openrouter.ai/api/v1/chat/completions'
+                : 'https://api.openai.com/v1/chat/completions';
+        }
+
+        if (trim((string) ($_ENV['AI_CHAT_COMPLETIONS_URL'] ?? $_SERVER['AI_CHAT_COMPLETIONS_URL'] ?? '')) !== '' && $explicitAiApiKey === '') {
+            return $this->json([
+                'error' => 'AI_CHAT_COMPLETIONS_URL is set, so AI_API_KEY must also be set for that provider.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $model = trim((string) (
+            $_ENV['AI_MODEL']
+            ?? $_SERVER['AI_MODEL']
+            ?? $_ENV['OPENAI_MODEL']
+            ?? $_SERVER['OPENAI_MODEL']
+            ?? ''
+        ));
+
+        if ($model === '') {
+            // Reliable default for OpenRouter that auto-selects available providers/models.
+            $model = str_contains($apiUrl, 'openrouter.ai')
+                ? 'openrouter/auto'
+                : 'gpt-4o-mini';
+        }
+
+        if ($apiKey === '') {
+            return $this->json([
+                'error' => 'AI_API_KEY (or OPENAI_API_KEY) is not configured on the server.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $userPrompt = sprintf(
+            "Generate a professional recruitment event description in plain text (90-140 words).\\nTitle: %s\\nEvent type: %s\\nLocation: %s\\nDate: %s\\nCapacity: %s\\n\\nRules:\\n- Keep it concise and attractive for candidates.\\n- Mention benefits and expected outcomes.\\n- No markdown, no emojis, no bullet points.",
+            $title,
+            $eventType,
+            $location,
+            $eventDate,
+            $capacity !== '' ? $capacity : 'Not specified'
+        );
+
+        try {
+            $headers = [
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json',
+            ];
+
+            if (str_contains($apiUrl, 'openrouter.ai')) {
+                $headers['HTTP-Referer'] = $request->getSchemeAndHttpHost();
+                $headers['X-Title'] = 'Talent Bridge Event Description Generator';
+            }
+
+            $requestCompletion = static function (HttpClientInterface $client, string $url, array $headersPayload, string $modelName, string $prompt) {
+                return $client->request('POST', $url, [
+                    'headers' => $headersPayload,
+                    'json' => [
+                        'model' => $modelName,
+                        'messages' => [
+                            [
+                                'role' => 'system',
+                                'content' => 'You are a recruitment copywriter for event pages.',
+                            ],
+                            [
+                                'role' => 'user',
+                                'content' => $prompt,
+                            ],
+                        ],
+                        'temperature' => 0.7,
+                    ],
+                    'timeout' => 20,
+                ]);
+            };
+
+            $apiResponse = $requestCompletion($httpClient, $apiUrl, $headers, $model, $userPrompt);
+
+            $statusCode = $apiResponse->getStatusCode();
+            $result = $apiResponse->toArray(false);
+
+            $apiError = trim((string) ($result['error']['message'] ?? ''));
+            $shouldRetryWithAuto = $statusCode >= 400
+                && str_contains($apiUrl, 'openrouter.ai')
+                && stripos($apiError, 'no endpoints found') !== false
+                && strtolower($model) !== 'openrouter/auto';
+
+            if ($shouldRetryWithAuto) {
+                $apiResponse = $requestCompletion($httpClient, $apiUrl, $headers, 'openrouter/auto', $userPrompt);
+                $statusCode = $apiResponse->getStatusCode();
+                $result = $apiResponse->toArray(false);
+                $apiError = trim((string) ($result['error']['message'] ?? ''));
+            }
+
+            if ($statusCode >= 400) {
+                if ($apiError === '') {
+                    $apiError = 'AI provider request failed with status ' . $statusCode . '.';
+                }
+
+                return $this->json([
+                    'error' => $apiError,
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            $rawContent = $result['choices'][0]['message']['content'] ?? '';
+            $description = '';
+
+            if (is_string($rawContent)) {
+                $description = trim($rawContent);
+            } elseif (is_array($rawContent)) {
+                $parts = [];
+                foreach ($rawContent as $part) {
+                    if (is_array($part) && ($part['type'] ?? '') === 'text') {
+                        $parts[] = trim((string) ($part['text'] ?? ''));
+                    }
+                }
+                $description = trim(implode("\n", array_filter($parts, static fn (string $value): bool => $value !== '')));
+            }
+
+            if ($description === '') {
+                return $this->json([
+                    'error' => 'The AI service returned no usable text. Please try again.',
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            return $this->json([
+                'description' => $description,
+            ]);
+        } catch (\Throwable) {
+            return $this->json([
+                'error' => 'Unable to generate description right now. Please try again in a moment.',
+            ], Response::HTTP_BAD_GATEWAY);
+        }
     }
 
     #[Route('/recruiter/delete-event/{id}', name: 'recruiter_delete_event', methods: ['POST'])]

@@ -98,12 +98,10 @@
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
         <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
         <script>
-            document.querySelectorAll('.tb-filter-form').forEach(function (filterForm) {
-                const targetSelector = filterForm.getAttribute('data-target');
-                if (!targetSelector) {
-                    return;
-                }
+            const initPortalInteractions = function (scope) {
+                const root = scope || document;
 
+<<<<<<< Updated upstream
                 const grid = document.querySelector(targetSelector);
                 if (!grid) {
                     return;
@@ -188,52 +186,73 @@
 
                     if (resultLabel) {
                         resultLabel.textContent = visibleCount + ' result(s)';
+=======
+                root.querySelectorAll('.tb-filter-form').forEach(function (filterForm) {
+                    if (filterForm.dataset.tbFilterBound === '1') {
+                        return;
+>>>>>>> Stashed changes
                     }
-                };
+                    filterForm.dataset.tbFilterBound = '1';
 
-                if (searchInput) {
-                    searchInput.addEventListener('input', runFilters);
-                }
-                if (sortSelect) {
-                    sortSelect.addEventListener('change', runFilters);
-                }
-                if (criteriaSelect) {
-                    criteriaSelect.addEventListener('change', runFilters);
-                }
-
-                runFilters();
-            });
-
-            document.querySelectorAll('.tb-detail-close').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    const panel = btn.closest('.tb-detail-panel');
-                    if (!panel) return;
-                    panel.classList.add('d-none');
-                    panel.classList.remove('is-open');
-                    document.querySelectorAll('.tb-module-card.is-selected').forEach(function (selectedCard) {
-                        selectedCard.classList.remove('is-selected');
-                    });
-                });
-            });
-
-            document.querySelectorAll('.tb-module-card').forEach(function (card) {
-                card.addEventListener('click', function (event) {
-                    if (event.target.closest('a,button,input,select,textarea,form')) {
+                    const targetSelector = filterForm.getAttribute('data-target');
+                    if (!targetSelector) {
                         return;
                     }
 
-                    document.querySelectorAll('.tb-module-card.is-selected').forEach(function (selectedCard) {
-                        selectedCard.classList.remove('is-selected');
-                    });
-                    card.classList.add('is-selected');
+                    const grid = document.querySelector(targetSelector);
+                    if (!grid) {
+                        return;
+                    }
 
-                    const detailTarget = card.getAttribute('data-detail-target');
-                    if (detailTarget) {
-                        document.querySelectorAll('.tb-detail-panel').forEach(function (p) {
-                            p.classList.add('d-none');
-                            p.classList.remove('is-open');
+                    const searchInput = filterForm.querySelector('[data-filter-search]');
+                    const criteriaSelect = filterForm.querySelector('[data-filter-criteria]');
+                    const sortSelect = filterForm.querySelector('[data-filter-sort]');
+                    const resultLabel = filterForm.querySelector('[data-filter-results]');
+                    const items = Array.from(grid.querySelectorAll('.tb-filter-item'));
+
+                    items.forEach(function (item, index) {
+                        item.dataset.originalIndex = String(index);
+                    });
+
+                    const runFilters = function () {
+                        const query = ((searchInput && searchInput.value) || '').trim().toLowerCase();
+                        const criteria = (criteriaSelect && criteriaSelect.value) || 'all';
+                        const sortMode = (sortSelect && sortSelect.value) || 'default';
+                        const fieldCriteria = ['title', 'meta', 'description', 'location', 'contract_type', 'status', 'type'];
+                        const isTypeFilter = criteria !== 'all' && !fieldCriteria.includes(criteria);
+
+                        let visibleCount = 0;
+                        items.forEach(function (item) {
+                            const haystack = (item.dataset.filterText || '').toLowerCase();
+                            const textMatches = query === '' || haystack.includes(query);
+
+                            let criteriaMatches = true;
+                            if (isTypeFilter) {
+                                criteriaMatches = (item.dataset.filterType || '').toLowerCase() === criteria;
+                            } else if (criteria === 'title') {
+                                criteriaMatches = (item.dataset.filterTitle || '').toLowerCase().includes(query);
+                            } else if (criteria === 'meta') {
+                                criteriaMatches = (item.dataset.filterMeta || '').toLowerCase().includes(query);
+                            } else if (criteria === 'description') {
+                                criteriaMatches = (item.dataset.filterDescription || '').toLowerCase().includes(query);
+                            } else if (criteria === 'type') {
+                                criteriaMatches = (item.dataset.filterType || '').toLowerCase().includes(query);
+                            } else if (criteria === 'location') {
+                                criteriaMatches = (item.dataset.filterLocation || '').toLowerCase().includes(query);
+                            } else if (criteria === 'contract_type') {
+                                criteriaMatches = (item.dataset.filterContractType || '').toLowerCase().includes(query);
+                            } else if (criteria === 'status') {
+                                criteriaMatches = (item.dataset.filterStatus || '').toLowerCase().includes(query);
+                            }
+
+                            const isMatch = textMatches && criteriaMatches;
+                            item.classList.toggle('d-none', !isMatch);
+                            if (isMatch) {
+                                visibleCount += 1;
+                            }
                         });
 
+<<<<<<< Updated upstream
                         const panel = document.querySelector(detailTarget);
                         if (panel) {
                             const meta = panel.querySelector('.tb-detail-meta');
@@ -267,51 +286,38 @@
                                     }
                                     extra.appendChild(item);
                                 });
+=======
+                        const sorted = items.slice().sort(function (a, b) {
+                            if (sortMode === 'title_asc') {
+                                return (a.dataset.sortTitle || '').localeCompare((b.dataset.sortTitle || ''));
+                            }
+                            if (sortMode === 'title_desc') {
+                                return (b.dataset.sortTitle || '').localeCompare((a.dataset.sortTitle || ''));
+                            }
+                            if (sortMode === 'meta_asc') {
+                                return (a.dataset.sortMeta || '').localeCompare((b.dataset.sortMeta || ''));
+                            }
+                            if (sortMode === 'meta_desc') {
+                                return (b.dataset.sortMeta || '').localeCompare((a.dataset.sortMeta || ''));
+                            }
+                            if (sortMode === 'date_asc') {
+                                return Number(a.dataset.sortDate || 0) - Number(b.dataset.sortDate || 0);
+                            }
+                            if (sortMode === 'date_desc') {
+                                return Number(b.dataset.sortDate || 0) - Number(a.dataset.sortDate || 0);
+                            }
+                            if (sortMode === 'status_asc') {
+                                return (a.dataset.sortStatus || '').localeCompare((b.dataset.sortStatus || ''));
+                            }
+                            if (sortMode === 'status_desc') {
+                                return (b.dataset.sortStatus || '').localeCompare((a.dataset.sortStatus || ''));
+>>>>>>> Stashed changes
                             }
 
-                            if (primary) {
-                                primary.textContent = card.getAttribute('data-action-primary') || 'Primary Action';
-                                const href = card.getAttribute('data-action-primary-href') || '#';
-                                if (primary.tagName === 'A') {
-                                    primary.setAttribute('href', href);
-                                }
-                                const disabled = card.getAttribute('data-action-primary-disabled') === '1';
-                                primary.classList.toggle('disabled', disabled);
-                                primary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-                            }
-                            if (secondary) {
-                                secondary.textContent = card.getAttribute('data-action-secondary') || 'Secondary Action';
-                                const href = card.getAttribute('data-action-secondary-href') || '#';
-                                const secondaryForm = secondary.closest('form');
-                                if (secondaryForm) {
-                                    secondaryForm.setAttribute('action', href);
-                                } else if (secondary.tagName === 'A') {
-                                    secondary.setAttribute('href', href);
-                                }
-                                const disabled = card.getAttribute('data-action-secondary-disabled') === '1';
-                                secondary.classList.toggle('disabled', disabled);
-                                secondary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-                                if (secondary.tagName === 'BUTTON') {
-                                    secondary.toggleAttribute('disabled', disabled);
-                                }
-                            }
-                            if (tertiary) {
-                                const tertiaryLabel = card.getAttribute('data-action-tertiary');
-                                if (tertiaryLabel) {
-                                    tertiary.textContent = tertiaryLabel;
-                                    const href = card.getAttribute('data-action-tertiary-href') || '#';
-                                    if (tertiary.tagName === 'A') {
-                                        tertiary.setAttribute('href', href);
-                                    }
-                                    const disabled = card.getAttribute('data-action-tertiary-disabled') === '1';
-                                    tertiary.classList.toggle('disabled', disabled);
-                                    tertiary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-                                    tertiary.classList.remove('d-none');
-                                } else {
-                                    tertiary.classList.add('d-none');
-                                }
-                            }
+                            return Number(a.dataset.originalIndex || 0) - Number(b.dataset.originalIndex || 0);
+                        });
 
+<<<<<<< Updated upstream
                             const pageWrapper = card.closest('.page-wrapper') || document;
                             const actionDock = pageWrapper.querySelector('.tb-generic-action-dock');
                             if (actionDock) {
@@ -351,16 +357,228 @@
 
                             panel.classList.remove('d-none');
                             panel.classList.add('is-open');
-                            return;
+=======
+                        sorted.forEach(function (item) {
+                            grid.appendChild(item);
+                        });
+
+                        if (resultLabel) {
+                            resultLabel.textContent = visibleCount + ' result(s)';
                         }
+                    };
+
+                    if (searchInput) {
+                        searchInput.addEventListener('input', runFilters);
+                    }
+                    if (sortSelect) {
+                        sortSelect.addEventListener('change', runFilters);
+                    }
+                    if (criteriaSelect) {
+                        criteriaSelect.addEventListener('change', runFilters);
                     }
 
-                    const href = card.getAttribute('data-href');
-                    if (href && href !== '#') {
-                        window.location.href = href;
+                    runFilters();
+                });
+
+                root.querySelectorAll('.tb-detail-close').forEach(function (btn) {
+                    if (btn.dataset.tbDetailCloseBound === '1') {
+                        return;
+                    }
+                    btn.dataset.tbDetailCloseBound = '1';
+
+                    btn.addEventListener('click', function () {
+                        const panel = btn.closest('.tb-detail-panel');
+                        if (!panel) return;
+                        panel.classList.add('d-none');
+                        panel.classList.remove('is-open');
+                        document.querySelectorAll('.tb-module-card.is-selected').forEach(function (selectedCard) {
+                            selectedCard.classList.remove('is-selected');
+                        });
+                    });
+                });
+
+                root.querySelectorAll('.tb-module-card').forEach(function (card) {
+                    if (card.dataset.tbCardBound === '1') {
+                        return;
+                    }
+                    card.dataset.tbCardBound = '1';
+
+                    card.addEventListener('click', function (event) {
+                        if (event.target.closest('a,button,input,select,textarea')) {
+>>>>>>> Stashed changes
+                            return;
+                        }
+
+                        document.querySelectorAll('.tb-module-card.is-selected').forEach(function (selectedCard) {
+                            selectedCard.classList.remove('is-selected');
+                        });
+                        card.classList.add('is-selected');
+
+                        const detailTarget = card.getAttribute('data-detail-target');
+                        if (detailTarget) {
+                            document.querySelectorAll('.tb-detail-panel').forEach(function (p) {
+                                p.classList.add('d-none');
+                                p.classList.remove('is-open');
+                            });
+
+                            const panel = document.querySelector(detailTarget);
+                            if (panel) {
+                                const meta = panel.querySelector('.tb-detail-meta');
+                                const title = panel.querySelector('.tb-detail-title');
+                                const text = panel.querySelector('.tb-detail-text');
+                                const extra = panel.querySelector('.tb-detail-extra');
+                                const primary = panel.querySelector('.tb-detail-primary');
+                                const secondary = panel.querySelector('.tb-detail-secondary');
+                                const tertiary = panel.querySelector('.tb-detail-tertiary');
+
+                                if (meta) meta.textContent = card.getAttribute('data-detail-meta') || '';
+                                if (title) title.textContent = card.getAttribute('data-detail-title') || 'Details';
+                                if (text) text.textContent = card.getAttribute('data-detail-text') || '';
+
+                                if (extra) {
+                                    const rawExtra = card.getAttribute('data-detail-extra') || '';
+                                    extra.innerHTML = '';
+
+                                    const appendValue = function (container, rawValue) {
+                                        const valueText = (rawValue || '').trim();
+                                        const isUrl = /^https?:\/\//i.test(valueText);
+                                        if (isUrl) {
+                                            const link = document.createElement('a');
+                                            link.href = valueText;
+                                            link.target = '_blank';
+                                            link.rel = 'noopener noreferrer';
+                                            link.textContent = valueText;
+                                            container.appendChild(link);
+                                            return;
+                                        }
+
+                                        const value = document.createElement('span');
+                                        value.textContent = valueText;
+                                        container.appendChild(value);
+                                    };
+
+                                    rawExtra.split('||').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (line) {
+                                        const item = document.createElement('div');
+                                        item.className = 'tb-detail-row';
+                                        const splitIndex = line.indexOf(':');
+                                        if (splitIndex > -1) {
+                                            const key = document.createElement('strong');
+                                            key.textContent = line.slice(0, splitIndex + 1) + ' ';
+                                            item.appendChild(key);
+                                            appendValue(item, line.slice(splitIndex + 1));
+                                        } else {
+                                            appendValue(item, line);
+                                        }
+                                        extra.appendChild(item);
+                                    });
+                                }
+
+                                if (primary) {
+                                    primary.textContent = card.getAttribute('data-action-primary') || 'Primary Action';
+                                    const href = card.getAttribute('data-action-primary-href') || '#';
+                                    if (primary.tagName === 'A') {
+                                        primary.setAttribute('href', href);
+                                    }
+                                    const disabled = card.getAttribute('data-action-primary-disabled') === '1';
+                                    primary.classList.toggle('disabled', disabled);
+                                    primary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+                                }
+                                if (secondary) {
+                                    secondary.textContent = card.getAttribute('data-action-secondary') || 'Secondary Action';
+                                    const href = card.getAttribute('data-action-secondary-href') || '#';
+                                    const secondaryForm = secondary.closest('form');
+                                    if (secondaryForm) {
+                                        secondaryForm.setAttribute('action', href);
+                                    } else if (secondary.tagName === 'A') {
+                                        secondary.setAttribute('href', href);
+                                    }
+                                    const disabled = card.getAttribute('data-action-secondary-disabled') === '1';
+                                    secondary.classList.toggle('disabled', disabled);
+                                    secondary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+                                    if (secondary.tagName === 'BUTTON') {
+                                        secondary.toggleAttribute('disabled', disabled);
+                                    }
+                                }
+                                if (tertiary) {
+                                    const tertiaryLabel = card.getAttribute('data-action-tertiary');
+                                    if (tertiaryLabel) {
+                                        tertiary.textContent = tertiaryLabel;
+                                        const href = card.getAttribute('data-action-tertiary-href') || '#';
+                                        if (tertiary.tagName === 'A') {
+                                            tertiary.setAttribute('href', href);
+                                        }
+                                        const disabled = card.getAttribute('data-action-tertiary-disabled') === '1';
+                                        tertiary.classList.toggle('disabled', disabled);
+                                        tertiary.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+                                        tertiary.classList.remove('d-none');
+                                    } else {
+                                        tertiary.classList.add('d-none');
+                                    }
+                                }
+
+                                panel.classList.remove('d-none');
+                                panel.classList.add('is-open');
+                                return;
+                            }
+                        }
+
+                        const href = card.getAttribute('data-href');
+                        if (href && href !== '#') {
+                            window.location.href = href;
+                        }
+                    });
+                });
+            };
+
+            document.addEventListener('DOMContentLoaded', function () {
+                initPortalInteractions(document);
+            });
+<<<<<<< Updated upstream
+=======
+
+            document.addEventListener('turbo:load', function () {
+                initPortalInteractions(document);
+            });
+
+            initPortalInteractions(document);
+
+            // Disable client-side HTML5 validation across the app and rely on server-side checks.
+            const disableClientValidation = function (root) {
+                const scope = root || document;
+
+                scope.querySelectorAll('form').forEach(function (form) {
+                    form.noValidate = true;
+                    form.setAttribute('novalidate', 'novalidate');
+                });
+
+                scope.querySelectorAll('input, select, textarea').forEach(function (field) {
+                    field.removeAttribute('required');
+                    field.removeAttribute('pattern');
+                    field.removeAttribute('min');
+                    field.removeAttribute('max');
+                    field.removeAttribute('minlength');
+                    field.removeAttribute('maxlength');
+
+                    if (typeof field.setCustomValidity === 'function') {
+                        field.setCustomValidity('');
                     }
                 });
+            };
+
+            document.addEventListener('submit', function () {
+                disableClientValidation(document);
+            }, true);
+
+            document.addEventListener('DOMContentLoaded', function () {
+                disableClientValidation(document);
             });
+
+            document.addEventListener('turbo:load', function () {
+                disableClientValidation(document);
+            });
+
+            disableClientValidation(document);
+>>>>>>> Stashed changes
         </script>
     </body>
 </html>
