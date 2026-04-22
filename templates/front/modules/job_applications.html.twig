@@ -47,6 +47,7 @@
                         <form method="get" action="{{ path('front_job_applications') }}" class="d-flex flex-wrap align-items-center gap-2">
                             <input type="hidden" name="role" value="recruiter">
                             <input type="hidden" name="ai_rank" value="{{ filters.ai_rank|default(false) ? '1' : '0' }}">
+                            <input type="hidden" name="page" value="1">
                             <div class="input-icon">
                                 <span class="input-icon-addon"><i class="ti ti-search"></i></span>
                                 <input type="text" name="search" class="form-control" value="{{ filters.search|default('') }}" placeholder="Search by offer, candidate, phone, status...">
@@ -243,6 +244,34 @@
                     </div>
                 {% endfor %}
             </div>
+
+            {% set pager = pagination|default({}) %}
+            {% if pager.enabled|default(false) %}
+                {% set baseParams = pager.route_params_base|default({'role': role}) %}
+                <div class="d-flex justify-content-center mt-3">
+                    <nav aria-label="Applications pagination">
+                        <ul class="pagination mb-0">
+                            <li class="page-item {{ pager.has_previous|default(false) ? '' : 'disabled' }}">
+                                <a class="page-link" href="{{ pager.has_previous|default(false) ? path('front_job_applications', baseParams|merge({'page': pager.previous_page|default(1)})) : '#' }}" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+
+                            {% for p in pager.pages|default([1]) %}
+                                <li class="page-item {{ p == (pager.current_page|default(1)) ? 'active' : '' }}">
+                                    <a class="page-link" href="{{ path('front_job_applications', baseParams|merge({'page': p})) }}">{{ p }}</a>
+                                </li>
+                            {% endfor %}
+
+                            <li class="page-item {{ pager.has_next|default(false) ? '' : 'disabled' }}">
+                                <a class="page-link" href="{{ pager.has_next|default(false) ? path('front_job_applications', baseParams|merge({'page': pager.next_page|default(1)})) : '#' }}" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            {% endif %}
 
                 </div>
                 <div class="col-12 col-xl-4">

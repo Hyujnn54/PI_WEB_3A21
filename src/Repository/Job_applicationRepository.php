@@ -135,6 +135,13 @@ class Job_applicationRepository extends ServiceEntityRepository
      */
     public function findForRecruiterListing(Recruiter $recruiter, string $search = '', string $status = 'all', string $sort = 'date_desc'): array
     {
+        return $this->createRecruiterListingQueryBuilder($recruiter, $search, $status, $sort)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function createRecruiterListingQueryBuilder(Recruiter $recruiter, string $search = '', string $status = 'all', string $sort = 'date_desc'): QueryBuilder
+    {
         $normalizedSearch = trim($search);
         $normalizedStatus = strtolower(trim($status));
         $normalizedSort = strtolower(trim($sort));
@@ -163,7 +170,31 @@ class Job_applicationRepository extends ServiceEntityRepository
 
         $this->applyRecruiterSort($qb, $normalizedSort);
 
-        return $qb->getQuery()->getResult();
+        return $qb;
+    }
+
+    public function createAdminListingQueryBuilder(): QueryBuilder
+    {
+        return $this->createQueryBuilder('application')
+            ->leftJoin('application.offer_id', 'offer')
+            ->leftJoin('application.candidate_id', 'candidate')
+            ->addSelect('offer', 'candidate')
+            ->andWhere('application.is_archived = :isArchived')
+            ->setParameter('isArchived', false)
+            ->orderBy('application.applied_at', 'DESC');
+    }
+
+    public function createCandidateListingQueryBuilder(Candidate $candidate): QueryBuilder
+    {
+        return $this->createQueryBuilder('application')
+            ->leftJoin('application.offer_id', 'offer')
+            ->leftJoin('application.candidate_id', 'candidate')
+            ->addSelect('offer', 'candidate')
+            ->andWhere('application.candidate_id = :candidate')
+            ->andWhere('application.is_archived = :isArchived')
+            ->setParameter('candidate', $candidate)
+            ->setParameter('isArchived', false)
+            ->orderBy('application.applied_at', 'DESC');
     }
 
     /**

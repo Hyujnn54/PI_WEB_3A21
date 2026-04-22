@@ -17,7 +17,11 @@ use App\Repository\UsersRepository;
 use App\Service\JobApplication\ApplicationAiRankingService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Pagerfanta\Adapter\ArrayAdapter;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -591,6 +595,19 @@ class FrontPortalController extends AbstractController
         $role = $this->resolveSessionRole($request);
         $cards = [];
         $rankingEnabled = false;
+        $page = max(1, (int) $request->query->get('page', 1));
+        $perPage = 9;
+        $pagination = [
+            'enabled' => false,
+            'current_page' => 1,
+            'total_pages' => 1,
+            'has_previous' => false,
+            'has_next' => false,
+            'previous_page' => 1,
+            'next_page' => 1,
+            'pages' => [1],
+            'route_params_base' => ['role' => $role],
+        ];
         $applicationFilters = [
             'search' => '',
             'status' => 'all',
@@ -626,40 +643,66 @@ class FrontPortalController extends AbstractController
                     'ai_rank' => $rankingEnabled,
                 ];
 
+                $pagination['route_params_base'] = [
+                    'role' => 'recruiter',
+                    'search' => $search,
+                    'status' => $status,
+                    'sort' => $sort,
+                    'ai_rank' => $rankingEnabled ? '1' : '0',
+                ];
+
                 $statusForQuery = $status === 'all' ? 'all' : strtoupper($status);
                 /** @var Job_applicationRepository $applicationRepository */
                 $applicationRepository = $this->doctrine->getRepository(Job_application::class);
-                $applications = $applicationRepository->findForRecruiterListing($recruiter, $search, $statusForQuery, $sort);
+                $queryBuilder = $applicationRepository->createRecruiterListingQueryBuilder($recruiter, $search, $statusForQuery, $sort);
+                $applications = [];
                 $rankingsByApplicationId = [];
 
-                if ($rankingEnabled && count($applications) > 0) {
-                    try {
-                        $rankingPayload = $this->applicationAiRankingService->rankApplications($applications);
-                        $rankingsByApplicationId = is_array($rankingPayload['results'] ?? null)
-                            ? $rankingPayload['results']
-                            : [];
+                if ($rankingEnabled) {
+                    $applications = $queryBuilder->getQuery()->getResult();
 
-                        usort($applications, static function (Job_application $left, Job_application $right) use ($rankingsByApplicationId): int {
-                            $leftScore = (int) ($rankingsByApplicationId[(string) $left->getId()]['score'] ?? -1);
-                            $rightScore = (int) ($rankingsByApplicationId[(string) $right->getId()]['score'] ?? -1);
+                    if (count($applications) > 0) {
+                        try {
+                            $rankingPayload = $this->applicationAiRankingService->rankApplications($applications);
+                            $rankingsByApplicationId = is_array($rankingPayload['results'] ?? null)
+                                ? $rankingPayload['results']
+                                : [];
 
-                            return $rightScore <=> $leftScore;
-                        });
+                            usort($applications, static function (Job_application $left, Job_application $right) use ($rankingsByApplicationId): int {
+                                $leftScore = (int) ($rankingsByApplicationId[(string) $left->getId()]['score'] ?? -1);
+                                $rightScore = (int) ($rankingsByApplicationId[(string) $right->getId()]['score'] ?? -1);
 
-                        $errors = is_array($rankingPayload['errors'] ?? null) ? $rankingPayload['errors'] : [];
-                        if ($errors !== []) {
-                            $this->addFlash('warning', sprintf(
-                                'AI ranking completed with %d fallback case(s). %s',
-                                count($errors),
-                                $errors[0]
-                            ));
+                                return $rightScore <=> $leftScore;
+                            });
+
+                            $errors = is_array($rankingPayload['errors'] ?? null) ? $rankingPayload['errors'] : [];
+                            if ($errors !== []) {
+                                $this->addFlash('warning', sprintf(
+                                    'AI ranking completed with %d fallback case(s). %s',
+                                    count($errors),
+                                    $errors[0]
+                                ));
+                            }
+                        } catch (Throwable $exception) {
+                            $rankingEnabled = false;
+                            $applicationFilters['ai_rank'] = false;
+                            $pagination['route_params_base']['ai_rank'] = '0';
+                            $rankingsByApplicationId = [];
+                            $this->addFlash('error', 'AI ranking is unavailable right now. ' . $exception->getMessage());
                         }
-                    } catch (Throwable $exception) {
-                        $rankingEnabled = false;
-                        $applicationFilters['ai_rank'] = false;
-                        $rankingsByApplicationId = [];
-                        $this->addFlash('error', 'AI ranking is unavailable right now. ' . $exception->getMessage());
                     }
+
+                    if ($rankingEnabled) {
+                        $pager = $this->createPagerFromArray($applications, $page, $perPage);
+                        $applications = iterator_to_array($pager->getCurrentPageResults());
+                        $pagination = $this->buildPaginationView($pager, $pagination['route_params_base']);
+                    }
+                }
+
+                if (!$rankingEnabled) {
+                    $pager = $this->createPagerFromQueryBuilder($queryBuilder, $page, $perPage);
+                    $applications = iterator_to_array($pager->getCurrentPageResults());
+                    $pagination = $this->buildPaginationView($pager, $pagination['route_params_base']);
                 }
 
                 foreach ($applications as $application) {
@@ -770,10 +813,12 @@ class FrontPortalController extends AbstractController
             }
         } elseif ($role === 'admin') {
             // ADMIN VIEW: read-only access to all applications with full inspection link
-            $applications = $this->doctrine->getRepository(Job_application::class)->findBy(
-                ['is_archived' => false],
-                ['applied_at' => 'DESC']
-            );
+            /** @var Job_applicationRepository $applicationRepository */
+            $applicationRepository = $this->doctrine->getRepository(Job_application::class);
+            $queryBuilder = $applicationRepository->createAdminListingQueryBuilder();
+            $pager = $this->createPagerFromQueryBuilder($queryBuilder, $page, $perPage);
+            $applications = iterator_to_array($pager->getCurrentPageResults());
+            $pagination = $this->buildPaginationView($pager, ['role' => 'admin']);
 
             foreach ($applications as $application) {
                 $offer = $application->getOffer_id();
@@ -805,10 +850,12 @@ class FrontPortalController extends AbstractController
             $candidate = $this->resolveCurrentCandidate($request);
 
             if ($candidate instanceof Candidate) {
-                $applications = $this->doctrine->getRepository(Job_application::class)->findBy(
-                    ['candidate_id' => $candidate, 'is_archived' => false],
-                    ['applied_at' => 'DESC']
-                );
+                /** @var Job_applicationRepository $applicationRepository */
+                $applicationRepository = $this->doctrine->getRepository(Job_application::class);
+                $queryBuilder = $applicationRepository->createCandidateListingQueryBuilder($candidate);
+                $pager = $this->createPagerFromQueryBuilder($queryBuilder, $page, $perPage);
+                $applications = iterator_to_array($pager->getCurrentPageResults());
+                $pagination = $this->buildPaginationView($pager, ['role' => 'candidate']);
 
                 foreach ($applications as $application) {
                     $offer = $application->getOffer_id();
@@ -845,6 +892,7 @@ class FrontPortalController extends AbstractController
             'cards' => $cards,
             'applicationFilters' => $applicationFilters,
             'aiRankingEnabled' => $rankingEnabled,
+            'pagination' => $pagination,
         ]);
     }
 
@@ -1945,6 +1993,63 @@ class FrontPortalController extends AbstractController
         }
 
         return $userId;
+    }
+
+    private function createPagerFromQueryBuilder(QueryBuilder $queryBuilder, int $page, int $perPage): Pagerfanta
+    {
+        $pager = new Pagerfanta(new QueryAdapter($queryBuilder, true, false));
+        $pager->setMaxPerPage($perPage);
+        try {
+            $pager->setCurrentPage($page);
+        } catch (\Throwable) {
+            $pager->setCurrentPage(1);
+        }
+
+        return $pager;
+    }
+
+    /**
+     * @param array<int, mixed> $items
+     */
+    private function createPagerFromArray(array $items, int $page, int $perPage): Pagerfanta
+    {
+        $pager = new Pagerfanta(new ArrayAdapter($items));
+        $pager->setMaxPerPage($perPage);
+        try {
+            $pager->setCurrentPage($page);
+        } catch (\Throwable) {
+            $pager->setCurrentPage(1);
+        }
+
+        return $pager;
+    }
+
+    /**
+     * @param array<string, mixed> $routeParamsBase
+     *
+     * @return array<string, mixed>
+     */
+    private function buildPaginationView(Pagerfanta $pager, array $routeParamsBase): array
+    {
+        $currentPage = $pager->getCurrentPage();
+        $totalPages = max(1, $pager->getNbPages());
+
+        $pages = [];
+        for ($i = 1; $i <= $totalPages; $i++) {
+            $pages[] = $i;
+        }
+
+        return [
+            'enabled' => $totalPages > 1,
+            'current_page' => $currentPage,
+            'total_pages' => $totalPages,
+            'has_previous' => $pager->hasPreviousPage(),
+            'has_next' => $pager->hasNextPage(),
+            'previous_page' => $pager->hasPreviousPage() ? $currentPage - 1 : 1,
+            'next_page' => $pager->hasNextPage() ? $currentPage + 1 : $totalPages,
+            'pages' => $pages,
+            'route_params_base' => $routeParamsBase,
+        ];
     }
 
     private function validateInterviewPayload(array $data): array
