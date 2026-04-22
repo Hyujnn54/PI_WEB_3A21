@@ -265,15 +265,20 @@
                 </div>
                 <div class="modal-footer d-flex justify-content-between">
                     <div class="small text-muted" id="reviewOfferFooterHint">Approve the changes or send another warning from here.</div>
-                    <div class="d-flex gap-2" id="reviewOfferActions">
-                        <form method="post" id="reviewAcceptForm">
-                            <button type="submit" class="btn btn-success" onclick="return confirm('Accept recruiter changes for this offer?');">
-                                <i class="ti ti-check me-1"></i>Accept Changes
-                            </button>
-                        </form>
-                        <button type="button" class="btn btn-danger" id="reviewSendWarningBtn" data-bs-toggle="modal" data-bs-target="#warningModal">
-                            <i class="ti ti-alert-triangle me-1"></i>Signaler
+                    <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-outline-primary" id="reviewAnalyzeBtn">
+                            <i class="ti ti-brain me-1"></i>Analyzer
                         </button>
+                        <div class="d-flex gap-2" id="reviewOfferActions">
+                            <form method="post" id="reviewAcceptForm">
+                                <button type="submit" class="btn btn-success" onclick="return confirm('Accept recruiter changes for this offer?');">
+                                    <i class="ti ti-check me-1"></i>Accept Changes
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-danger" id="reviewSendWarningBtn" data-bs-toggle="modal" data-bs-target="#warningModal">
+                                <i class="ti ti-alert-triangle me-1"></i>Signaler
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -351,6 +356,7 @@
             const reviewContent = document.getElementById('reviewOfferContent');
             const reviewAcceptForm = document.getElementById('reviewAcceptForm');
             const reviewSendWarningBtn = document.getElementById('reviewSendWarningBtn');
+            const reviewAnalyzeBtn = document.getElementById('reviewAnalyzeBtn');
             const reviewModalTitle = document.getElementById('reviewOfferModalTitle');
             const reviewFooterHint = document.getElementById('reviewOfferFooterHint');
             const reviewActions = document.getElementById('reviewOfferActions');
@@ -483,6 +489,54 @@
                         warningModalError.textContent = '';
                         warningModalError.style.display = 'none';
                     }
+                });
+            }
+
+            if (reviewAnalyzeBtn) {
+                reviewAnalyzeBtn.addEventListener('click', function () {
+                    const descriptionNode = document.getElementById('reviewOfferDescription');
+                    const titleNode = document.getElementById('reviewOfferTitle');
+                    const descriptionText = (descriptionNode && descriptionNode.textContent ? descriptionNode.textContent : '').trim();
+                    const titleText = (titleNode && titleNode.textContent ? titleNode.textContent : '').trim();
+
+                    if (!descriptionText || descriptionText === '-') {
+                        alert('Please open offer details first, then run Analyzer.');
+                        return;
+                    }
+
+                    const payloadText = 'Title: ' + (titleText || 'Untitled') + '\nDescription: ' + descriptionText;
+
+                    fetch('{{ path('app_admin_comment_analyzer_analyze') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({ comment: payloadText })
+                    })
+                    .then(function (response) { return response.json(); })
+                    .then(function (payload) {
+                        if (!payload || payload.ok !== true) {
+                            throw new Error((payload && payload.error) ? payload.error : 'Analysis failed.');
+                        }
+
+                        const analysis = payload.analysis || {};
+                        const labels = Array.isArray(analysis.labels) && analysis.labels.length > 0 ? analysis.labels.join(', ') : 'none';
+                        const message = [
+                            'Analyzer Result (Offer #' + (currentReviewOfferId || '-') + ')',
+                            'Toxicity: ' + Number(analysis.toxicityScore || 0).toFixed(3),
+                            'Spam: ' + Number(analysis.spamScore || 0).toFixed(3),
+                            'Sentiment: ' + String(analysis.sentiment || 'neutral'),
+                            'Labels: ' + labels,
+                            'Flagged: ' + (((analysis.flagged || false) === true) ? 'YES' : 'NO')
+                        ].join('\n');
+
+                        alert(message);
+                    })
+                    .catch(function (error) {
+                        alert(error.message || 'Unable to analyze this offer right now.');
+                    });
                 });
             }
 

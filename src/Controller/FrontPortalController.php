@@ -9,6 +9,7 @@ use App\Entity\Interview;
 use App\Entity\Interview_feedback;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
+use App\Entity\Job_offer_comment;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Form\Filter\JobOfferFilterType;
@@ -16,6 +17,7 @@ use App\Form\ProfileType;
 use App\Repository\Job_offerRepository;
 use App\Repository\UsersRepository;
 use App\Service\CandidateOfferMatchingService;
+use App\Service\CommentAnalyzerService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
@@ -46,7 +48,8 @@ class FrontPortalController extends AbstractController
 
     public function __construct(
         private readonly ManagerRegistry $doctrine,
-        private readonly CandidateOfferMatchingService $candidateOfferMatchingService
+        private readonly CandidateOfferMatchingService $candidateOfferMatchingService,
+        private readonly CommentAnalyzerService $commentAnalyzerService
     )
     {
     }
@@ -2084,6 +2087,191 @@ class FrontPortalController extends AbstractController
         } catch (Throwable) {
             return false;
         }
+    }
+
+    #[Route('/front/job-offers/comments/analyze', name: 'front_job_offer_comment_analyze', methods: ['POST'])]
+    public function analyzeJobOfferComment(Request $request): JsonResponse
+    {
+        $role = $this->resolveSessionRole($request);
+        if ($role !== 'candidate') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Only candidates can analyze comments from this page.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        $comment = trim((string) ($payload['comment'] ?? ''));
+        $validation = Job_offer_comment::validateCommentText($comment);
+        if (($validation['ok'] ?? false) !== true) {
+            return $this->json([
+                'ok' => false,
+                'error' => (string) ($validation['error'] ?? 'Invalid comment.'),
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $analysis = $this->commentAnalyzerService->analyze((string) $validation['value']);
+
+        return $this->json([
+            'ok' => true,
+            'analysis' => $analysis,
+        ]);
+    }
+
+    #[Route('/front/job-offers/{id}/comments', name: 'front_job_offer_comment_create', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function createJobOfferComment(string $id, Request $request, Connection $connection): JsonResponse
+    {
+        $role = $this->resolveSessionRole($request);
+        if ($role !== 'candidate') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Only candidates can post comments.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $candidate = $this->resolveCurrentCandidate($request);
+        if (!$candidate instanceof Candidate) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Candidate session is required.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $offerExists = $connection->fetchOne('SELECT id FROM job_offer WHERE id = :id LIMIT 1', ['id' => $id]);
+        if ($offerExists === false || $offerExists === null) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Job offer not found.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        $comment = trim((string) ($payload['comment'] ?? ''));
+        $validation = Job_offer_comment::validateCommentText($comment);
+        if (($validation['ok'] ?? false) !== true) {
+            return $this->json([
+                'ok' => false,
+                'error' => (string) ($validation['error'] ?? 'Invalid comment.'),
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $analysis = $this->commentAnalyzerService->analyze((string) $validation['value']);
+        $labelsJson = '[]';
+        try {
+            $labelsJson = (string) json_encode((array) ($analysis['labels'] ?? []), JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            $labelsJson = '[]';
+        }
+
+        $now = new \DateTimeImmutable();
+        $commentId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
+        $moderationStatus = (($analysis['flagged'] ?? false) === true)
+            ? Job_offer_comment::STATUS_FLAGGED
+            : Job_offer_comment::STATUS_APPROVED;
+        $visibilityStatus = (($analysis['autoHidden'] ?? false) === true)
+            ? Job_offer_comment::VISIBILITY_HIDDEN
+            : Job_offer_comment::VISIBILITY_VISIBLE;
+
+        try {
+            $connection->insert('job_offer_comment', [
+                'id' => $commentId,
+                'job_offer_id' => $id,
+                'candidate_id' => (string) $candidate->getId(),
+                'comment_text' => (string) $validation['value'],
+                'toxicity_score' => (float) ($analysis['toxicityScore'] ?? 0),
+                'spam_score' => (float) ($analysis['spamScore'] ?? 0),
+                'sentiment' => (string) ($analysis['sentiment'] ?? 'neutral'),
+                'labels' => $labelsJson,
+                'moderation_status' => $moderationStatus,
+                'visibility_status' => $visibilityStatus,
+                'is_auto_flagged' => (($analysis['flagged'] ?? false) === true) ? 1 : 0,
+                'analyzer_source' => (string) ($analysis['provider'] ?? 'heuristic'),
+                'created_at' => $now->format('Y-m-d H:i:s'),
+                'analyzed_at' => $now->format('Y-m-d H:i:s'),
+                'moderated_at' => null,
+                'moderator_id' => null,
+                'moderator_action_note' => null,
+            ]);
+        } catch (\Throwable) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Unable to save comment right now.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->json([
+            'ok' => true,
+            'comment' => [
+                'id' => $commentId,
+                'text' => (string) $validation['value'],
+                'status' => $moderationStatus,
+                'visibility' => $visibilityStatus,
+                'createdAt' => $now->format(DATE_ATOM),
+            ],
+            'analysis' => $analysis,
+        ]);
+    }
+
+    #[Route('/front/job-offers/{id}/comments', name: 'front_job_offer_comments_list', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function listJobOfferComments(string $id, Request $request, Connection $connection): JsonResponse
+    {
+        $candidate = $this->resolveCurrentCandidate($request);
+        $params = ['offer_id' => $id, 'visible_status' => Job_offer_comment::VISIBILITY_VISIBLE];
+        $sql = <<<'SQL'
+SELECT c.id, c.comment_text, c.sentiment, c.moderation_status, c.visibility_status, c.created_at,
+       u.first_name, u.last_name
+FROM job_offer_comment c
+LEFT JOIN users u ON u.id = c.candidate_id
+WHERE c.job_offer_id = :offer_id
+  AND c.visibility_status = :visible_status
+ORDER BY c.created_at DESC
+LIMIT 25
+SQL;
+
+        if ($candidate instanceof Candidate) {
+            $sql = <<<'SQL'
+SELECT c.id, c.comment_text, c.sentiment, c.moderation_status, c.visibility_status, c.created_at,
+       u.first_name, u.last_name
+FROM job_offer_comment c
+LEFT JOIN users u ON u.id = c.candidate_id
+WHERE c.job_offer_id = :offer_id
+  AND (c.visibility_status = :visible_status OR c.candidate_id = :candidate_id)
+ORDER BY c.created_at DESC
+LIMIT 25
+SQL;
+            $params['candidate_id'] = (string) $candidate->getId();
+        }
+
+        try {
+            $rows = $connection->fetchAllAssociative($sql, $params);
+        } catch (\Throwable) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Unable to load comments right now.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $comments = array_map(function (array $row): array {
+            $authorName = trim((string) ($row['first_name'] ?? '') . ' ' . (string) ($row['last_name'] ?? ''));
+            if ($authorName === '') {
+                $authorName = 'Candidate';
+            }
+
+            return [
+                'id' => (string) ($row['id'] ?? ''),
+                'text' => (string) ($row['comment_text'] ?? ''),
+                'sentiment' => (string) ($row['sentiment'] ?? 'neutral'),
+                'status' => (string) ($row['moderation_status'] ?? Job_offer_comment::STATUS_APPROVED),
+                'visibility' => (string) ($row['visibility_status'] ?? Job_offer_comment::VISIBILITY_VISIBLE),
+                'createdAt' => (string) ($row['created_at'] ?? ''),
+                'author' => $authorName,
+            ];
+        }, $rows);
+
+        return $this->json([
+            'ok' => true,
+            'comments' => $comments,
+        ]);
     }
 
     private function canSubmitFeedback(Interview $interview): bool

@@ -6,6 +6,7 @@ use App\Entity\Admin;
 use App\Entity\Interview;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
+use App\Entity\Job_offer_comment;
 use App\Entity\Job_offer_warning;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
@@ -13,6 +14,7 @@ use App\Entity\Users;
 use App\Form\Filter\JobOfferFilterType;
 use App\Repository\Job_offerRepository;
 use App\Repository\UsersRepository;
+use App\Service\CommentAnalyzerService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Knp\Snappy\Pdf;
@@ -804,6 +806,179 @@ SQL;
         }
     }
 
+    #[Route('/admin/comment-analyzer', name: 'app_admin_comment_analyzer', methods: ['GET'])]
+    public function commentAnalyzerDashboard(Request $request, Connection $connection): Response
+    {
+        $status = strtoupper(trim((string) $request->query->get('status', 'ALL')));
+        $allowedStatuses = [
+            'ALL',
+            Job_offer_comment::STATUS_FLAGGED,
+            Job_offer_comment::STATUS_APPROVED,
+            Job_offer_comment::STATUS_REJECTED,
+            Job_offer_comment::STATUS_WARNED,
+        ];
+        if (!in_array($status, $allowedStatuses, true)) {
+            $status = 'ALL';
+        }
+
+        $sql = <<<'SQL'
+SELECT c.id, c.comment_text, c.toxicity_score, c.spam_score, c.sentiment, c.labels,
+       c.moderation_status, c.visibility_status, c.created_at, c.moderated_at, c.moderator_action_note,
+       j.id AS offer_id, j.title AS offer_title,
+       u.first_name, u.last_name, u.email
+FROM job_offer_comment c
+LEFT JOIN job_offer j ON j.id = c.job_offer_id
+LEFT JOIN users u ON u.id = c.candidate_id
+SQL;
+
+        $params = [];
+        if ($status !== 'ALL') {
+            $sql .= ' WHERE c.moderation_status = :status';
+            $params['status'] = $status;
+        }
+
+        $sql .= ' ORDER BY c.created_at DESC LIMIT 300';
+
+        $comments = [];
+        $flaggedCount = 0;
+        try {
+            $rows = $connection->fetchAllAssociative($sql, $params);
+            $comments = array_map(function (array $row): array {
+                $labels = [];
+                $decoded = json_decode((string) ($row['labels'] ?? '[]'), true);
+                if (is_array($decoded)) {
+                    foreach ($decoded as $label) {
+                        $value = trim((string) $label);
+                        if ($value !== '') {
+                            $labels[] = $value;
+                        }
+                    }
+                }
+
+                $authorName = trim((string) ($row['first_name'] ?? '') . ' ' . (string) ($row['last_name'] ?? ''));
+                if ($authorName === '') {
+                    $authorName = (string) ($row['email'] ?? 'Candidate');
+                }
+
+                return [
+                    'id' => (string) ($row['id'] ?? ''),
+                    'offer_id' => (string) ($row['offer_id'] ?? ''),
+                    'offer_title' => (string) ($row['offer_title'] ?? 'Unknown offer'),
+                    'author' => $authorName,
+                    'comment_text' => (string) ($row['comment_text'] ?? ''),
+                    'toxicity_score' => round((float) ($row['toxicity_score'] ?? 0), 3),
+                    'spam_score' => round((float) ($row['spam_score'] ?? 0), 3),
+                    'sentiment' => (string) ($row['sentiment'] ?? 'neutral'),
+                    'labels' => $labels,
+                    'moderation_status' => (string) ($row['moderation_status'] ?? Job_offer_comment::STATUS_APPROVED),
+                    'visibility_status' => (string) ($row['visibility_status'] ?? Job_offer_comment::VISIBILITY_VISIBLE),
+                    'created_at' => (string) ($row['created_at'] ?? ''),
+                    'moderated_at' => (string) ($row['moderated_at'] ?? ''),
+                    'moderator_action_note' => (string) ($row['moderator_action_note'] ?? ''),
+                ];
+            }, $rows);
+
+            $flaggedCount = (int) $connection->fetchOne(
+                'SELECT COUNT(*) FROM job_offer_comment WHERE moderation_status = :status',
+                ['status' => Job_offer_comment::STATUS_FLAGGED]
+            );
+        } catch (\Throwable) {
+            $this->addFlash('error', 'Unable to load comment analyzer data right now.');
+        }
+
+        return $this->render('admin/comment_analyzer.html.twig', [
+            'authUser' => ['role' => 'admin'],
+            'comments' => $comments,
+            'selectedStatus' => $status,
+            'allowedStatuses' => $allowedStatuses,
+            'flaggedCount' => $flaggedCount,
+        ]);
+    }
+
+    #[Route('/admin/comment-analyzer/analyze', name: 'app_admin_comment_analyzer_analyze', methods: ['POST'])]
+    public function analyzeCommentPayload(Request $request, CommentAnalyzerService $commentAnalyzerService): JsonResponse
+    {
+        $payload = json_decode((string) $request->getContent(), true);
+        $comment = trim((string) ($payload['comment'] ?? ''));
+        $validation = Job_offer_comment::validateCommentText($comment);
+        if (($validation['ok'] ?? false) !== true) {
+            return new JsonResponse([
+                'ok' => false,
+                'error' => (string) ($validation['error'] ?? 'Invalid comment.'),
+            ], 400);
+        }
+
+        return new JsonResponse([
+            'ok' => true,
+            'analysis' => $commentAnalyzerService->analyze((string) $validation['value']),
+        ]);
+    }
+
+    #[Route('/admin/comment-analyzer/{id}/approve', name: 'app_admin_comment_analyzer_approve', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function approveComment(string $id, Request $request, Connection $connection): Response
+    {
+        $adminId = (string) $request->getSession()->get('user_id', '');
+        $note = trim((string) $request->request->get('note', 'Approved after moderator review.'));
+
+        $ok = $this->applyCommentModeration(
+            $connection,
+            $id,
+            $adminId,
+            Job_offer_comment::STATUS_APPROVED,
+            Job_offer_comment::VISIBILITY_VISIBLE,
+            $note
+        );
+
+        $this->addFlash($ok ? 'success' : 'error', $ok ? 'Comment approved.' : 'Unable to approve comment.');
+
+        return $this->redirectToRoute('app_admin_comment_analyzer');
+    }
+
+    #[Route('/admin/comment-analyzer/{id}/reject', name: 'app_admin_comment_analyzer_reject', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function rejectComment(string $id, Request $request, Connection $connection): Response
+    {
+        $adminId = (string) $request->getSession()->get('user_id', '');
+        $note = trim((string) $request->request->get('note', 'Rejected due to policy or quality issues.'));
+
+        $ok = $this->applyCommentModeration(
+            $connection,
+            $id,
+            $adminId,
+            Job_offer_comment::STATUS_REJECTED,
+            Job_offer_comment::VISIBILITY_HIDDEN,
+            $note
+        );
+
+        $this->addFlash($ok ? 'warning' : 'error', $ok ? 'Comment rejected and hidden.' : 'Unable to reject comment.');
+
+        return $this->redirectToRoute('app_admin_comment_analyzer');
+    }
+
+    #[Route('/admin/comment-analyzer/{id}/warn', name: 'app_admin_comment_analyzer_warn', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function warnCommentAuthor(string $id, Request $request, Connection $connection): Response
+    {
+        $adminId = (string) $request->getSession()->get('user_id', '');
+        $note = trim((string) $request->request->get('warning_note', 'Please keep comments constructive and respectful.'));
+        $hideComment = trim((string) $request->request->get('hide_comment', '0')) === '1';
+
+        if (mb_strlen($note) > 500) {
+            $note = trim(mb_substr($note, 0, 500));
+        }
+
+        $ok = $this->applyCommentModeration(
+            $connection,
+            $id,
+            $adminId,
+            Job_offer_comment::STATUS_WARNED,
+            $hideComment ? Job_offer_comment::VISIBILITY_HIDDEN : Job_offer_comment::VISIBILITY_VISIBLE,
+            $note
+        );
+
+        $this->addFlash($ok ? 'warning' : 'error', $ok ? 'User warning recorded for this comment.' : 'Unable to warn user for this comment.');
+
+        return $this->redirectToRoute('app_admin_comment_analyzer');
+    }
+
     private function closeExpiredOffers(Connection $connection, \DateTimeImmutable $now): void
     {
         $connection->executeStatement(
@@ -813,6 +988,35 @@ SQL;
                 'now' => $now->format('Y-m-d H:i:s'),
             ]
         );
+    }
+
+    private function applyCommentModeration(
+        Connection $connection,
+        string $commentId,
+        string $adminId,
+        string $status,
+        string $visibility,
+        string $note
+    ): bool {
+        if ($commentId === '' || $adminId === '') {
+            return false;
+        }
+
+        try {
+            $affectedRows = $connection->update('job_offer_comment', [
+                'moderation_status' => $status,
+                'visibility_status' => $visibility,
+                'moderated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'moderator_id' => $adminId,
+                'moderator_action_note' => $note,
+            ], [
+                'id' => $commentId,
+            ]);
+
+            return $affectedRows > 0;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

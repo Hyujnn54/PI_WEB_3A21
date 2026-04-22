@@ -10,9 +10,12 @@
         "doctrine/doctrine-bundle": "^2.18",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6",
+        "geocoder-php/nominatim-provider": "*",
         "knplabs/knp-snappy-bundle": "*",
+        "nyholm/psr7": "*",
         "phpdocumentor/reflection-docblock": "^5.2",
         "phpstan/phpdoc-parser": "^2.3",
+        "psr/http-client": "*",
         "spiriitlabs/form-filter-bundle": "^12.1",
         "symfony/asset": "6.4.*",
         "symfony/asset-mapper": "6.4.*",
@@ -44,7 +47,8 @@
         "symfony/web-link": "6.4.*",
         "symfony/yaml": "6.4.*",
         "twig/extra-bundle": "^2.12|^3.0",
-        "twig/twig": "^2.12|^3.0"
+        "twig/twig": "^2.12|^3.0",
+        "willdurand/geocoder-bundle": "*"
     },
     "config": {
         "allow-plugins": {
