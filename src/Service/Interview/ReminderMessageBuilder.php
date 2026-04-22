@@ -17,7 +17,8 @@ class ReminderMessageBuilder
         int $durationMinutes,
         string $modeLabel,
         string $placeLabel,
-        string $notes
+        string $notes,
+        string $mapsUrl = ''
     ): string {
         $lines = [
             'Hello ' . $recipientName . ',',
@@ -34,6 +35,9 @@ class ReminderMessageBuilder
             $lines[] = 'Access: Use the "Join Meeting" button in this email.';
         } else {
             $lines[] = 'Location: ' . $placeLabel;
+            if (filter_var($mapsUrl, FILTER_VALIDATE_URL)) {
+                $lines[] = 'Map link: ' . $mapsUrl;
+            }
         }
 
         if ($notes !== '') {
@@ -54,7 +58,9 @@ class ReminderMessageBuilder
         int $durationMinutes,
         string $modeLabel,
         string $placeLabel,
-        string $notes
+        string $notes,
+        string $mapsUrl = '',
+        string $locationQrCodeDataUri = ''
     ): string {
         $isOnline = strtoupper($modeLabel) === 'ONLINE';
         $safeName = $this->escapeHtml($recipientName);
@@ -64,12 +70,20 @@ class ReminderMessageBuilder
         $safeDuration = $this->escapeHtml((string) $durationMinutes);
         $safeMode = $this->escapeHtml($modeLabel);
         $safePlaceLabel = $this->escapeHtml($placeLabel);
+        $hasMapsUrl = (bool) filter_var($mapsUrl, FILTER_VALIDATE_URL);
+        $safeMapsUrl = $hasMapsUrl ? $this->escapeHtml($mapsUrl) : '';
+        $hasQrCodeDataUri = str_starts_with($locationQrCodeDataUri, 'data:image/')
+            && str_contains($locationQrCodeDataUri, ';base64,');
+        $safeQrCodeDataUri = $hasQrCodeDataUri ? $this->escapeHtml($locationQrCodeDataUri) : '';
 
         $placeRow = '';
         if ($isOnline) {
             $placeRow = '<tr><td style="padding:12px 14px;font-size:14px;color:#44506a;width:40%;">Meeting Access</td><td style="padding:12px 14px;font-size:14px;color:#1d2433;">Use the Join Meeting button below.</td></tr>';
         } else {
-            $placeRow = '<tr><td style="padding:12px 14px;font-size:14px;color:#44506a;width:40%;">Location</td><td style="padding:12px 14px;font-size:14px;color:#1d2433;word-break:break-word;">' . $safePlaceLabel . '</td></tr>';
+            $mapLinkHtml = $hasMapsUrl
+                ? '<div style="margin-top:8px;"><a href="' . $safeMapsUrl . '" style="color:#2f6fed;text-decoration:none;font-weight:600;">Open in Google Maps</a></div>'
+                : '';
+            $placeRow = '<tr><td style="padding:12px 14px;font-size:14px;color:#44506a;width:40%;">Location</td><td style="padding:12px 14px;font-size:14px;color:#1d2433;word-break:break-word;">' . $safePlaceLabel . $mapLinkHtml . '</td></tr>';
         }
 
         $joinButtonBlock = '';
@@ -88,6 +102,16 @@ class ReminderMessageBuilder
             $notesBlock = '<tr>'
                 . '<td style="padding: 0 24px 18px 24px;">'
                 . '<div style="font-size:14px;color:#44506a;"><strong>Notes:</strong><br>' . $safeNotes . '</div>'
+                . '</td>'
+                . '</tr>';
+        }
+
+        $qrCodeBlock = '';
+        if (!$isOnline && $safeQrCodeDataUri !== '') {
+            $qrCodeBlock = '<tr>'
+                . '<td style="padding: 0 24px 18px 24px;">'
+                . '<div style="font-size:14px;color:#44506a;margin-bottom:10px;"><strong>Quick check-in map</strong><br>Scan this QR code to open the interview location.</div>'
+                . '<img src="' . $safeQrCodeDataUri . '" alt="Interview location QR code" width="180" height="180" style="display:block;border:1px solid #dbe5f5;border-radius:10px;background:#ffffff;padding:8px;">'
                 . '</td>'
                 . '</tr>';
         }
@@ -125,6 +149,7 @@ class ReminderMessageBuilder
             . '</td>'
             . '</tr>'
             . $joinButtonBlock
+            . $qrCodeBlock
             . $notesBlock
             . '<tr>'
             . '<td style="padding:0 24px 26px 24px;font-size:13px;color:#6a748b;line-height:1.5;">'
@@ -144,12 +169,16 @@ class ReminderMessageBuilder
             . '</html>';
     }
 
-    public function buildSmsText(string $offerTitle, string $scheduledAt, string $modeLabel, string $placeLabel): string
+    public function buildSmsText(string $offerTitle, string $scheduledAt, string $modeLabel, string $placeLabel, string $mapsUrl = ''): string
     {
         $base = sprintf('Reminder: Interview for %s in 24h. %s, %s.', $offerTitle, $scheduledAt, $modeLabel);
 
         if ($modeLabel === 'ONLINE') {
             return $base . ' Link: ' . $placeLabel;
+        }
+
+        if (filter_var($mapsUrl, FILTER_VALIDATE_URL)) {
+            return $base . ' Location: ' . $placeLabel . ' Map: ' . $mapsUrl;
         }
 
         return $base . ' Location: ' . $placeLabel;

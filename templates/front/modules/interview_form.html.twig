@@ -45,9 +45,12 @@
                             <div class="form-hint" data-meeting-link-feedback></div>
                         </div>
                         <div class="col-md-6" data-onsite-field>
-                            <label class="form-label">Room (required for onsite)</label>
-                            <input type="text" name="location" class="form-control" placeholder="Room / Office location" value="{{ formData.location|default('') }}" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
-                            <div class="form-hint">3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
+                            <label class="form-label">Location (required for onsite)</label>
+                            <div class="input-group">
+                                <input type="text" name="location" class="form-control" placeholder="Room / Office location" value="{{ formData.location|default('') }}" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
+                                <button type="button" class="btn btn-outline-primary" data-map-picker-trigger>Select on Map</button>
+                            </div>
+                            <div class="form-hint">Use map picker to save as Place (lat,lng). 3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Additional Notes</label>
@@ -66,7 +69,25 @@
 </div>
 
 <script>
-    const initInterviewFormPage = function () {
+    const ensureMapPickerService = async function () {
+        if (window.tbInterviewMapPickerService) {
+            return window.tbInterviewMapPickerService;
+        }
+
+        try {
+            const module = await import('{{ asset('services/interviewMapPickerService.js') }}');
+            if (module && typeof module.createInterviewMapPickerService === 'function') {
+                window.tbInterviewMapPickerService = module.createInterviewMapPickerService();
+                return window.tbInterviewMapPickerService;
+            }
+        } catch (error) {
+            console.error('Map picker service failed to load.', error);
+        }
+
+        return null;
+    };
+
+    const initInterviewFormPage = async function () {
         const form = document.querySelector('form');
         if (!form) return;
         if (form.dataset.tbInterviewFormInitialized === '1') return;
@@ -79,8 +100,14 @@
         const generateFeedback = form.querySelector('[data-meeting-link-feedback]');
         const onlineField = form.querySelector('[data-online-field]');
         const onsiteField = form.querySelector('[data-onsite-field]');
+        const mapPickerTrigger = form.querySelector('[data-map-picker-trigger]');
         const notesInput = form.querySelector('textarea[name="notes"]');
         const notesCount = form.querySelector('[data-notes-count]');
+        const mapPickerService = await ensureMapPickerService();
+
+        if (mapPickerService && locationInput && mapPickerTrigger) {
+            mapPickerService.attach(locationInput, mapPickerTrigger);
+        }
 
         const setGenerateFeedback = function (message, type) {
             if (!generateFeedback) return;
@@ -194,7 +221,7 @@
         applyModeFields();
     };
 
-    document.addEventListener('DOMContentLoaded', initInterviewFormPage);
-    document.addEventListener('turbo:load', initInterviewFormPage);
+    document.addEventListener('DOMContentLoaded', function () { void initInterviewFormPage(); });
+    document.addEventListener('turbo:load', function () { void initInterviewFormPage(); });
 </script>
 {% endblock %}

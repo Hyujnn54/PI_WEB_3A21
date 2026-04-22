@@ -196,19 +196,22 @@ class Interview
     public static function validateInput(array $data, int $maxFutureDays = 90): array
     {
         try {
-            $scheduledAt = new \DateTimeImmutable((string) ($data['scheduled_at'] ?? ''));
+            $scheduledAtImmutable = new \DateTimeImmutable((string) ($data['scheduled_at'] ?? ''));
         } catch (\Throwable) {
             return ['ok' => false, 'error' => 'Invalid interview date/time.'];
         }
 
         $now = new \DateTimeImmutable();
-        if ($scheduledAt <= $now) {
+        if ($scheduledAtImmutable <= $now) {
             return ['ok' => false, 'error' => 'Interview date/time must be in the future.'];
         }
 
-        if ($scheduledAt > $now->modify('+' . $maxFutureDays . ' days')) {
+        if ($scheduledAtImmutable > $now->modify('+' . $maxFutureDays . ' days')) {
             return ['ok' => false, 'error' => 'Interview cannot be scheduled more than ' . $maxFutureDays . ' days ahead.'];
         }
+
+        // Entity fields are mapped as mutable datetime, so convert before persistence.
+        $scheduledAt = \DateTime::createFromImmutable($scheduledAtImmutable);
 
         $duration = (int) ($data['duration_minutes'] ?? 0);
         if ($duration < 15 || $duration > 240) {

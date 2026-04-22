@@ -18,6 +18,7 @@ class InterviewReminderDispatcher
         private readonly BrevoEmailSender $emailSender,
         private readonly SmsMobileApiSender $smsSender,
         private readonly ReminderMessageBuilder $messageBuilder,
+        private readonly InterviewLocationQrCodeService $locationQrCodeService,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -32,9 +33,9 @@ class InterviewReminderDispatcher
             'sms_sent' => 0,
         ];
 
-        $transportEnabled = $this->emailSender->isEnabled() || $this->smsSender->isEnabled();
+        $transportEnabled = $this->emailSender->isEnabled() && $this->smsSender->isEnabled();
         if (!$transportEnabled) {
-            $this->logger->warning('Interview reminders are disabled because Brevo and SMS Mobile API are not configured.');
+            $this->logger->warning('Interview reminders are disabled because both Brevo and SMS Mobile API must be configured.');
             return $stats;
         }
 
@@ -70,12 +71,26 @@ class InterviewReminderDispatcher
                 }
 
                 $subject = $this->messageBuilder->buildSubject($context['offerTitle']);
+                $allDelivered = true;
+                $recipientCount = 0;
 
                 foreach ($context['recipients'] as $recipient) {
+                    ++$recipientCount;
                     $recipientName = $recipient['name'];
                     $email = $recipient['email'];
                     $phone = $recipient['phone'];
                     $roleLabel = ucfirst($recipient['role']);
+
+                    if ($email === '' || $phone === '') {
+                        $allDelivered = false;
+                        $this->logger->warning('Interview reminder recipient is missing required contact details.', [
+                            'interviewId' => (string) $row->getId(),
+                            'role' => $recipient['role'],
+                            'hasEmail' => $email !== '',
+                            'hasPhone' => $phone !== '',
+                        ]);
+                        continue;
+                    }
 
                     $emailTextBody = $this->messageBuilder->buildEmailText(
                         $recipientName,
@@ -85,7 +100,8 @@ class InterviewReminderDispatcher
                         $context['durationMinutes'],
                         $context['modeLabel'],
                         $context['placeLabel'],
-                        $context['notes']
+                        $context['notes'],
+                        $context['mapsUrl']
                     );
 
                     $emailHtmlBody = $this->messageBuilder->buildEmailHtml(
@@ -96,10 +112,13 @@ class InterviewReminderDispatcher
                         $context['durationMinutes'],
                         $context['modeLabel'],
                         $context['placeLabel'],
-                        $context['notes']
+                        $context['notes'],
+                        $context['mapsUrl'],
+                        $context['locationQrCodeDataUri']
                     );
 
-                    if ($email !== '' && $this->emailSender->send($email, $recipientName, $subject, $emailTextBody, $emailHtmlBody)) {
+                    $emailSent = $this->emailSender->send($email, $recipientName, $subject, $emailTextBody, $emailHtmlBody);
+                    if ($emailSent) {
                         ++$stats['emails_sent'];
                     }
 
@@ -107,11 +126,29 @@ class InterviewReminderDispatcher
                         $context['offerTitle'],
                         $context['scheduledAt'],
                         $context['modeLabel'],
-                        $context['placeLabel']
+                        $context['placeLabel'],
+                        $context['mapsUrl']
                     );
-                    if ($phone !== '' && $this->smsSender->send($phone, $smsText)) {
+
+                    $smsSent = $this->smsSender->send($phone, $smsText);
+                    if ($smsSent) {
                         ++$stats['sms_sent'];
                     }
+
+                    if (!$emailSent || !$smsSent) {
+                        $allDelivered = false;
+                        $this->logger->warning('Interview reminder delivery failed for recipient.', [
+                            'interviewId' => (string) $row->getId(),
+                            'role' => $recipient['role'],
+                            'emailSent' => $emailSent,
+                            'smsSent' => $smsSent,
+                        ]);
+                    }
+                }
+
+                if ($recipientCount === 0 || !$allDelivered) {
+                    ++$stats['skipped'];
+                    continue;
                 }
 
                 // Reuse existing reminder_sent column to guarantee reminders are never dispatched twice.
@@ -154,6 +191,14 @@ class InterviewReminderDispatcher
             $mode = $this->normalizeMode((string) $interview->getMode());
             $meetingLink = trim((string) $interview->getMeeting_link());
             $location = trim((string) $interview->getLocation());
+            $mapsUrl = '';
+            $locationQrCodeDataUri = '';
+
+            if ($mode === 'onsite') {
+                $locationPayload = $this->locationQrCodeService->buildOnsiteLocationPayload($location);
+                $mapsUrl = (string) ($locationPayload['mapsUrl'] ?? '');
+                $locationQrCodeDataUri = (string) ($locationPayload['qrCodeDataUri'] ?? '');
+            }
 
             $placeLabel = $mode === 'onsite'
                 ? ($location !== '' ? $location : 'Not specified')
@@ -167,6 +212,8 @@ class InterviewReminderDispatcher
                 'modeLabel' => strtoupper($mode),
                 'placeLabel' => $placeLabel,
                 'notes' => trim((string) $interview->getNotes()),
+                'mapsUrl' => $mapsUrl,
+                'locationQrCodeDataUri' => $locationQrCodeDataUri,
                 'recipients' => [$candidateRecipient, $recruiterRecipient],
             ];
         } catch (Throwable) {

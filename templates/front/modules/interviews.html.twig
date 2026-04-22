@@ -183,9 +183,12 @@
                                         <div class="form-hint" data-edit-meeting-link-feedback></div>
                                     </div>
                                     <div class="col-md-6" data-onsite-field>
-                                        <label class="form-label">Room (onsite)</label>
-                                        <input type="text" name="location" class="form-control" placeholder="Room / Office location" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
-                                        <div class="form-hint">3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
+                                        <label class="form-label">Location (onsite)</label>
+                                        <div class="input-group">
+                                            <input type="text" name="location" class="form-control" placeholder="Room / Office location" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
+                                            <button type="button" class="btn btn-outline-primary" data-edit-map-picker-trigger>Select on Map</button>
+                                        </div>
+                                        <div class="form-hint">Use map picker to save as Place (lat,lng). 3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label">Additional Notes</label>
@@ -254,6 +257,7 @@
         pageRoot.dataset.tbInterviewsInitialized = '1';
 
         const params = new URLSearchParams(window.location.search);
+        const mapPickerService = window.tbInterviewMapPickerService || null;
         const calendarRoot = document.getElementById('tbInterviewCalendar');
         const dayDetails = document.getElementById('tbCalendarDayDetails');
         const calendarModalEl = document.getElementById('interviewCalendarModal');
@@ -599,10 +603,15 @@
             const generateMeetingButton = editForm.querySelector('[data-edit-generate-meeting-link]');
             const generateMeetingFeedback = editForm.querySelector('[data-edit-meeting-link-feedback]');
             const locationInput = editForm.querySelector('input[name="location"]');
+            const mapPickerTrigger = editForm.querySelector('[data-edit-map-picker-trigger]');
             const notesInput = editForm.querySelector('textarea[name="notes"]');
             const notesCount = editForm.querySelector('[data-edit-notes-count]');
             const onlineField = editForm.querySelector('[data-online-field]');
             const onsiteField = editForm.querySelector('[data-onsite-field]');
+
+            if (mapPickerService && locationInput && mapPickerTrigger) {
+                mapPickerService.attach(locationInput, mapPickerTrigger);
+            }
 
             if (scheduleInput) scheduleInput.min = minValue;
 

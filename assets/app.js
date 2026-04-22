@@ -1,4 +1,5 @@
 import './bootstrap.js';
+import { createInterviewMapPickerService } from './services/interviewMapPickerService.js';
 /*
  * Welcome to your app's main JavaScript file!
  *
@@ -6,5 +7,7 @@ import './bootstrap.js';
  * which should already be in your base.html.twig.
  */
 import './styles/app.css';
+
+window.tbInterviewMapPickerService = createInterviewMapPickerService();
 
 console.log('This log comes from assets/app.js - welcome to AssetMapper! 🎉');

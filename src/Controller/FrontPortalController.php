@@ -11,6 +11,7 @@ use App\Entity\Job_application;
 use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
+use App\Service\Interview\InterviewCalendarService;
 use App\Service\Interview\JitsiMeetingLinkGenerator;
 use App\Form\ProfileType;
 use App\Repository\InterviewRepository;
@@ -37,7 +38,10 @@ class FrontPortalController extends AbstractController
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
 
-    public function __construct(private readonly ManagerRegistry $doctrine)
+    public function __construct(
+        private readonly ManagerRegistry $doctrine,
+        private readonly InterviewCalendarService $interviewCalendarService,
+    )
     {
     }
 
@@ -1215,7 +1219,6 @@ class FrontPortalController extends AbstractController
         }
 
         $cards = [];
-        $upcomingInterviews = [];
         foreach ($interviews as $interview) {
             try {
                 $application = $interview->getApplication_id();
@@ -1297,25 +1300,13 @@ class FrontPortalController extends AbstractController
                     'delete_url' => $deleteUrl,
                     'feedback_url' => $feedbackUrl,
                 ];
-
-                $upcomingInterviews[] = [
-                    'interview_id' => (string) $interview->getId(),
-                    'timestamp' => $scheduledAt->getTimestamp(),
-                    'date' => $scheduledAt->format('d M Y H:i'),
-                    'ymd' => $scheduledAt->format('Y-m-d'),
-                    'title' => $title === '' ? 'Untitled offer' : $title,
-                    'mode' => strtoupper($mode),
-                    'status' => $displayStatus,
-                    'location' => $mode === 'onsite' ? ($location === '' ? 'N/A' : $location) : '',
-                    'meeting_link' => $mode === 'online' ? ($meetingLink === '' ? 'N/A' : $meetingLink) : '',
-                ];
             } catch (Throwable) {
                 // Skip malformed rows so one broken interview does not break the page.
                 continue;
             }
         }
 
-        usort($upcomingInterviews, static fn (array $a, array $b): int => $b['timestamp'] <=> $a['timestamp']);
+        $upcomingInterviews = $this->interviewCalendarService->buildUpcomingFromCards($cards);
 
         return $this->render('front/modules/interviews.html.twig', [
             'authUser' => ['role' => $role],
