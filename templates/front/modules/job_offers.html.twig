@@ -138,10 +138,15 @@
                 {% for card in cards %}
                     {% set isPendingReview = card.warning_status|default(null) == 'RESOLVED' %}
                     <div class="col-lg-4 col-md-6">
-                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-offer-id="{{ card.id }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-match-score="{{ card.match_score|default('') }}" data-match-label="{{ card.match_label|default('') }}" data-match-summary="{{ card.match_summary|default('')|e('html_attr') }}" data-match-matching-skills="{{ card.match_matching_skills|default('')|e('html_attr') }}" data-match-missing-skills="{{ card.match_missing_skills|default('')|e('html_attr') }}" data-match-explanation="{{ card.match_explanation|default('')|e('html_attr') }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : (isAdminReadOnly ? 'Read Only' : (card.already_applied ? 'Already Applied' : (card.can_apply|default(false) ? 'Apply' : 'Offer Unavailable'))) }}" data-action-primary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) : (isAdminReadOnly ? '#' : (card.can_apply|default(false) ? path('app_candidate_apply', {'offerId': card.id}) : '#')) }}" data-action-primary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : (role == 'candidate' and (card.already_applied or not card.can_apply|default(false)) ? '1' : '0')) }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete Offer' : (isAdminReadOnly ? '' : 'Save Offer') }}" data-action-secondary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) : '#' }}" data-action-secondary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0') }}" data-action-tertiary="{{ role == 'recruiter' ? 'View Applicants' : (isAdminReadOnly ? '' : 'Compare Offer') }}" data-action-tertiary-href="#" data-action-tertiary-disabled="{{ isAdminReadOnly ? '1' : '0' }}" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ card.meta|split(' | ')|last ~ '||Location: ' ~ card.meta|split(' | ')|first) }}">
+                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-offer-id="{{ card.id }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta|e('html_attr') }}" data-detail-title="{{ card.title|e('html_attr') }}" data-detail-text="{{ card.text|e('html_attr') }}" data-match-score="{{ card.match_score|default('')|e('html_attr') }}" data-match-label="{{ card.match_label|default('')|e('html_attr') }}" data-match-summary="{{ card.match_summary|default('')|e('html_attr') }}" data-match-matching-skills="{{ card.match_matching_skills|default('')|e('html_attr') }}" data-match-missing-skills="{{ card.match_missing_skills|default('')|e('html_attr') }}" data-match-explanation="{{ card.match_explanation|default('')|e('html_attr') }}" data-action-primary="{{ (role == 'recruiter' ? 'Modify Offer' : (isAdminReadOnly ? 'Read Only' : (card.already_applied ? 'Already Applied' : (card.can_apply|default(false) ? 'Apply' : 'Offer Unavailable'))))|e('html_attr') }}" data-action-primary-href="{{ (role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) : (isAdminReadOnly ? '#' : (card.can_apply|default(false) ? path('app_candidate_apply', {'offerId': card.id}) : '#')))|e('html_attr') }}" data-action-primary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : (role == 'candidate' and (card.already_applied or not card.can_apply|default(false)) ? '1' : '0')) }}" data-action-secondary="{{ (role == 'recruiter' ? 'Delete Offer' : (isAdminReadOnly ? '' : 'Save Offer'))|e('html_attr') }}" data-action-secondary-href="{{ (role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) : '#')|e('html_attr') }}" data-action-secondary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0') }}" data-action-tertiary="{{ (role == 'recruiter' ? 'View Applicants' : (isAdminReadOnly ? '' : 'Compare Offer'))|e('html_attr') }}" data-action-tertiary-href="#" data-action-tertiary-disabled="{{ isAdminReadOnly ? '1' : '0' }}" data-detail-extra="{{ (card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ card.meta|split(' | ')|last ~ '||Location: ' ~ card.meta|split(' | ')|first))|e('html_attr') }}">
                             {% if role == 'candidate' and card.match_score is defined and card.match_score is not null %}
                                 {% set matchTone = card.match_score >= 85 ? 'success' : (card.match_score >= 70 ? 'warning' : 'danger') %}
                                 <div class="badge bg-{{ matchTone }}-lt text-{{ matchTone }} mb-2">Match {{ card.match_score }}%{{ card.match_label|default('') ? ' - ' ~ card.match_label|capitalize : '' }}</div>
+                            {% endif %}
+                            {% if role == 'candidate' and card.distance is defined and card.distance is not null %}
+                                <div class="badge bg-blue-lt text-blue mb-2">
+                                    <i class="ti ti-map-pin me-1"></i>Distance: {{ card.distance|number_format(1) }} km
+                                </div>
                             {% endif %}
                             {% if isPendingReview %}
                                 <div class="badge bg-info mb-2" style="position: absolute; top: 8px; right: 8px;">Pending Review</div>
@@ -245,6 +250,136 @@
 </div>
 
 <script>
+    (function () {
+        const cards = Array.from(document.querySelectorAll('#offerCardsGrid .tb-module-card[data-detail-target]'));
+        const detailPanel = document.getElementById('offerDetailPanel');
+        const actionDock = document.getElementById('offerActionDock');
+
+        if (!detailPanel || cards.length === 0) {
+            return;
+        }
+
+        const metaNode = detailPanel.querySelector('.tb-detail-meta');
+        const titleNode = detailPanel.querySelector('.tb-detail-title');
+        const textNode = detailPanel.querySelector('.tb-detail-text');
+        const extraNode = detailPanel.querySelector('.tb-detail-extra');
+
+        const matchScoreNode = detailPanel.querySelector('.tb-match-score');
+        const matchLabelNode = detailPanel.querySelector('.tb-match-label');
+        const matchSummaryNode = detailPanel.querySelector('.tb-match-summary');
+        const matchMatchingNode = detailPanel.querySelector('.tb-match-matching');
+        const matchMissingNode = detailPanel.querySelector('.tb-match-missing');
+        const matchExplanationNode = detailPanel.querySelector('.tb-match-explanation');
+
+        const dockPrimary = actionDock ? actionDock.querySelector('.tb-dock-primary') : null;
+        const dockSecondaryForm = actionDock ? actionDock.querySelector('.tb-dock-secondary-form') : null;
+        const dockSecondaryButton = actionDock ? actionDock.querySelector('.tb-dock-secondary') : null;
+        const dockTertiary = actionDock ? actionDock.querySelector('.tb-dock-tertiary') : null;
+
+        const applyButtonState = function (node, disabled) {
+            if (!node) return;
+            if (disabled) {
+                node.classList.add('disabled');
+                node.setAttribute('aria-disabled', 'true');
+                node.setAttribute('tabindex', '-1');
+            } else {
+                node.classList.remove('disabled');
+                node.removeAttribute('aria-disabled');
+                node.removeAttribute('tabindex');
+            }
+        };
+
+        const updateDock = function (card) {
+            if (!actionDock) {
+                return;
+            }
+
+            const primaryLabel = card.getAttribute('data-action-primary') || 'Primary Action';
+            const primaryHref = card.getAttribute('data-action-primary-href') || '#';
+            const primaryDisabled = card.getAttribute('data-action-primary-disabled') === '1';
+
+            const secondaryLabel = card.getAttribute('data-action-secondary') || '';
+            const secondaryHref = card.getAttribute('data-action-secondary-href') || '#';
+            const secondaryDisabled = card.getAttribute('data-action-secondary-disabled') === '1' || secondaryLabel === '';
+
+            const tertiaryLabel = card.getAttribute('data-action-tertiary') || '';
+            const tertiaryHref = card.getAttribute('data-action-tertiary-href') || '#';
+            const tertiaryDisabled = card.getAttribute('data-action-tertiary-disabled') === '1' || tertiaryLabel === '';
+
+            if (dockPrimary) {
+                dockPrimary.innerHTML = '<i class="ti ti-edit me-1"></i>' + primaryLabel;
+                dockPrimary.setAttribute('href', primaryHref);
+                applyButtonState(dockPrimary, primaryDisabled);
+            }
+
+            if (dockSecondaryForm && dockSecondaryButton) {
+                dockSecondaryForm.setAttribute('action', secondaryHref);
+                dockSecondaryButton.innerHTML = '<i class="ti ti-trash me-1"></i>' + (secondaryLabel || 'Delete');
+                dockSecondaryButton.disabled = secondaryDisabled;
+            }
+
+            if (dockTertiary) {
+                dockTertiary.innerHTML = '<i class="ti ti-link me-1"></i>' + (tertiaryLabel || 'View');
+                dockTertiary.setAttribute('href', tertiaryHref);
+                applyButtonState(dockTertiary, tertiaryDisabled);
+            }
+
+            actionDock.classList.remove('d-none');
+        };
+
+        const updateMatch = function (card) {
+            if (!matchScoreNode || !matchLabelNode) {
+                return;
+            }
+
+            const scoreRaw = card.getAttribute('data-match-score') || '';
+            const label = card.getAttribute('data-match-label') || '';
+            const summary = card.getAttribute('data-match-summary') || '';
+            const matching = card.getAttribute('data-match-matching-skills') || '-';
+            const missing = card.getAttribute('data-match-missing-skills') || '-';
+            const explanation = card.getAttribute('data-match-explanation') || '';
+
+            if (scoreRaw === '') {
+                matchScoreNode.textContent = 'N/A';
+                matchLabelNode.textContent = 'No match data available for this offer.';
+            } else {
+                const score = Number(scoreRaw);
+                matchScoreNode.textContent = Number.isFinite(score) ? score.toFixed(0) + '%' : scoreRaw + '%';
+                matchLabelNode.textContent = label || 'Match computed';
+            }
+
+            if (matchSummaryNode) matchSummaryNode.textContent = summary;
+            if (matchMatchingNode) matchMatchingNode.textContent = matching || '-';
+            if (matchMissingNode) matchMissingNode.textContent = missing || '-';
+            if (matchExplanationNode) matchExplanationNode.textContent = explanation;
+        };
+
+        cards.forEach(function (card) {
+            card.addEventListener('click', function () {
+                cards.forEach(function (item) { item.classList.remove('is-selected'); });
+                card.classList.add('is-selected');
+
+                if (metaNode) metaNode.textContent = card.getAttribute('data-detail-meta') || '';
+                if (titleNode) titleNode.textContent = card.getAttribute('data-detail-title') || 'Offer Details';
+                if (textNode) textNode.textContent = card.getAttribute('data-detail-text') || 'No description available.';
+
+                if (extraNode) {
+                    const extras = (card.getAttribute('data-detail-extra') || '')
+                        .split('||')
+                        .map(function (entry) { return entry.trim(); })
+                        .filter(function (entry) { return entry !== ''; });
+
+                    extraNode.innerHTML = extras
+                        .map(function (line) { return '<div>' + line + '</div>'; })
+                        .join('');
+                }
+
+                updateMatch(card);
+                updateDock(card);
+            });
+        });
+    })();
+
     (function () {
         const filterForm = document.getElementById('jobOfferFilterForm');
         const locationInput = document.getElementById('filterLocation');

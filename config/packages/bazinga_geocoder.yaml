@@ -1,0 +1,7 @@
+bazinga_geocoder:
+    providers:
+        nominatim:
+            factory: Bazinga\GeocoderBundle\ProviderFactory\NominatimFactory
+            options:
+                root_url: 'https://nominatim.openstreetmap.org'
+                user_agent: 'TalentBridge/1.0 (noreply@talentbridge.local)'

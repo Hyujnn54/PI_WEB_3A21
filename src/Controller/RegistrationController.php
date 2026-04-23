@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Candidate;
 use App\Entity\Recruiter;
 use App\Repository\UsersRepository;
+use App\Service\GeolocationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,7 +20,8 @@ class RegistrationController extends AbstractController
         Request $request, 
         UserPasswordHasherInterface $hasher, 
         EntityManagerInterface $em,
-        UsersRepository $userRepository
+        UsersRepository $userRepository,
+        GeolocationService $geolocationService
     ): Response {
         if ($request->isMethod('POST')) {
             // 1. DATA COLLECTION
@@ -77,6 +79,12 @@ class RegistrationController extends AbstractController
                 $user->setEducationLevel($request->request->get('education_level'));
                 $user->setExperienceYears((int)$request->request->get('experience_years'));
                 $user->setRoles(['ROLE_CANDIDATE']);
+
+                $coords = $geolocationService->tryGeocode((string) $user->getLocation());
+                if ($coords !== null) {
+                    $user->setLatitude($coords['lat']);
+                    $user->setLongitude($coords['lng']);
+                }
 
                 // Handle CV Upload
                 $file = $request->files->get('cv_file');

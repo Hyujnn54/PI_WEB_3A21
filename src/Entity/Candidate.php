@@ -11,8 +11,14 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'candidate')]
 class Candidate extends Users
 {
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(name: 'location', length: 255, nullable: true)]
     private ?string $location = null;
+
+    #[ORM\Column(name: 'latitude', type: 'float', nullable: true)]
+    private ?float $latitude = null;
+
+    #[ORM\Column(name: 'longitude', type: 'float', nullable: true)]
+    private ?float $longitude = null;
 
     #[ORM\Column(name: "education_level", length: 100, nullable: true)]
     private ?string $educationLevel = null;
@@ -25,6 +31,15 @@ class Candidate extends Users
 
     public function getLocation(): ?string { return $this->location; }
     public function setLocation(?string $location): self { $this->location = $location; return $this; }
+
+    public function getCity(): ?string { return $this->location; }
+    public function setCity(?string $city): self { $this->location = $city; return $this; }
+
+    public function getLatitude(): ?float { return $this->latitude; }
+    public function setLatitude(?float $latitude): self { $this->latitude = $latitude; return $this; }
+
+    public function getLongitude(): ?float { return $this->longitude; }
+    public function setLongitude(?float $longitude): self { $this->longitude = $longitude; return $this; }
 
     public function getEducationLevel(): ?string { return $this->educationLevel; }
     public function setEducationLevel(?string $educationLevel): self { $this->educationLevel = $educationLevel; return $this; }

@@ -109,7 +109,16 @@
 
                         <div class="col-md-6">
                             <label class="form-label">Location</label>
-                            <input type="text" name="location" class="form-control {{ fieldErrors.location|default(null) ? 'is-invalid' : '' }}" value="{{ formData.location|default('') }}">
+                            <input type="text"
+                                   id="locationInput"
+                                   name="location"
+                                   list="locationSuggestionList"
+                                   autocomplete="off"
+                                   class="form-control {{ fieldErrors.location|default(null) ? 'is-invalid' : '' }}"
+                                   value="{{ formData.location|default('') }}"
+                                   placeholder="Start typing a city or address...">
+                            <datalist id="locationSuggestionList"></datalist>
+                            <small id="locationSuggestionHint" class="text-secondary d-block mt-1">Type at least 2 characters to get location suggestions.</small>
                             <div class="invalid-feedback d-block" data-error-for="location"></div>
                             {% if fieldErrors.location|default(null) %}
                                 <div class="invalid-feedback d-block">{{ fieldErrors.location }}</div>
@@ -143,7 +152,14 @@
         const form = document.getElementById('jobOfferCreateForm');
         const generateAiBtn = document.getElementById('generateAiBtn');
         const aiGenerateStatus = document.getElementById('aiGenerateStatus');
+        const locationInput = document.getElementById('locationInput');
+        const locationSuggestionList = document.getElementById('locationSuggestionList');
+        const locationSuggestionHint = document.getElementById('locationSuggestionHint');
+        const locationSuggestionUrl = '{{ path('front_job_offer_location_suggestions') }}';
         if (!container || !addBtn || !form) return;
+
+        let locationDebounceTimer = null;
+        let lastLocationQuery = '';
 
         const levelOptionsHtml = `{% for skillLevel in skillLevels %}<option value="{{ skillLevel }}">{{ skillLevel|capitalize }}</option>{% endfor %}`;
 
@@ -163,6 +179,68 @@
             aiGenerateStatus.textContent = message || '';
             aiGenerateStatus.classList.toggle('text-danger', Boolean(isError));
             aiGenerateStatus.classList.toggle('text-secondary', !isError);
+        };
+
+        const setLocationHint = function (message, isError) {
+            if (!locationSuggestionHint) return;
+            locationSuggestionHint.textContent = message || '';
+            locationSuggestionHint.classList.toggle('text-danger', Boolean(isError));
+            locationSuggestionHint.classList.toggle('text-secondary', !isError);
+        };
+
+        const renderLocationSuggestions = function (suggestions) {
+            if (!locationSuggestionList) return;
+            locationSuggestionList.innerHTML = '';
+            suggestions.forEach(function (entry) {
+                const option = document.createElement('option');
+                option.value = entry;
+                locationSuggestionList.appendChild(option);
+            });
+        };
+
+        const fetchLocationSuggestions = async function (rawQuery) {
+            const query = rawQuery.trim();
+            if (query.length < 2) {
+                renderLocationSuggestions([]);
+                setLocationHint('Type at least 2 characters to get location suggestions.', false);
+                return;
+            }
+
+            lastLocationQuery = query;
+
+            try {
+                const response = await fetch(locationSuggestionUrl + '?q=' + encodeURIComponent(query), {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const payload = await response.json();
+                if (query !== lastLocationQuery) {
+                    return;
+                }
+
+                if (!response.ok || !payload || payload.ok !== true) {
+                    throw new Error((payload && payload.error) ? payload.error : 'Unable to fetch location suggestions.');
+                }
+
+                const suggestions = Array.isArray(payload.suggestions) ? payload.suggestions : [];
+                const values = suggestions
+                    .map(function (item) { return (item && typeof item.label === 'string') ? item.label : ''; })
+                    .filter(function (value) { return value.trim() !== ''; });
+
+                renderLocationSuggestions(values);
+
+                if (values.length > 0) {
+                    setLocationHint('Choose one of the suggested locations.', false);
+                } else {
+                    setLocationHint('No suggestion found. You can still type location manually.', false);
+                }
+            } catch (error) {
+                renderLocationSuggestions([]);
+                setLocationHint((error && error.message) ? error.message : 'Unable to fetch location suggestions.', true);
+            }
         };
 
         const clearSkillRowErrors = function (row) {
@@ -456,6 +534,18 @@
         if (generateAiBtn) {
             generateAiBtn.addEventListener('click', function () {
                 generateWithAi();
+            });
+        }
+
+        if (locationInput) {
+            locationInput.addEventListener('input', function () {
+                if (locationDebounceTimer) {
+                    clearTimeout(locationDebounceTimer);
+                }
+
+                locationDebounceTimer = setTimeout(function () {
+                    fetchLocationSuggestions(locationInput.value || '');
+                }, 300);
             });
         }
 

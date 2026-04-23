@@ -24,6 +24,8 @@ class Job_offerRepository extends ServiceEntityRepository
                 'jo.title AS title',
                 'jo.description AS description',
                 'jo.location AS location',
+                'jo.latitude AS latitude',
+                'jo.longitude AS longitude',
                 'jo.contract_type AS contract_type',
                 'jo.status AS status',
                 'jo.deadline AS deadline',

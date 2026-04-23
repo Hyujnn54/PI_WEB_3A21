@@ -30,14 +30,14 @@ class Job_offer
     #[ORM\Column(type: "text")]
     private string $description;
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $location;
+    #[ORM\Column(type: "string", length: 255, nullable: true)]
+    private ?string $location = null;
 
-    #[ORM\Column(type: "float")]
-    private float $latitude;
+    #[ORM\Column(type: "float", nullable: true)]
+    private ?float $latitude = null;
 
-    #[ORM\Column(type: "float")]
-    private float $longitude;
+    #[ORM\Column(type: "float", nullable: true)]
+    private ?float $longitude = null;
 
     #[ORM\Column(type: "string")]
     private string $contract_type;
@@ -103,34 +103,40 @@ class Job_offer
         $this->description = $value;
     }
 
-    public function getLocation()
+    public function getLocation(): ?string
     {
         return $this->location;
     }
 
-    public function setLocation($value)
+    public function setLocation(?string $value): self
     {
         $this->location = $value;
+
+        return $this;
     }
 
-    public function getLatitude()
+    public function getLatitude(): ?float
     {
         return $this->latitude;
     }
 
-    public function setLatitude($value)
+    public function setLatitude(?float $value): self
     {
         $this->latitude = $value;
+
+        return $this;
     }
 
-    public function getLongitude()
+    public function getLongitude(): ?float
     {
         return $this->longitude;
     }
 
-    public function setLongitude($value)
+    public function setLongitude(?float $value): self
     {
         $this->longitude = $value;
+
+        return $this;
     }
 
     public function getContract_type()

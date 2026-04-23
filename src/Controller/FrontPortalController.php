@@ -18,6 +18,8 @@ use App\Repository\Job_offerRepository;
 use App\Repository\UsersRepository;
 use App\Service\CandidateOfferMatchingService;
 use App\Service\CommentAnalyzerService;
+use App\Service\GeolocationService;
+use App\Service\JobOfferLocationGeocoder;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
@@ -49,7 +51,9 @@ class FrontPortalController extends AbstractController
     public function __construct(
         private readonly ManagerRegistry $doctrine,
         private readonly CandidateOfferMatchingService $candidateOfferMatchingService,
-        private readonly CommentAnalyzerService $commentAnalyzerService
+        private readonly CommentAnalyzerService $commentAnalyzerService,
+        private readonly JobOfferLocationGeocoder $jobOfferLocationGeocoder,
+        private readonly GeolocationService $geolocationService
     )
     {
     }
@@ -205,12 +209,45 @@ class FrontPortalController extends AbstractController
                 ];
             }, $rows);
 
+            // --- Geolocation: geocode the candidate's city in-memory (no DB write) ---
+            $candidateLat = null;
+            $candidateLng = null;
+            if ($role === 'candidate' && $candidate instanceof Candidate) {
+                $candidateCity = $candidate->getLocation();
+                if ($candidateCity !== null && $candidateCity !== '') {
+                    $coords = $this->geolocationService->tryGeocode($candidateCity);
+                    if ($coords !== null) {
+                        $candidateLat = $coords['lat'];
+                        $candidateLng = $coords['lng'];
+                    }
+                }
+            }
+
+            // Add distance to each card.
             foreach ($dbCards as $dbCard) {
+                $dbCard['distance'] = $this->geolocationService->buildOfferWithDistance(
+                    $dbCard,
+                    $candidateLat,
+                    $candidateLng
+                )['distance'];
+
                 if (($dbCard['is_expired'] ?? false) === true) {
                     $expiredOffers[] = $dbCard;
                 }
 
                 $cards[] = $dbCard;
+            }
+
+            // Sort cards nearest → farthest for candidates (nulls go last).
+            if ($role === 'candidate' && $candidateLat !== null) {
+                usort($cards, static function (array $a, array $b): int {
+                    $da = $a['distance'];
+                    $db = $b['distance'];
+                    if ($da === null && $db === null) { return 0; }
+                    if ($da === null) { return 1; }
+                    if ($db === null) { return -1; }
+                    return $da <=> $db;
+                });
             }
         } catch (\Throwable $exception) {
             // Keep UI usable even if table is not ready in current environment.
@@ -421,6 +458,7 @@ class FrontPortalController extends AbstractController
                 $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
                 if ($deadline) {
                     $now = new \DateTimeImmutable();
+                    $coords = $this->resolveLocationCoordinates($formData['location']);
                     $newId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
                     try {
                         $connection->beginTransaction();
@@ -431,8 +469,8 @@ class FrontPortalController extends AbstractController
                             'title' => $formData['title'],
                             'description' => $formData['description'],
                             'location' => $formData['location'],
-                            'latitude' => 0,
-                            'longitude' => 0,
+                            'latitude' => $coords['lat'],
+                            'longitude' => $coords['lng'],
                             'contract_type' => $formData['contract_type'],
                             'created_at' => $now->format('Y-m-d H:i:s'),
                             'deadline' => $deadline->format('Y-m-d H:i:s'),
@@ -473,6 +511,33 @@ class FrontPortalController extends AbstractController
             'skillLevels' => self::SKILL_LEVELS,
             'formData' => $formData,
             'fieldErrors' => $fieldErrors,
+        ]);
+    }
+
+    #[Route('/front/job-offers/location-suggestions', name: 'front_job_offer_location_suggestions', methods: ['GET'])]
+    public function suggestOfferLocations(Request $request): JsonResponse
+    {
+        $role = $this->resolveSessionRole($request);
+        if ($role !== 'recruiter') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Only recruiters can access location suggestions.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $term = trim((string) $request->query->get('q', ''));
+        if (mb_strlen($term) < 2) {
+            return $this->json([
+                'ok' => true,
+                'suggestions' => [],
+            ]);
+        }
+
+        $suggestions = $this->jobOfferLocationGeocoder->suggestLocations($term, 6);
+
+        return $this->json([
+            'ok' => true,
+            'suggestions' => $suggestions,
         ]);
     }
 
@@ -633,6 +698,8 @@ class FrontPortalController extends AbstractController
             if (empty($fieldErrors)) {
                 $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $formData['deadline']);
                 if ($deadline) {
+                    $coords = $this->resolveLocationCoordinates($formData['location']);
+
                     try {
                         $connection->beginTransaction();
 
@@ -642,8 +709,8 @@ class FrontPortalController extends AbstractController
                             'location' => $formData['location'],
                             'contract_type' => $formData['contract_type'],
                             'deadline' => $deadline->format('Y-m-d H:i:s'),
-                            'latitude' => 0,
-                            'longitude' => 0,
+                            'latitude' => $coords['lat'],
+                            'longitude' => $coords['lng'],
                         ], [
                             'id' => $id,
                             'recruiter_id' => $currentRecruiterId,
@@ -1898,6 +1965,14 @@ class FrontPortalController extends AbstractController
                 $user->setPassword($passwordHasher->hashPassword($user, $plainPassword));
             }
 
+            if ($user instanceof Candidate) {
+                $coords = $this->geolocationService->tryGeocode((string) $user->getLocation());
+                if ($coords !== null) {
+                    $user->setLatitude($coords['lat']);
+                    $user->setLongitude($coords['lng']);
+                }
+            }
+
             $entityManager->flush();
             $request->getSession()->set('user_name', $user->getFirstName());
 
@@ -1978,6 +2053,23 @@ class FrontPortalController extends AbstractController
         }
 
         return $userId;
+    }
+
+    /**
+     * @return array{lat: float|null, lng: float|null}
+     */
+    private function resolveLocationCoordinates(string $location): array
+    {
+        $coords = $this->geolocationService->tryGeocode($location);
+
+        if ($coords === null) {
+            return ['lat' => null, 'lng' => null];
+        }
+
+        return [
+            'lat' => $coords['lat'],
+            'lng' => $coords['lng'],
+        ];
     }
 
     private function validateInterviewPayload(array $data): array
