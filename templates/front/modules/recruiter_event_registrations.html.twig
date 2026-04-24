@@ -18,6 +18,17 @@
     </div>
     <div class="page-body">
         <div class="container-xl">
+            {% if role == 'recruiter' and urgencyNotifications is defined and urgencyNotifications is not empty %}
+                <div class="alert alert-warning" role="alert">
+                    <div class="fw-bold mb-2"><i class="ti ti-alert-triangle me-1"></i>Urgency notifications</div>
+                    <ul class="mb-0 ps-3">
+                        {% for notice in urgencyNotifications %}
+                            <li>{{ notice }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
             {% if events is not empty %}
                 {% for event in events %}
                     <div class="card mb-4">
@@ -49,6 +60,12 @@
                                         <i class="ti ti-users me-2"></i>
                                         <strong>Registered Candidates:</strong> {{ event.registration_count }} / {{ event.capacity }}
                                     </div>
+                                    {% if role == 'recruiter' and event.urgent_pending_count|default(0) > 0 %}
+                                        <div class="alert alert-warning mt-2 mb-0">
+                                            <i class="ti ti-bell-ringing me-2"></i>
+                                            <strong>Urgent pending decisions:</strong> {{ event.urgent_pending_count }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             
@@ -68,7 +85,7 @@
                                     <tbody>
                                         {% if event.registrations is not empty %}
                                             {% for candidate in event.registrations %}
-                                                <tr>
+                                                <tr{% if role == 'recruiter' and candidate.is_urgent|default(false) %} class="table-warning"{% endif %}>
                                                     <td>{{ candidate.name }}</td>
                                                     <td>{{ candidate.email }}</td>
                                                     <td>{{ candidate.registered_at|date('d M Y H:i') }}</td>
@@ -79,6 +96,9 @@
                                                             <span class="badge bg-danger">Rejected</span>
                                                         {% else %}
                                                             <span class="badge bg-warning">Under Review</span>
+                                                        {% endif %}
+                                                        {% if role == 'recruiter' and candidate.is_urgent|default(false) %}
+                                                            <span class="badge bg-danger ms-1">Urgent{% if candidate.hours_until_event is not null %} ({{ candidate.hours_until_event }}h left){% endif %}</span>
                                                         {% endif %}
                                                     </td>
                                                     {% if role == 'recruiter' %}

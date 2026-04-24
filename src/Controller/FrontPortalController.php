@@ -23,6 +23,9 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
+use Symfony\Component\Notifier\Notification\Notification;
+use Symfony\Component\Notifier\NotifierInterface;
+use Symfony\Component\Notifier\Recipient\NoRecipient;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
@@ -32,6 +35,7 @@ class FrontPortalController extends AbstractController
 {
     private const MAX_FUTURE_DAYS = 90;
     private const EDIT_LOCK_HOURS = 2;
+    private const URGENCY_WINDOW_HOURS = 48;
     private const LOCATION_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,120}$/u';
     private const TEXTAREA_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{0,1000}$/u';
     private const REVIEW_COMMENT_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,1000}$/u';
@@ -1025,7 +1029,7 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/recruiter/event-registrations', name: 'recruiter_event_registrations')]
-    public function recruiterEventRegistrations(Request $request, EntityManagerInterface $entityManager): Response
+    public function recruiterEventRegistrations(Request $request, EntityManagerInterface $entityManager, NotifierInterface $notifier): Response
     {
         $role = $this->resolveSessionRole($request);
         if ($role !== 'recruiter') {
@@ -1042,15 +1046,31 @@ class FrontPortalController extends AbstractController
             ], ['id' => 'DESC']);
         }
 
+        $now = new \DateTimeImmutable();
+        $urgencyNotifications = [];
         $eventsData = [];
         foreach ($events as $event) {
             $registrations = $event->getEvent_registrations();
+            $eventDate = $event->getEvent_date();
+            $secondsUntilEvent = $eventDate->getTimestamp() - $now->getTimestamp();
 
             $candidatesList = [];
+            $urgentPendingCount = 0;
             foreach ($registrations as $registration) {
                 $candidateEntity = $registration->getCandidate_id();
                 $candidateFullName = '';
                 $candidateEmail = '';
+                $status = strtolower((string) ($registration->getAttendance_status() ?? 'registered'));
+                $isPendingDecision = !in_array($status, ['confirmed', 'rejected'], true);
+
+                $hoursUntilEvent = null;
+                if ($secondsUntilEvent > 0) {
+                    $hoursUntilEvent = (int) ceil($secondsUntilEvent / 3600);
+                }
+
+                $isUrgent = $isPendingDecision
+                    && $secondsUntilEvent > 0
+                    && $secondsUntilEvent <= (self::URGENCY_WINDOW_HOURS * 3600);
 
                 if ($candidateEntity instanceof Candidate) {
                     $candidateFullName = trim(((string) $candidateEntity->getFirstName()) . ' ' . ((string) $candidateEntity->getLastName()));
@@ -1067,31 +1087,59 @@ class FrontPortalController extends AbstractController
                     $candidateEmail = (string) ($registration->getCandidate_email() ?? 'N/A');
                 }
 
+                if ($isUrgent) {
+                    ++$urgentPendingCount;
+                    $urgencyNotifications[] = sprintf(
+                        'Urgent: %s has a pending registration for "%s" in about %d hour(s).',
+                        $candidateFullName !== '' ? $candidateFullName : 'A candidate',
+                        (string) $event->getTitle(),
+                        $hoursUntilEvent ?? self::URGENCY_WINDOW_HOURS
+                    );
+                }
+
                 $candidatesList[] = [
                     'registration_id' => $registration->getId(),
                     'name' => $candidateFullName,
                     'email' => $candidateEmail,
                     'registered_at' => $registration->getRegistered_at(),
                     'status' => $registration->getAttendance_status() ?? 'registered',
+                    'is_urgent' => $isUrgent,
+                    'hours_until_event' => $hoursUntilEvent,
                 ];
             }
 
             $eventsData[] = [
                 'id' => $event->getId(),
                 'title' => $event->getTitle(),
-                'meta' => $event->getEvent_date()->format('d M Y') . ' | ' . $event->getLocation(),
-                'date' => $event->getEvent_date(),
+                'meta' => $eventDate->format('d M Y') . ' | ' . $event->getLocation(),
+                'date' => $eventDate,
                 'location' => $event->getLocation(),
                 'capacity' => $event->getCapacity(),
                 'event_type' => $event->getEvent_type(),
                 'registrations' => $candidatesList,
                 'registration_count' => count($candidatesList),
+                'urgent_pending_count' => $urgentPendingCount,
             ];
+        }
+
+        $urgencyNotifications = array_values(array_unique($urgencyNotifications));
+        if (count($urgencyNotifications) > 0) {
+            $summary = sprintf(
+                'Urgency alert: %d pending registration(s) require action in less than %d hours.',
+                count($urgencyNotifications),
+                self::URGENCY_WINDOW_HOURS
+            );
+
+            $notification = (new Notification($summary, ['browser']))
+                ->importance(Notification::IMPORTANCE_HIGH);
+
+            $notifier->send($notification, new NoRecipient());
         }
 
         return $this->render('front/modules/recruiter_event_registrations.html.twig', [
             'authUser' => ['role' => $role],
             'events' => $eventsData,
+            'urgencyNotifications' => $urgencyNotifications,
         ]);
     }
 
