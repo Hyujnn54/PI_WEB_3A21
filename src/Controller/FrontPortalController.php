@@ -21,6 +21,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
@@ -1158,7 +1160,7 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/recruiter/event-registrations/{id}/status', name: 'recruiter_update_registration_status', methods: ['POST'])]
-    public function updateRegistrationStatus(Request $request, string $id, EntityManagerInterface $entityManager): Response
+    public function updateRegistrationStatus(Request $request, string $id, EntityManagerInterface $entityManager, MailerInterface $mailer): Response
     {
         $role = $this->resolveSessionRole($request);
         if ($role !== 'recruiter') {
@@ -1182,12 +1184,93 @@ class FrontPortalController extends AbstractController
         if (in_array($status, ['confirmed', 'rejected'], true)) {
             $registration->setAttendance_status($status);
             $entityManager->flush();
+
+            try {
+                $this->sendEventRegistrationStatusEmail($registration, $mailer);
+            } catch (\Throwable) {
+                // Keep status update successful even if mail transport fails.
+                $this->addFlash('warning', 'Status was updated, but the notification email could not be sent.');
+            }
+
             $this->addFlash('success', 'Registration status updated to ' . ucfirst($status) . '.');
         } else {
             $this->addFlash('warning', 'Invalid status provided.');
         }
 
         return $this->redirectToRoute('recruiter_event_registrations', ['role' => 'recruiter']);
+    }
+
+    private function sendEventRegistrationStatusEmail(Event_registration $registration, MailerInterface $mailer): void
+    {
+        $candidateEntity = $registration->getCandidate_id();
+        $candidateName = trim((string) ($registration->getCandidate_name() ?? 'Candidate'));
+        $candidateEmail = trim((string) ($registration->getCandidate_email() ?? ''));
+
+        if ($candidateEntity instanceof Candidate) {
+            $resolvedName = trim(((string) $candidateEntity->getFirstName()) . ' ' . ((string) $candidateEntity->getLastName()));
+            if ($resolvedName !== '') {
+                $candidateName = $resolvedName;
+            }
+
+            $resolvedEmail = trim((string) $candidateEntity->getEmail());
+            if ($resolvedEmail !== '') {
+                $candidateEmail = $resolvedEmail;
+            }
+        }
+
+        if ($candidateEmail === '' || !filter_var($candidateEmail, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        $event = $registration->getEvent_id();
+        $eventTitle = $event instanceof Recruitment_event ? (string) $event->getTitle() : 'Event';
+        $eventType = $event instanceof Recruitment_event ? (string) $event->getEvent_type() : 'General';
+        $meetingLink = $event instanceof Recruitment_event ? trim((string) $event->getMeet_link()) : '';
+        $eventDate = $event instanceof Recruitment_event && $event->getEvent_date() instanceof \DateTimeInterface
+            ? $event->getEvent_date()->format('d M Y H:i')
+            : 'To be announced';
+
+        $normalizedStatus = strtolower((string) $registration->getAttendance_status());
+        $statusLabel = $normalizedStatus === 'confirmed' ? 'Confirmed' : 'Declined';
+        $isConfirmed = $normalizedStatus === 'confirmed';
+        $normalizedEventType = strtolower(trim($eventType));
+        $isWorkshopOrHiringDay = in_array($normalizedEventType, ['workshop', 'hiring day', 'hiringday'], true);
+        $isWebinar = in_array($normalizedEventType, ['webinar', 'webinair'], true);
+        $registrationId = (string) $registration->getId();
+        $qrPayload = sprintf(
+            'TB|REG:%s|EVENT:%s|TYPE:%s|DATE:%s|EMAIL:%s|STATUS:%s',
+            $registrationId,
+            $eventTitle,
+            $eventType,
+            $eventDate,
+            $candidateEmail,
+            strtoupper($statusLabel)
+        );
+        $qrCodeUrl = $isConfirmed && $isWorkshopOrHiringDay
+            ? 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&format=png&data=' . rawurlencode($qrPayload)
+            : null;
+        $webinarMeetingLink = $isConfirmed && $isWebinar && filter_var($meetingLink, FILTER_VALIDATE_URL)
+            ? $meetingLink
+            : null;
+        $subject = sprintf('Event registration %s - %s', strtolower($statusLabel), $eventTitle);
+        $fromAddress = (string) ($_ENV['MAILER_FROM'] ?? 'rayanbenamor207@gmail.com');
+
+        $email = (new Email())
+            ->from($fromAddress)
+            ->to($candidateEmail)
+            ->subject($subject)
+            ->html($this->renderView('front/emails/event_registration_status.html.twig', [
+                'candidate_name' => $candidateName,
+                'status_label' => $statusLabel,
+                'is_confirmed' => $isConfirmed,
+                'event_title' => $eventTitle,
+                'event_type' => $eventType,
+                'event_date' => $eventDate,
+                'qr_code_url' => $qrCodeUrl,
+                'meeting_link' => $webinarMeetingLink,
+            ]));
+
+        $mailer->send($email);
     }
 
     #[Route('/front/interviews', name: 'front_interviews')]

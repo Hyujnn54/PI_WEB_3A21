@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event registration update</title>
+</head>
+<body style="margin:0;padding:0;background:#edf1f7;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#1f2937;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#edf1f7;padding:24px 12px;">
+    <tr>
+        <td align="center">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #d7deeb;">
+                <tr>
+                    <td style="background:linear-gradient(120deg,#2f5e9d,#4577bc);padding:24px;">
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr>
+                                <td>
+                                    <div style="font-size:12px;letter-spacing:1px;color:#dce8ff;text-transform:uppercase;font-weight:600;">Talent Bridge</div>
+                                    <div style="font-size:34px;line-height:1.2;color:#ffffff;font-weight:700;margin-top:8px;">Event registration update</div>
+                                </td>
+                                <td align="right" valign="top">
+                                    <span style="display:inline-block;padding:10px 16px;border-radius:999px;font-size:14px;font-weight:700;color:#ffffff;background:{{ is_confirmed ? '#2f9e5b' : '#b43a3a' }};text-transform:uppercase;">{{ status_label }}</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:28px 24px 20px 24px;">
+                        <p style="margin:0 0 12px 0;font-size:22px;font-weight:700;color:#263957;">Hello {{ candidate_name|default('candidate') }},</p>
+                        {% if is_confirmed %}
+                            <p style="margin:0 0 20px 0;font-size:17px;line-height:1.6;color:#3a4b65;">
+                                Your event registration has been confirmed by the recruiter.
+                                Please arrive a few minutes early and bring everything required for the session.
+                            </p>
+                        {% else %}
+                            <p style="margin:0 0 20px 0;font-size:17px;line-height:1.6;color:#3a4b65;">
+                                Your registration request was declined by the recruiter for this event.
+                                You can still explore and register for other upcoming events in Talent Bridge.
+                            </p>
+                        {% endif %}
+
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d7deeb;border-radius:12px;background:#f8fbff;overflow:hidden;">
+                            <tr>
+                                <td style="padding:18px;">
+                                    <div style="font-size:12px;letter-spacing:1px;color:#6f7f95;text-transform:uppercase;font-weight:700;margin-bottom:12px;">Registration details</div>
+                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                        <tr>
+                                            <td style="padding:8px 0;color:#6f7f95;font-size:15px;width:120px;">Event</td>
+                                            <td style="padding:8px 0;color:#263957;font-size:15px;font-weight:700;">{{ event_title }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:8px 0;color:#6f7f95;font-size:15px;">Type</td>
+                                            <td style="padding:8px 0;color:#263957;font-size:15px;font-weight:700;">{{ event_type }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:8px 0;color:#6f7f95;font-size:15px;">Date</td>
+                                            <td style="padding:8px 0;color:#263957;font-size:15px;font-weight:700;">{{ event_date }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:8px 0;color:#6f7f95;font-size:15px;">Status</td>
+                                            <td style="padding:8px 0;color:#263957;font-size:15px;font-weight:700;">{{ status_label }}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <div style="margin-top:16px;padding:14px 16px;border-radius:10px;background:{{ is_confirmed ? '#edf7ef' : '#fbecec' }};border-left:4px solid {{ is_confirmed ? '#2f9e5b' : '#b43a3a' }};color:#3a4b65;font-size:14px;">
+                            {% if is_confirmed %}
+                                We look forward to seeing you there.
+                            {% else %}
+                                Do not worry - new opportunities are added regularly.
+                            {% endif %}
+                        </div>
+
+                        {% if is_confirmed and qr_code_url is not empty %}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:20px;border:1px solid #c8dcf2;border-radius:12px;background:#f1f8ff;overflow:hidden;">
+                                <tr>
+                                    <td style="padding:16px;text-align:center;">
+                                        <div style="font-size:12px;letter-spacing:1px;color:#345b8d;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Your access QR code</div>
+                                        <div style="font-size:14px;color:#4b607e;margin-bottom:12px;">Show this code at check-in for event access.</div>
+                                        <img src="{{ qr_code_url }}" alt="Event access QR code" width="180" height="180" style="display:block;margin:0 auto;border:1px solid #c8dcf2;border-radius:8px;background:#ffffff;padding:8px;">
+                                    </td>
+                                </tr>
+                            </table>
+                        {% endif %}
+
+                        {% if is_confirmed and meeting_link is not empty %}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:20px;border:1px solid #c8dcf2;border-radius:12px;background:#f1f8ff;overflow:hidden;">
+                                <tr>
+                                    <td style="padding:16px;">
+                                        <div style="font-size:12px;letter-spacing:1px;color:#345b8d;text-transform:uppercase;font-weight:700;margin-bottom:8px;text-align:center;">Webinar meeting link</div>
+                                        <div style="font-size:14px;color:#4b607e;margin-bottom:12px;text-align:center;">Join your webinar session using this secure link.</div>
+                                        <div style="text-align:center;">
+                                            <a href="{{ meeting_link }}" style="display:inline-block;background:#3f6ead;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 20px;border-radius:8px;">Join Webinar</a>
+                                        </div>
+                                        <div style="margin-top:10px;font-size:12px;color:#6a7b95;word-break:break-all;text-align:center;">{{ meeting_link }}</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
