@@ -929,6 +929,54 @@ class FrontPortalController extends AbstractController
         return $this->redirectToRoute('front_event_registrations', ['role' => 'candidate']);
     }
 
+    #[Route('/front/events/{id}/google-calendar', name: 'front_event_google_calendar', methods: ['GET'])]
+    public function addEventToGoogleCalendar(Request $request, int $id, EntityManagerInterface $entityManager): Response
+    {
+        $role = $this->resolveSessionRole($request);
+        if ($role !== 'candidate') {
+            $this->addFlash('warning', 'Only candidates can add events to Google Calendar.');
+            return $this->redirectToRoute('front_events');
+        }
+
+        $event = $entityManager->getRepository(Recruitment_event::class)->find($id);
+        if (!$event) {
+            throw $this->createNotFoundException('Event not found');
+        }
+
+        $startAt = \DateTimeImmutable::createFromInterface($event->getEvent_date());
+        $endAt = $startAt->modify('+1 hour');
+
+        $startUtc = $startAt->setTimezone(new \DateTimeZone('UTC'));
+        $endUtc = $endAt->setTimezone(new \DateTimeZone('UTC'));
+
+        $eventType = strtolower(trim((string) $event->getEvent_type()));
+        $meetLink = trim((string) $event->getMeet_link());
+        $isWebinar = in_array($eventType, ['webinar', 'webinair'], true);
+        $location = $isWebinar && filter_var($meetLink, FILTER_VALIDATE_URL)
+            ? $meetLink
+            : (string) $event->getLocation();
+
+        $detailsLines = [
+            'Talent Bridge event registration',
+            'Type: ' . (string) $event->getEvent_type(),
+            'Description: ' . trim((string) $event->getDescription()),
+        ];
+
+        if (filter_var($meetLink, FILTER_VALIDATE_URL)) {
+            $detailsLines[] = 'Meeting link: ' . $meetLink;
+        }
+
+        $googleUrl = 'https://calendar.google.com/calendar/render?' . http_build_query([
+            'action' => 'TEMPLATE',
+            'text' => (string) $event->getTitle(),
+            'dates' => $startUtc->format('Ymd\\THis\\Z') . '/' . $endUtc->format('Ymd\\THis\\Z'),
+            'details' => implode("\n", $detailsLines),
+            'location' => $location,
+        ], '', '&', PHP_QUERY_RFC3986);
+
+        return $this->redirect($googleUrl);
+    }
+
     #[Route('/front/events/registrations', name: 'front_event_registrations')]
     public function registrations(Request $request, EntityManagerInterface $entityManager): Response
     {

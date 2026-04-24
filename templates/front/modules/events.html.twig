@@ -86,6 +86,7 @@
                                         <form method="post" action="{{ path('front_event_unregister', {'id': card.id}) }}" class="d-inline">
                                             <button type="submit" class="btn btn-sm btn-outline-danger">Unregister</button>
                                         </form>
+                                        <a href="{{ path('front_event_google_calendar', {'id': card.id}) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a>
                                     {% else %}
                                         <form method="post" action="{{ path('front_event_register', {'id': card.id}) }}" class="d-inline">
                                             <button type="submit" class="btn btn-sm btn-primary">Register</button>
