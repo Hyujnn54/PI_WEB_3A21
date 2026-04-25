@@ -47,18 +47,18 @@
                             <span class="input-icon-addon"><i class="ti ti-search"></i></span>
                             <input type="text" class="form-control" placeholder="Search events by title, date, location..." data-filter-search>
                         </div>
-                        <select class="form-select" style="max-width: 220px;" data-filter-criteria>
-                            <option value="all">Search In: All</option>
-                            <option value="title">Title</option>
-                            <option value="meta">Meta</option>
-                            <option value="description">Description</option>
+                        <select class="form-select" style="max-width: 220px;" data-filter-type-select>
+                            <option value="">Filter by Type: All</option>
+                            <option value="workshop">Workshop</option>
+                            <option value="hiring day">Hiring Day</option>
+                            <option value="webinair">Webinair</option>
                         </select>
                         <select class="form-select" style="max-width: 230px;" data-filter-sort>
                             <option value="default">Default Order</option>
                             <option value="title_asc">Title A-Z</option>
                             <option value="title_desc">Title Z-A</option>
-                            <option value="meta_asc">Meta A-Z</option>
-                            <option value="meta_desc">Meta Z-A</option>
+                            <option value="meta_asc">Date Oldest</option>
+                            <option value="meta_desc">Date Newest</option>
                         </select>
                         <div class="small text-secondary ms-auto" data-filter-results></div>
                     </div>
@@ -68,7 +68,7 @@
             <div id="eventCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-type="{{ card.event_type|default('')|lower }}" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="See Details" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}" data-event-id="{{ card.id|default('') }}" data-event-type="{{ card.event_type|default('') }}" data-event-location="{{ card.location|default('') }}" data-event-capacity="{{ card.capacity|default('') }}" data-event-meet-link="{{ card.meet_link|default('') }}" data-event-date-value="{{ card.event_date_value|default('') }}">
+                        <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.full_text|default(card.text) }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="See Details" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}" data-event-id="{{ card.id|default('') }}" data-event-type="{{ card.event_type|default('') }}" data-event-location="{{ card.location|default('') }}" data-event-capacity="{{ card.capacity|default('') }}" data-event-date-value="{{ card.event_date_value|default('') }}">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div>
                                     <div class="tb-module-meta">{{ card.meta }}</div>
@@ -173,10 +173,6 @@
                         <dt class="col-sm-4">Capacity</dt>
                         <dd class="col-sm-8" id="candidateEventDetailCapacity"></dd>
 
-                        <dt class="col-sm-4" id="candidateEventDetailMeetLabel">Meeting Link</dt>
-                        <dd class="col-sm-8" id="candidateEventDetailMeetValue">
-                            <a id="candidateEventDetailMeetLink" href="#" target="_blank" rel="noopener noreferrer">Open meeting link</a>
-                        </dd>
                     </dl>
                     <h6>Description</h6>
                     <p class="mb-0" id="candidateEventDetailDescription"></p>
@@ -184,83 +180,5 @@
             </div>
         </div>
     </div>
-
-    <script>
-        window.addEventListener('load', function () {
-            const detailButton = document.getElementById('candidateEventDetailBtn');
-            const modalEl = document.getElementById('candidateEventDetailModal');
-            if (!detailButton || !modalEl) {
-                return;
-            }
-
-            if (typeof bootstrap === 'undefined') {
-                return;
-            }
-
-            const modal = new bootstrap.Modal(modalEl);
-
-            const findSelectedCard = function () {
-                return document.querySelector('.tb-module-card.is-selected');
-            };
-
-            const syncButtonState = function () {
-                detailButton.disabled = !findSelectedCard();
-            };
-
-            document.querySelectorAll('.tb-module-card').forEach(function (card) {
-                card.addEventListener('click', function () {
-                    setTimeout(syncButtonState, 0);
-                });
-            });
-
-            syncButtonState();
-
-            detailButton.addEventListener('click', function () {
-                const card = findSelectedCard();
-                if (!card) {
-                    return;
-                }
-
-                const title = card.getAttribute('data-detail-title') || 'Event Details';
-                const meta = card.getAttribute('data-detail-meta') || '';
-                const description = card.getAttribute('data-detail-text') || '';
-                const eventType = card.getAttribute('data-event-type') || 'N/A';
-                const location = card.getAttribute('data-event-location') || 'N/A';
-                const capacity = card.getAttribute('data-event-capacity') || 'N/A';
-                const meetLink = card.getAttribute('data-event-meet-link') || '';
-                const eventDateValue = card.getAttribute('data-event-date-value') || '';
-
-                modalEl.querySelector('.modal-title').textContent = title;
-                document.getElementById('candidateEventDetailMeta').textContent = meta;
-                document.getElementById('candidateEventDetailType').textContent = eventType;
-                document.getElementById('candidateEventDetailLocation').textContent = location;
-                document.getElementById('candidateEventDetailCapacity').textContent = capacity;
-                document.getElementById('candidateEventDetailDescription').textContent = description;
-
-                if (eventDateValue !== '') {
-                    const parsedDate = new Date(eventDateValue);
-                    document.getElementById('candidateEventDetailDate').textContent = isNaN(parsedDate.getTime())
-                        ? eventDateValue
-                        : parsedDate.toLocaleString();
-                } else {
-                    document.getElementById('candidateEventDetailDate').textContent = 'N/A';
-                }
-
-                const meetLabel = document.getElementById('candidateEventDetailMeetLabel');
-                const meetValue = document.getElementById('candidateEventDetailMeetValue');
-                const meetLinkEl = document.getElementById('candidateEventDetailMeetLink');
-                const hasMeetLink = /^https?:\/\//i.test(meetLink);
-
-                meetLabel.classList.toggle('d-none', !hasMeetLink);
-                meetValue.classList.toggle('d-none', !hasMeetLink);
-                if (hasMeetLink) {
-                    meetLinkEl.href = meetLink;
-                    meetLinkEl.textContent = meetLink;
-                }
-
-                modal.show();
-            });
-        });
-    </script>
 {% endif %}
 {% endblock %}

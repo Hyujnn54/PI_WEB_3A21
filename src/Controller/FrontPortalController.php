@@ -786,12 +786,14 @@ class FrontPortalController extends AbstractController
 
         $cards = array_map(static function (Recruitment_event $event) use ($registeredIds): array {
             $description = trim((string) $event->getDescription());
+            $preview = $description === '' ? 'No event description available yet.' : mb_substr($description, 0, 190);
 
             return [
                 'id' => $event->getId(),
                 'meta' => sprintf('%s | %s', $event->getEvent_date()->format('d M Y'), (string) $event->getLocation()),
                 'title' => (string) $event->getTitle(),
-                'text' => $description === '' ? 'No event description available yet.' : substr($description, 0, 190),
+                'text' => $preview,
+                'full_text' => $description === '' ? 'No event description available yet.' : $description,
                 'event_type' => (string) $event->getEvent_type(),
                 'location' => (string) $event->getLocation(),
                 'capacity' => (int) $event->getCapacity(),

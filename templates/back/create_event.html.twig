@@ -56,7 +56,7 @@
                                     <option value="">-- Select Type --</option>
                                     <option value="Workshop" {{ formData.event_type|default('') == 'Workshop' ? 'selected' : '' }}>Workshop</option>
                                     <option value="Hiring Day" {{ formData.event_type|default('') == 'Hiring Day' ? 'selected' : '' }}>Hiring Day</option>
-                                    <option value="Webinar" {{ formData.event_type|default('') == 'Webinar' ? 'selected' : '' }}>Webinar</option>
+                                    <option value="Webinair" {{ formData.event_type|default('') == 'Webinair' ? 'selected' : '' }}>Webinair</option>
                                 </select>
                                 <small class="text-danger d-none" id="event_typeError"></small>
                             </div>
@@ -112,8 +112,8 @@
                 return;
             }
 
-            const isWebinar = eventTypeSelect.value === 'Webinar';
-            meetLinkContainer.classList.toggle('d-none', !isWebinar);
+            const isWebinair = eventTypeSelect.value === 'Webinair';
+            meetLinkContainer.classList.toggle('d-none', !isWebinair);
         }
 
         function validateForm() {
@@ -181,7 +181,7 @@
             }
 
             // Validate meet link
-            if (eventType === 'Webinar' && meetLink && !isValidUrl(meetLink)) {
+            if (eventType === 'Webinair' && meetLink && !isValidUrl(meetLink)) {
                 errors.meet_link = 'Please enter a valid URL.';
             }
 

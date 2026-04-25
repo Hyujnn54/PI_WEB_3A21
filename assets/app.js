@@ -42,7 +42,7 @@ function createToastContainer() {
     return container;
 }
 
-// Intercept event registration forms for AJAX
+// ===== Event Registration Forms (AJAX) =====
 function initEventRegistrationForms() {
     document.querySelectorAll('form.event-registration-form').forEach(form => {
         form.addEventListener('submit', async function(e) {
@@ -89,8 +89,148 @@ function initEventRegistrationForms() {
     });
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initEventRegistrationForms);
-} else {
-    initEventRegistrationForms();
+// ===== Event Filtering =====
+function initEventFilters() {
+    const filterForm = document.querySelector('.tb-filter-form');
+    if (!filterForm) return;
+    
+    const searchInput = filterForm.querySelector('[data-filter-search]');
+    const typeSelect = filterForm.querySelector('[data-filter-type-select]');
+    const sortSelect = filterForm.querySelector('[data-filter-sort]');
+    const resultCounter = filterForm.querySelector('[data-filter-results]');
+    const gridTarget = filterForm.getAttribute('data-target');
+    const itemsContainer = document.querySelector(gridTarget);
+    
+    if (!itemsContainer) return;
+    
+    function applyFilters() {
+        const searchTerm = searchInput?.value.toLowerCase() || '';
+        const selectedType = typeSelect?.value.toLowerCase() || '';
+        const sortBy = sortSelect?.value || 'default';
+        
+        let items = Array.from(itemsContainer.querySelectorAll('.tb-filter-item'));
+        let visibleCount = 0;
+        
+        items.forEach(item => {
+            const text = item.getAttribute('data-filter-text') || '';
+            const type = item.getAttribute('data-filter-type') || '';
+            
+            const matchesSearch = searchTerm === '' || text.includes(searchTerm);
+            const matchesType = selectedType === '' || type === selectedType;
+            
+            const shouldShow = matchesSearch && matchesType;
+            item.style.display = shouldShow ? '' : 'none';
+            
+            if (shouldShow) visibleCount++;
+        });
+        
+        // Sort items
+        items.sort((a, b) => {
+            if (sortBy === 'default') return 0;
+            if (sortBy === 'title_asc') return (a.getAttribute('data-sort-title') || '').localeCompare(b.getAttribute('data-sort-title') || '');
+            if (sortBy === 'title_desc') return (b.getAttribute('data-sort-title') || '').localeCompare(a.getAttribute('data-sort-title') || '');
+            if (sortBy === 'meta_asc') return (a.getAttribute('data-sort-meta') || '').localeCompare(b.getAttribute('data-sort-meta') || '');
+            if (sortBy === 'meta_desc') return (b.getAttribute('data-sort-meta') || '').localeCompare(a.getAttribute('data-sort-meta') || '');
+            return 0;
+        });
+        
+        if (resultCounter) {
+            resultCounter.textContent = `${visibleCount} result${visibleCount !== 1 ? 's' : ''}`;
+        }
+    }
+    
+    searchInput?.addEventListener('input', applyFilters);
+    typeSelect?.addEventListener('change', applyFilters);
+    sortSelect?.addEventListener('change', applyFilters);
 }
+
+// ===== Event Detail Panel & Modal =====
+function initEventDetailPanel() {
+    const detailButton = document.getElementById('candidateEventDetailBtn');
+    const modalEl = document.getElementById('candidateEventDetailModal');
+    
+    if (!detailButton || !modalEl || typeof bootstrap === 'undefined') {
+        return;
+    }
+    
+    const modal = new bootstrap.Modal(modalEl);
+    
+    const findSelectedCard = function () {
+        return document.querySelector('.tb-module-card.is-selected');
+    };
+    
+    const syncButtonState = function () {
+        detailButton.disabled = !findSelectedCard();
+    };
+    
+    // Use event delegation for click events
+    document.addEventListener('click', function(e) {
+        const card = e.target.closest('.tb-module-card');
+        if (card) {
+            document.querySelectorAll('.tb-module-card').forEach(c => c.classList.remove('is-selected'));
+            card.classList.add('is-selected');
+            syncButtonState();
+        }
+    });
+    
+    syncButtonState();
+    
+    detailButton.addEventListener('click', function () {
+        const card = findSelectedCard();
+        if (!card) {
+            return;
+        }
+        
+        const title = card.getAttribute('data-detail-title') || 'Event Details';
+        const meta = card.getAttribute('data-detail-meta') || '';
+        const description = card.getAttribute('data-detail-text') || '';
+        const eventType = card.getAttribute('data-event-type') || 'N/A';
+        const location = card.getAttribute('data-event-location') || 'N/A';
+        const capacity = card.getAttribute('data-event-capacity') || 'N/A';
+        const eventDateValue = card.getAttribute('data-event-date-value') || '';
+        
+        modalEl.querySelector('.modal-title').textContent = title;
+        document.getElementById('candidateEventDetailMeta').textContent = meta;
+        document.getElementById('candidateEventDetailType').textContent = eventType;
+        document.getElementById('candidateEventDetailLocation').textContent = location;
+        document.getElementById('candidateEventDetailCapacity').textContent = capacity;
+        document.getElementById('candidateEventDetailDescription').textContent = description;
+        
+        if (eventDateValue !== '') {
+            const parsedDate = new Date(eventDateValue);
+            document.getElementById('candidateEventDetailDate').textContent = isNaN(parsedDate.getTime())
+                ? eventDateValue
+                : parsedDate.toLocaleString();
+        } else {
+            document.getElementById('candidateEventDetailDate').textContent = 'N/A';
+        }
+        
+        modal.show();
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+
+        document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) {
+            backdrop.remove();
+        });
+    });
+}
+
+// ===== Initialize on Page Load & After Pagination =====
+function initializeAll() {
+    initEventRegistrationForms();
+    initEventFilters();
+    initEventDetailPanel();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeAll);
+} else {
+    initializeAll();
+}
+
+// Re-initialize after pagination (if using AJAX pagination)
+document.addEventListener('pjax:complete', initializeAll);
+document.addEventListener('turbo:load', initializeAll);
