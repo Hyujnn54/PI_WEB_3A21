@@ -57,8 +57,19 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Location <span class="text-danger">*</span></label>
-                                <input type="text" name="location" id="location" class="form-control" minlength="2" value="{{ formData.location|default('') }}">
+                                <div class="input-group mb-2">
+                                    <input type="text" name="location" id="location" class="form-control" minlength="2" value="{{ formData.location|default('') }}" placeholder="Enter location or select from map">
+                                    <button class="btn btn-outline-secondary" type="button" id="toggleMapBtn" title="Toggle location map">
+                                        <i class="ti ti-map"></i>
+                                    </button>
+                                </div>
                                 <small class="text-danger d-none" id="locationError"></small>
+                                
+                                <!-- Map Container -->
+                                <div id="mapContainer" class="d-none mb-2">
+                                    <div id="locationMap" style="width: 100%; height: 400px; border: 1px solid #ccc; border-radius: 4px;"></div>
+                                    <small class="text-muted d-block mt-2">Click on the map to select a location</small>
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Event Date <span class="text-danger">*</span></label>
@@ -202,6 +213,119 @@
         }
 
         toggleMeetLinkVisibility();
+
+        // ===== Leaflet Map Integration =====
+        let locationMap;
+        let marker;
+        const mapContainer = document.getElementById('mapContainer');
+        const toggleMapBtn = document.getElementById('toggleMapBtn');
+        const locationInput = document.getElementById('location');
+
+        function initializeMap() {
+            // Default center (Tunisia)
+            const defaultCenter = [35.8, 9.5];
+            
+            locationMap = L.map('locationMap').setView(defaultCenter, 7);
+
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(locationMap);
+
+            // Click on map to select location
+            locationMap.on('click', function(event) {
+                const latitude = event.latlng.lat;
+                const longitude = event.latlng.lng;
+                
+                // Remove previous marker
+                if (marker) {
+                    locationMap.removeLayer(marker);
+                }
+
+                // Add new marker
+                marker = L.marker([latitude, longitude], {
+                    title: 'Selected Location'
+                }).addTo(locationMap);
+
+                // Reverse geocode to get address using Nominatim
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.address) {
+                            const address = data.address.road || data.address.village || data.address.city || data.address.county || data.address.country;
+                            locationInput.value = address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                            locationInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        } else {
+                            locationInput.value = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Geocoding error:', error);
+                        locationInput.value = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                    });
+            });
+
+            // Search for address when input changes
+            locationInput.addEventListener('input', debounce(function(event) {
+                const inputValue = event.target.value.trim();
+                if (inputValue.length > 3) {
+                    // Geocode address using Nominatim
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(inputValue)}&limit=1`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.length > 0) {
+                                const result = data[0];
+                                const lat = parseFloat(result.lat);
+                                const lon = parseFloat(result.lon);
+                                locationMap.setView([lat, lon], 13);
+                                
+                                // Remove previous marker
+                                if (marker) {
+                                    locationMap.removeLayer(marker);
+                                }
+                                
+                                // Add marker at found location
+                                marker = L.marker([lat, lon], {
+                                    title: 'Selected Location'
+                                }).addTo(locationMap);
+                            }
+                        })
+                        .catch(error => console.error('Search error:', error));
+                }
+            }, 500));
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Toggle map visibility
+        if (toggleMapBtn) {
+            toggleMapBtn.addEventListener('click', function() {
+                mapContainer.classList.toggle('d-none');
+                if (!mapContainer.classList.contains('d-none') && locationMap) {
+                    // Trigger map resize when shown
+                    setTimeout(() => locationMap.invalidateSize(), 100);
+                }
+            });
+        }
+
+        // Initialize map when document is ready
+        document.addEventListener('DOMContentLoaded', initializeMap);
     </script>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </div>
 {% endblock %}
