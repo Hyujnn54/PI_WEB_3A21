@@ -16,6 +16,7 @@ use App\Repository\UsersRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -736,7 +737,7 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/events', name: 'front_events')]
-    public function events(Request $request, EntityManagerInterface $entityManager): Response
+    public function events(Request $request, EntityManagerInterface $entityManager, PaginatorInterface $paginator): Response
     {
         $role = $this->resolveSessionRole($request);
         $session = $request->getSession();
@@ -762,18 +763,26 @@ class FrontPortalController extends AbstractController
             $session->set('registered_event_ids', $registeredIds);
         }
 
+        $eventRepository = $entityManager->getRepository(Recruitment_event::class);
+        $queryBuilder = $eventRepository->createQueryBuilder('e')
+            ->orderBy('e.id', 'DESC');
+
         if ($role === 'recruiter') {
             $recruiter = $this->resolveCurrentRecruiter($request);
             if (!$recruiter instanceof Recruiter) {
-                $events = [];
+                $queryBuilder->andWhere('1 = 0');
             } else {
-                $events = $entityManager->getRepository(Recruitment_event::class)->findBy([
-                    'recruiter_id' => $recruiter,
-                ], ['id' => 'DESC']);
+                $queryBuilder
+                    ->andWhere('e.recruiter_id = :recruiter')
+                    ->setParameter('recruiter', $recruiter);
             }
-        } else {
-            $events = $entityManager->getRepository(Recruitment_event::class)->findBy([], ['id' => 'DESC']);
         }
+
+        $eventsPagination = $paginator->paginate(
+            $queryBuilder,
+            $request->query->getInt('page', 1),
+            6
+        );
 
         $cards = array_map(static function (Recruitment_event $event) use ($registeredIds): array {
             $description = trim((string) $event->getDescription());
@@ -790,11 +799,12 @@ class FrontPortalController extends AbstractController
                 'event_date_value' => $event->getEvent_date()->format('Y-m-d\TH:i'),
                 'registered' => in_array($event->getId(), $registeredIds, true),
             ];
-        }, $events);
+        }, iterator_to_array($eventsPagination));
 
         return $this->render('front/modules/events.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
+            'eventsPagination' => $eventsPagination,
         ]);
     }
 

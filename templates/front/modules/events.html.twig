@@ -110,6 +110,12 @@
                 {% endfor %}
             </div>
 
+            {% if eventsPagination is defined and eventsPagination.getTotalItemCount > 6 %}
+                <div class="d-flex justify-content-center mt-3">
+                    {{ knp_pagination_render(eventsPagination) }}
+                </div>
+            {% endif %}
+
                 </div>
                 <div class="col-12 col-xl-4">
             <div id="eventDetailPanel" class="card tb-detail-panel tb-detail-panel-side">
