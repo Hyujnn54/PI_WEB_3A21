@@ -18,6 +18,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/offermanagement')]
 class BackOfficeController extends AbstractController
@@ -848,6 +849,88 @@ SQL;
                 'meet_link' => '',
             ],
         ]);
+    }
+
+    #[Route('/recruiter/generate-event-description', name: 'recruiter_generate_event_description_ai', methods: ['POST'])]
+    public function generateEventDescription(Request $request, EntityManagerInterface $entityManager, HttpClientInterface $httpClient): JsonResponse
+    {
+        $currentRecruiter = $this->resolveCurrentRecruiter($request, $entityManager);
+        if (!$currentRecruiter instanceof Recruiter) {
+            return $this->json([
+                'ok' => false,
+                'message' => 'Unauthorized recruiter session.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        $title = trim((string) ($payload['title'] ?? ''));
+        $eventType = trim((string) ($payload['event_type'] ?? ''));
+        $location = trim((string) ($payload['location'] ?? ''));
+
+        if ($title === '' || $eventType === '' || $location === '') {
+            return $this->json([
+                'ok' => false,
+                'message' => 'Title, event type, and location are required.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $apiUrl = trim((string) ($_ENV['AI_CHAT_COMPLETIONS_URL'] ?? ''));
+        $apiModel = trim((string) ($_ENV['AI_MODEL'] ?? ''));
+        $apiKey = trim((string) ($_ENV['AI_API_KEY'] ?? ''));
+
+        if ($apiUrl === '' || $apiModel === '' || $apiKey === '') {
+            return $this->json([
+                'ok' => false,
+                'message' => 'AI provider configuration is missing.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $systemPrompt = 'You are an HR event assistant. Write a concise, professional event description in plain text. Avoid markdown and bullet lists. Keep it between 90 and 150 words.';
+        $userPrompt = sprintf(
+            "Generate a recruitment event description with these details:\n- Title: %s\n- Event Type: %s\n- Location: %s\n\nInclude objective, expected audience, and value for candidates.",
+            $title,
+            $eventType,
+            $location
+        );
+
+        try {
+            $response = $httpClient->request('POST', $apiUrl, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => [
+                    'model' => $apiModel,
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => $userPrompt],
+                    ],
+                    'temperature' => 0.7,
+                    'max_tokens' => 220,
+                ],
+                'timeout' => 20,
+            ]);
+
+            $data = $response->toArray(false);
+            $description = trim((string) ($data['choices'][0]['message']['content'] ?? ''));
+
+            if ($description === '') {
+                return $this->json([
+                    'ok' => false,
+                    'message' => 'AI did not return a description.',
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            return $this->json([
+                'ok' => true,
+                'description' => $description,
+            ]);
+        } catch (\Throwable) {
+            return $this->json([
+                'ok' => false,
+                'message' => 'Unable to generate description at the moment.',
+            ], Response::HTTP_BAD_GATEWAY);
+        }
     }
 
     #[Route('/recruiter/delete-event/{id}', name: 'recruiter_delete_event', methods: ['POST'])]

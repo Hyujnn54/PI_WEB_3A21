@@ -41,7 +41,12 @@
                                 <small class="text-danger d-none" id="titleError"></small>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Description <span class="text-danger">*</span></label>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label mb-0">Description <span class="text-danger">*</span></label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="generateDescriptionBtn">
+                                        <i class="ti ti-wand me-1"></i>Generate with AI
+                                    </button>
+                                </div>
                                 <textarea name="description" id="description" class="form-control" rows="3" minlength="10">{{ formData.description|default('') }}</textarea>
                                 <small class="text-danger d-none" id="descriptionError"></small>
                             </div>
@@ -100,6 +105,7 @@
         const createEventForm = document.getElementById('createEventForm');
         const eventTypeSelect = document.getElementById('event_type');
         const meetLinkContainer = document.getElementById('meetLinkContainer');
+        const generateDescriptionBtn = document.getElementById('generateDescriptionBtn');
 
         function toggleMeetLinkVisibility() {
             if (!eventTypeSelect || !meetLinkContainer) {
@@ -213,6 +219,62 @@
         }
 
         toggleMeetLinkVisibility();
+
+        if (generateDescriptionBtn) {
+            generateDescriptionBtn.addEventListener('click', async function() {
+                const title = document.getElementById('title').value.trim();
+                const eventType = document.getElementById('event_type').value.trim();
+                const location = document.getElementById('location').value.trim();
+                const descriptionField = document.getElementById('description');
+                const descriptionError = document.getElementById('descriptionError');
+
+                if (descriptionError) {
+                    descriptionError.classList.add('d-none');
+                }
+
+                if (!title || !eventType || !location) {
+                    if (descriptionError) {
+                        descriptionError.textContent = 'Fill in Title, Event Type, and Location before generating.';
+                        descriptionError.classList.remove('d-none');
+                    }
+                    return;
+                }
+
+                const originalButtonHtml = generateDescriptionBtn.innerHTML;
+                generateDescriptionBtn.disabled = true;
+                generateDescriptionBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Generating...';
+
+                try {
+                    const response = await fetch('{{ path('recruiter_generate_event_description_ai') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            title: title,
+                            event_type: eventType,
+                            location: location
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok || !data.ok || !data.description) {
+                        throw new Error(data.message || 'Failed to generate description.');
+                    }
+
+                    descriptionField.value = data.description.trim();
+                } catch (error) {
+                    if (descriptionError) {
+                        descriptionError.textContent = error.message || 'Failed to generate description.';
+                        descriptionError.classList.remove('d-none');
+                    }
+                } finally {
+                    generateDescriptionBtn.disabled = false;
+                    generateDescriptionBtn.innerHTML = originalButtonHtml;
+                }
+            });
+        }
 
         // ===== Leaflet Map Integration =====
         let locationMap;
