@@ -83,12 +83,14 @@
                             <div class="d-flex gap-2 mt-3 flex-wrap">
                                 {% if role == 'candidate' %}
                                     {% if card.registered %}
-                                        <form method="post" action="{{ path('front_event_unregister', {'id': card.id}) }}" class="d-inline">
+                                        <form method="post" action="{{ path('front_event_unregister', {'id': card.id}) }}" class="d-inline event-registration-form">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('front_event_unregister') }}">
                                             <button type="submit" class="btn btn-sm btn-outline-danger">Unregister</button>
                                         </form>
                                         <a href="{{ path('front_event_google_calendar', {'id': card.id}) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a>
                                     {% else %}
-                                        <form method="post" action="{{ path('front_event_register', {'id': card.id}) }}" class="d-inline">
+                                        <form method="post" action="{{ path('front_event_register', {'id': card.id}) }}" class="d-inline event-registration-form">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('front_event_register') }}">
                                             <button type="submit" class="btn btn-sm btn-primary">Register</button>
                                         </form>
                                     {% endif %}
@@ -143,6 +145,10 @@
         </div>
     </div>
 </div>
+
+{% if role == 'candidate' %}
+    {{ stream_notifications(['/chat/event-registrations']) }}
+{% endif %}
 
 {% if role in ['candidate', 'recruiter', 'admin'] %}
     <div class="modal fade" id="candidateEventDetailModal" tabindex="-1" aria-hidden="true">

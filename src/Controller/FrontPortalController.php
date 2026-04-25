@@ -935,7 +935,13 @@ class FrontPortalController extends AbstractController
             }
         }
 
-        $this->addFlash('success', sprintf('You have cancelled registration for "%s".', $event->getTitle()));
+        $message = sprintf('You have cancelled registration for "%s".', $event->getTitle());
+        
+        if ($request->isXmlHttpRequest()) {
+            return $this->json(['success' => true, 'message' => $message]);
+        }
+        
+        $this->addFlash('success', $message);
         return $this->redirectToRoute('front_event_registrations', ['role' => 'candidate']);
     }
 
