@@ -68,12 +68,17 @@
             <div id="eventCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-type="{{ card.event_type|default('')|lower }}" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.full_text|default(card.text) }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="See Details" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}" data-event-id="{{ card.id|default('') }}" data-event-type="{{ card.event_type|default('') }}" data-event-location="{{ card.location|default('') }}" data-event-capacity="{{ card.capacity|default('') }}" data-event-date-value="{{ card.event_date_value|default('') }}">
+                        <div class="tb-module-card h-100 {{ card.popular and role == 'candidate' ? 'tb-module-card-popular' : '' }}" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.full_text|default(card.text) }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="See Details" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}" data-event-id="{{ card.id|default('') }}" data-event-type="{{ card.event_type|default('') }}" data-event-location="{{ card.location|default('') }}" data-event-capacity="{{ card.capacity|default('') }}" data-event-date-value="{{ card.event_date_value|default('') }}">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div>
                                     <div class="tb-module-meta">{{ card.meta }}</div>
                                     <h3>{{ card.title }}</h3>
                                 </div>
+                                {% if card.popular and role == 'candidate' %}
+                                    <span class="badge tb-popular-badge">
+                                        <i class="ti ti-flame me-1"></i>Popular
+                                    </span>
+                                {% endif %}
                                 {% if card.registered and role == 'candidate' %}
                                     <span class="badge bg-success">Registered</span>
                                 {% endif %}

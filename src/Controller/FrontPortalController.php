@@ -784,9 +784,44 @@ class FrontPortalController extends AbstractController
             6
         );
 
-        $cards = array_map(static function (Recruitment_event $event) use ($registeredIds): array {
+        $pageEvents = iterator_to_array($eventsPagination);
+        $pageEventIds = array_values(array_filter(array_map(static fn (Recruitment_event $event): ?int => $event->getId(), $pageEvents)));
+
+        $registrationCounts = [];
+        if ($pageEventIds !== []) {
+            $rows = $entityManager->getRepository(Event_registration::class)
+                ->createQueryBuilder('er')
+                ->select('IDENTITY(er.event_id) AS eventId, COUNT(er.id) AS totalRegistrations, SUM(CASE WHEN LOWER(er.attendance_status) = :acceptedStatus THEN 1 ELSE 0 END) AS acceptedRegistrations')
+                ->where('IDENTITY(er.event_id) IN (:eventIds)')
+                ->setParameter('eventIds', $pageEventIds)
+                ->setParameter('acceptedStatus', 'accepted')
+                ->groupBy('er.event_id')
+                ->getQuery()
+                ->getArrayResult();
+
+            foreach ($rows as $row) {
+                $eventId = (int) ($row['eventId'] ?? 0);
+                if ($eventId <= 0) {
+                    continue;
+                }
+
+                $acceptedRegistrations = (int) ($row['acceptedRegistrations'] ?? 0);
+                $totalRegistrations = (int) ($row['totalRegistrations'] ?? 0);
+
+                $registrationCounts[$eventId] = [
+                    'accepted' => $acceptedRegistrations,
+                    'total' => $totalRegistrations,
+                ];
+            }
+        }
+
+        $cards = array_map(static function (Recruitment_event $event) use ($registeredIds, $registrationCounts): array {
             $description = trim((string) $event->getDescription());
             $preview = $description === '' ? 'No event description available yet.' : mb_substr($description, 0, 190);
+            $stats = $registrationCounts[$event->getId()] ?? ['accepted' => 0, 'total' => 0];
+            $registrationsToUse = $stats['accepted'] > 0 ? $stats['accepted'] : $stats['total'];
+            $capacity = max(1, (int) $event->getCapacity());
+            $isPopular = $registrationsToUse / $capacity >= 0.7;
 
             return [
                 'id' => $event->getId(),
@@ -800,8 +835,9 @@ class FrontPortalController extends AbstractController
                 'meet_link' => (string) $event->getMeet_link(),
                 'event_date_value' => $event->getEvent_date()->format('Y-m-d\TH:i'),
                 'registered' => in_array($event->getId(), $registeredIds, true),
+                'popular' => $isPopular,
             ];
-        }, iterator_to_array($eventsPagination));
+        }, $pageEvents);
 
         return $this->render('front/modules/events.html.twig', [
             'authUser' => ['role' => $role],

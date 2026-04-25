@@ -166,6 +166,33 @@
     cursor: pointer;
 }
 
+.tb-module-card-popular {
+    border-color: #f2a100;
+    box-shadow: 0 14px 26px rgba(242, 161, 0, 0.18), 0 0 0 1px rgba(242, 161, 0, 0.18);
+    background: linear-gradient(180deg, #fffdfa 0%, #fff8e9 100%);
+}
+
+.tb-module-card-popular:hover {
+    border-color: #d98c00;
+    box-shadow: 0 20px 34px rgba(242, 161, 0, 0.24), 0 0 0 1px rgba(242, 161, 0, 0.22);
+}
+
+.tb-popular-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.42rem 0.7rem;
+    border-radius: 999px;
+    color: #6f3d00;
+    background: linear-gradient(135deg, #ffd25f 0%, #ffb000 100%);
+    border: 1px solid rgba(151, 92, 0, 0.25);
+    box-shadow: 0 8px 18px rgba(242, 161, 0, 0.24);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 800;
+    font-size: 0.72rem;
+}
+
 .tb-module-card.is-selected {
     border-color: #0d5bd7;
     box-shadow: 0 0 0 4px rgba(31, 99, 211, 0.24), 0 22px 36px rgba(13, 91, 215, 0.22);
