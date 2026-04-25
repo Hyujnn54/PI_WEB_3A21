@@ -37,6 +37,21 @@
                 {% endfor %}
             </div>
         {% endif %}
+        {% if role == 'candidate' and preferredEventTypes is defined and preferredEventTypes is not empty %}
+            <div class="container-xl mb-3">
+                <div class="tb-recommendation-banner">
+                    <div>
+                        <div class="tb-recommendation-kicker"><i class="ti ti-sparkles me-1"></i>Recommended for you</div>
+                        <div class="tb-recommendation-title">Based on your past event registrations</div>
+                    </div>
+                    <div class="tb-recommendation-types">
+                        {% for type in preferredEventTypes %}
+                            <span class="tb-recommendation-chip">{{ type|title }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
         <div class="container-xl tb-interviews-page">
             <div class="row g-3 tb-interviews-layout">
                 <div class="col-12 col-xl-8">
@@ -68,24 +83,31 @@
             <div id="eventCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-type="{{ card.event_type|default('')|lower }}" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100 {{ card.popular and role == 'candidate' ? 'tb-module-card-popular' : '' }}" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.full_text|default(card.text) }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="See Details" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}" data-event-id="{{ card.id|default('') }}" data-event-type="{{ card.event_type|default('') }}" data-event-location="{{ card.location|default('') }}" data-event-capacity="{{ card.capacity|default('') }}" data-event-date-value="{{ card.event_date_value|default('') }}">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div>
+                        <div class="tb-module-card h-100 {{ card.popular and role == 'candidate' ? 'tb-module-card-popular' : '' }} {{ card.recommended and role == 'candidate' ? 'tb-module-card-recommended' : '' }}" data-detail-target="#eventDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.full_text|default(card.text) }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Event' : 'Register' }}" data-action-primary-href="#" data-action-primary-disabled="0" data-action-secondary="{{ role == 'recruiter' ? 'Manage Registrations' : 'Add to Calendar' }}" data-action-secondary-href="#" data-action-secondary-disabled="0" data-action-tertiary="See Details" data-action-tertiary-href="#" data-action-tertiary-disabled="0" data-detail-extra="Date & Place: {{ card.meta }}" data-event-id="{{ card.id|default('') }}" data-event-type="{{ card.event_type|default('') }}" data-event-location="{{ card.location|default('') }}" data-event-capacity="{{ card.capacity|default('') }}" data-event-date-value="{{ card.event_date_value|default('') }}">
+                            <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+                                <div class="tb-card-heading">
                                     <div class="tb-module-meta">{{ card.meta }}</div>
                                     <h3>{{ card.title }}</h3>
                                 </div>
-                                {% if card.popular and role == 'candidate' %}
-                                    <span class="badge tb-popular-badge">
-                                        <i class="ti ti-flame me-1"></i>Popular
-                                    </span>
-                                {% endif %}
-                                {% if card.registered and role == 'candidate' %}
-                                    <span class="badge bg-success">Registered</span>
-                                {% endif %}
+                                <div class="tb-card-badges">
+                                    {% if card.popular and role == 'candidate' %}
+                                        <span class="badge tb-popular-badge">
+                                            <i class="ti ti-flame me-1"></i>Popular
+                                        </span>
+                                    {% endif %}
+                                    {% if card.recommended and role == 'candidate' %}
+                                        <span class="badge tb-recommended-badge">
+                                            <i class="ti ti-sparkles me-1"></i>Recommended
+                                        </span>
+                                    {% endif %}
+                                    {% if card.registered and role == 'candidate' %}
+                                        <span class="badge tb-registered-badge">Registered</span>
+                                    {% endif %}
+                                </div>
                             </div>
                             <p>{{ card.text }}</p>
 
-                            <div class="d-flex gap-2 mt-3 flex-wrap">
+                            <div class="d-flex gap-2 mt-3 flex-wrap tb-module-actions">
                                 {% if role == 'candidate' %}
                                     {% if card.registered %}
                                         <form method="post" action="{{ path('front_event_unregister', {'id': card.id}) }}" class="d-inline event-registration-form">

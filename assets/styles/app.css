@@ -164,6 +164,15 @@
     transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
     position: relative;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    overflow: hidden;
+}
+
+.tb-card-heading {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .tb-module-card-popular {
@@ -177,20 +186,137 @@
     box-shadow: 0 20px 34px rgba(242, 161, 0, 0.24), 0 0 0 1px rgba(242, 161, 0, 0.22);
 }
 
+.tb-module-card-recommended {
+    border-color: #4d63ff;
+    box-shadow: 0 14px 26px rgba(77, 99, 255, 0.16), 0 0 0 1px rgba(77, 99, 255, 0.18);
+    background: linear-gradient(180deg, #fbfcff 0%, #f3f6ff 100%);
+}
+
+.tb-module-card-recommended::before {
+    border-color: rgba(77, 99, 255, 0.18);
+}
+
+.tb-module-card-recommended:hover {
+    border-color: #3047d8;
+    box-shadow: 0 20px 34px rgba(77, 99, 255, 0.22), 0 0 0 1px rgba(77, 99, 255, 0.22);
+}
+
+.tb-module-card-popular.tb-module-card-recommended {
+    border-color: #7a65d9;
+    background: linear-gradient(180deg, #fffdf7 0%, #f4f6ff 100%);
+    box-shadow: 0 16px 28px rgba(122, 101, 217, 0.2), 0 0 0 1px rgba(122, 101, 217, 0.2);
+}
+
+.tb-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: flex-start;
+    gap: 0.25rem;
+    max-width: 44%;
+    flex: 0 0 auto;
+    min-width: 0;
+    margin-left: auto;
+}
+
 .tb-popular-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.15rem;
+    gap: 0.12rem;
+    padding: 0.24rem 0.5rem;
+    border-radius: 999px;
+    color: #7b4f00;
+    background: #fff3cf;
+    border: 1px solid #efd497;
+    box-shadow: none;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 700;
+    font-size: 0.68rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.tb-recommended-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.12rem;
+    padding: 0.24rem 0.5rem;
+    border-radius: 999px;
+    color: #2b3f99;
+    background: #eaf0ff;
+    border: 1px solid #cdd8ff;
+    box-shadow: none;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 700;
+    font-size: 0.68rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.tb-registered-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.24rem 0.5rem;
+    border-radius: 999px;
+    color: #0d5a2d;
+    background: #e5f6eb;
+    border: 1px solid #bfe5cc;
+    box-shadow: none;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 700;
+    font-size: 0.68rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.tb-recommendation-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    border-radius: 18px;
+    border: 1px solid #d6dfff;
+    background: linear-gradient(135deg, rgba(77, 99, 255, 0.11), rgba(19, 182, 255, 0.08));
+    box-shadow: 0 14px 28px rgba(57, 78, 192, 0.08);
+}
+
+.tb-recommendation-kicker {
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #3047d8;
+}
+
+.tb-recommendation-title {
+    margin-top: 0.25rem;
+    font-size: 0.95rem;
+    color: #29416a;
+    font-weight: 600;
+}
+
+.tb-recommendation-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    justify-content: flex-end;
+}
+
+.tb-recommendation-chip {
+    display: inline-flex;
+    align-items: center;
     padding: 0.42rem 0.7rem;
     border-radius: 999px;
-    color: #6f3d00;
-    background: linear-gradient(135deg, #ffd25f 0%, #ffb000 100%);
-    border: 1px solid rgba(151, 92, 0, 0.25);
-    box-shadow: 0 8px 18px rgba(242, 161, 0, 0.24);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    font-weight: 800;
-    font-size: 0.72rem;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(77, 99, 255, 0.18);
+    color: #3047d8;
+    font-size: 0.78rem;
+    font-weight: 700;
+    box-shadow: 0 8px 16px rgba(38, 58, 170, 0.08);
 }
 
 .tb-module-card.is-selected {
@@ -221,6 +347,8 @@
 .tb-module-card h3 {
     font-size: 1.05rem;
     margin-bottom: 0.5rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
 }
 
 .tb-module-meta {
@@ -237,8 +365,19 @@
     color: #395172;
     font-size: 0.9rem;
     margin-bottom: 0.7rem;
-    padding-bottom: 0.2rem;
+    padding-bottom: 0.45rem;
     border-bottom: 2px dashed #d2e2fb;
+    min-height: 72px;
+}
+
+.tb-module-actions {
+    margin-top: auto;
+}
+
+@media (max-width: 576px) {
+    .tb-card-badges {
+        max-width: 100%;
+    }
 }
 
 .tb-interview-status {

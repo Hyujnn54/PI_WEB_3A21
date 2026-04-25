@@ -763,6 +763,27 @@ class FrontPortalController extends AbstractController
             $session->set('registered_event_ids', $registeredIds);
         }
 
+        $preferredEventTypes = [];
+        $eventTypeScores = [];
+        foreach ($myRegs as $registration) {
+            $event = $registration->getEvent_id();
+            if (!$event instanceof Recruitment_event) {
+                continue;
+            }
+
+            $eventType = strtolower(trim((string) $event->getEvent_type()));
+            if ($eventType === '') {
+                continue;
+            }
+
+            $eventTypeScores[$eventType] = ($eventTypeScores[$eventType] ?? 0) + 1;
+        }
+
+        if ($eventTypeScores !== []) {
+            arsort($eventTypeScores);
+            $preferredEventTypes = array_slice(array_keys($eventTypeScores), 0, 3);
+        }
+
         $eventRepository = $entityManager->getRepository(Recruitment_event::class);
         $queryBuilder = $eventRepository->createQueryBuilder('e')
             ->orderBy('e.id', 'DESC');
@@ -815,13 +836,15 @@ class FrontPortalController extends AbstractController
             }
         }
 
-        $cards = array_map(static function (Recruitment_event $event) use ($registeredIds, $registrationCounts): array {
+        $cards = array_map(static function (Recruitment_event $event) use ($registeredIds, $registrationCounts, $preferredEventTypes): array {
             $description = trim((string) $event->getDescription());
             $preview = $description === '' ? 'No event description available yet.' : mb_substr($description, 0, 190);
             $stats = $registrationCounts[$event->getId()] ?? ['accepted' => 0, 'total' => 0];
             $registrationsToUse = $stats['accepted'] > 0 ? $stats['accepted'] : $stats['total'];
             $capacity = max(1, (int) $event->getCapacity());
             $isPopular = $registrationsToUse / $capacity >= 0.7;
+            $eventType = strtolower(trim((string) $event->getEvent_type()));
+            $isRecommended = $preferredEventTypes !== [] && $eventType !== '' && in_array($eventType, $preferredEventTypes, true);
 
             return [
                 'id' => $event->getId(),
@@ -836,6 +859,7 @@ class FrontPortalController extends AbstractController
                 'event_date_value' => $event->getEvent_date()->format('Y-m-d\TH:i'),
                 'registered' => in_array($event->getId(), $registeredIds, true),
                 'popular' => $isPopular,
+                'recommended' => $isRecommended,
             ];
         }, $pageEvents);
 
@@ -843,6 +867,8 @@ class FrontPortalController extends AbstractController
             'authUser' => ['role' => $role],
             'cards' => $cards,
             'eventsPagination' => $eventsPagination,
+            'preferredEventTypes' => $preferredEventTypes,
+            'eventTypeScores' => $eventTypeScores,
         ]);
     }
 
