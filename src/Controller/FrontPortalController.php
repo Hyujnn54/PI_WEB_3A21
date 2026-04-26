@@ -12,10 +12,16 @@ use App\Entity\Job_offer;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Form\ProfileType;
+use App\Repository\Job_applicationRepository;
 use App\Repository\UsersRepository;
+use App\Service\JobApplication\ApplicationAiRankingService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Pagerfanta\Adapter\ArrayAdapter;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -37,7 +43,10 @@ class FrontPortalController extends AbstractController
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
 
-    public function __construct(private readonly ManagerRegistry $doctrine)
+    public function __construct(
+        private readonly ManagerRegistry $doctrine,
+        private readonly ApplicationAiRankingService $applicationAiRankingService
+    )
     {
     }
 
@@ -585,78 +594,231 @@ class FrontPortalController extends AbstractController
     {
         $role = $this->resolveSessionRole($request);
         $cards = [];
+        $rankingEnabled = false;
+        $page = max(1, (int) $request->query->get('page', 1));
+        $perPage = 6;
+        $pagination = [
+            'enabled' => false,
+            'current_page' => 1,
+            'total_pages' => 1,
+            'has_previous' => false,
+            'has_next' => false,
+            'previous_page' => 1,
+            'next_page' => 1,
+            'pages' => [1],
+            'route_params_base' => ['role' => $role],
+        ];
+        $applicationFilters = [
+            'search' => '',
+            'status' => 'all',
+            'sort' => 'date_desc',
+            'ai_rank' => false,
+        ];
 
         if ($role === 'recruiter') {
             // RECRUITER VIEW: Show applications for their job offers with interview creation capability
             $recruiter = $this->resolveCurrentRecruiter($request);
 
             if ($recruiter instanceof Recruiter) {
-                $ownedOffers = $this->doctrine->getRepository(Job_offer::class)->findBy(['recruiter_id' => $recruiter]);
-                if (!empty($ownedOffers)) {
-                    $applications = $this->doctrine->getRepository(Job_application::class)->findBy(
-                        ['offer_id' => $ownedOffers, 'is_archived' => false],
-                        ['applied_at' => 'DESC']
-                    );
+                $search = trim((string) $request->query->get('search', ''));
+                $status = strtolower(trim((string) $request->query->get('status', 'all')));
+                $sort = strtolower(trim((string) $request->query->get('sort', 'date_desc')));
+                $aiRankFlag = strtolower(trim((string) $request->query->get('ai_rank', '0')));
+                $rankingEnabled = in_array($aiRankFlag, ['1', 'true', 'yes', 'on'], true);
 
-                    foreach ($applications as $application) {
-                        $offer = $application->getOffer_id();
-                        $candidate = $application->getCandidate_id();
-                        $candidateName = 'Candidate';
-                        if ($candidate instanceof Candidate) {
-                            $fullName = trim((string) $candidate->getFirstName() . ' ' . (string) $candidate->getLastName());
-                            if ($fullName !== '') {
-                                $candidateName = $fullName;
+                $allowedStatuses = ['all', 'submitted', 'in_review', 'shortlisted', 'rejected', 'interview', 'hired'];
+                if (!in_array($status, $allowedStatuses, true)) {
+                    $status = 'all';
+                }
+
+                $allowedSorts = ['date_desc', 'date_asc', 'title_asc', 'title_desc', 'status_asc', 'status_desc'];
+                if (!in_array($sort, $allowedSorts, true)) {
+                    $sort = 'date_desc';
+                }
+
+                $applicationFilters = [
+                    'search' => $search,
+                    'status' => $status,
+                    'sort' => $sort,
+                    'ai_rank' => $rankingEnabled,
+                ];
+
+                $pagination['route_params_base'] = [
+                    'role' => 'recruiter',
+                    'search' => $search,
+                    'status' => $status,
+                    'sort' => $sort,
+                    'ai_rank' => $rankingEnabled ? '1' : '0',
+                ];
+
+                $statusForQuery = $status === 'all' ? 'all' : strtoupper($status);
+                /** @var Job_applicationRepository $applicationRepository */
+                $applicationRepository = $this->doctrine->getRepository(Job_application::class);
+                $queryBuilder = $applicationRepository->createRecruiterListingQueryBuilder($recruiter, $search, $statusForQuery, $sort);
+                $applications = [];
+                $rankingsByApplicationId = [];
+
+                if ($rankingEnabled) {
+                    $applications = $queryBuilder->getQuery()->getResult();
+
+                    if (count($applications) > 0) {
+                        try {
+                            $rankingPayload = $this->applicationAiRankingService->rankApplications($applications);
+                            $rankingsByApplicationId = is_array($rankingPayload['results'] ?? null)
+                                ? $rankingPayload['results']
+                                : [];
+
+                            usort($applications, static function (Job_application $left, Job_application $right) use ($rankingsByApplicationId): int {
+                                $leftScore = (int) ($rankingsByApplicationId[(string) $left->getId()]['score'] ?? -1);
+                                $rightScore = (int) ($rankingsByApplicationId[(string) $right->getId()]['score'] ?? -1);
+
+                                return $rightScore <=> $leftScore;
+                            });
+
+                            $errors = is_array($rankingPayload['errors'] ?? null) ? $rankingPayload['errors'] : [];
+                            if ($errors !== []) {
+                                $this->addFlash('warning', sprintf(
+                                    'AI ranking completed with %d fallback case(s). %s',
+                                    count($errors),
+                                    $errors[0]
+                                ));
                             }
+                        } catch (Throwable $exception) {
+                            $rankingEnabled = false;
+                            $applicationFilters['ai_rank'] = false;
+                            $pagination['route_params_base']['ai_rank'] = '0';
+                            $rankingsByApplicationId = [];
+                            $this->addFlash('error', 'AI ranking is unavailable right now. ' . $exception->getMessage());
+                        }
+                    }
+
+                    if ($rankingEnabled) {
+                        $pager = $this->createPagerFromArray($applications, $page, $perPage);
+                        $applications = iterator_to_array($pager->getCurrentPageResults());
+                        $pagination = $this->buildPaginationView($pager, $pagination['route_params_base']);
+                    }
+                }
+
+                if (!$rankingEnabled) {
+                    $pager = $this->createPagerFromQueryBuilder($queryBuilder, $page, $perPage);
+                    $applications = iterator_to_array($pager->getCurrentPageResults());
+                    $pagination = $this->buildPaginationView($pager, $pagination['route_params_base']);
+                }
+
+                foreach ($applications as $application) {
+                    $offer = $application->getOffer_id();
+                    $candidate = $application->getCandidate_id();
+                    $candidateName = 'Candidate';
+                    if ($candidate instanceof Candidate) {
+                        $fullName = trim((string) $candidate->getFirstName() . ' ' . (string) $candidate->getLastName());
+                        if ($fullName !== '') {
+                            $candidateName = $fullName;
+                        }
+                    }
+
+                    // Check if interview already exists (one interview per application rule)
+                    $hasActiveInterview = $this->hasActiveInterviewForApplication($application);
+                    $createInterviewUrl = $this->generateUrl('front_interview_create', [
+                        'applicationId' => (string) $application->getId(),
+                        'role' => $role
+                    ] + $request->query->all());
+                    $createInterviewCheckUrl = $this->generateUrl('front_application_interview_availability', [
+                        'applicationId' => (string) $application->getId(),
+                        'role' => $role,
+                    ] + $request->query->all());
+                    $acceptUrl = $this->generateUrl('front_application_set_status', [
+                        'applicationId' => (string) $application->getId(),
+                        'status' => 'accepted',
+                        'role' => $role
+                    ] + $request->query->all());
+                    $declineUrl = $this->generateUrl('front_application_set_status', [
+                        'applicationId' => (string) $application->getId(),
+                        'status' => 'declined',
+                        'role' => $role
+                    ] + $request->query->all());
+
+                    $applicationId = (string) $application->getId();
+                    $ranking = $rankingsByApplicationId[$applicationId] ?? null;
+                    $score = is_array($ranking) && isset($ranking['score']) ? (int) $ranking['score'] : null;
+                    $rationale = is_array($ranking) ? trim((string) ($ranking['rationale'] ?? '')) : '';
+                    $breakdown = is_array($ranking) && is_array($ranking['breakdown'] ?? null) ? $ranking['breakdown'] : [];
+                    $matchedSkills = is_array($ranking) && is_array($ranking['matched_skills'] ?? null)
+                        ? $ranking['matched_skills']
+                        : [];
+                    $missingSkills = is_array($ranking) && is_array($ranking['missing_skills'] ?? null)
+                        ? $ranking['missing_skills']
+                        : [];
+
+                    $detailExtra = [
+                        'Status: ' . (string) $application->getCurrent_status(),
+                        'Offer: ' . ($offer ? (string) $offer->getTitle() : 'Unknown Offer'),
+                        'Candidate: ' . $candidateName,
+                        'Applied At: ' . $application->getApplied_at()->format('d M Y H:i'),
+                        'Phone: ' . (string) $application->getPhone(),
+                    ];
+
+                    if ($score !== null) {
+                        $detailExtra[] = 'AI Score: ' . $score . '/100';
+                        if ($rationale !== '') {
+                            $detailExtra[] = 'AI Rationale: ' . $rationale;
+                        }
+                        $detailExtra[] = sprintf(
+                            'AI Breakdown: Skills %d | Experience %d | Education %d | Cover Letter %d | CV %d',
+                            (int) ($breakdown['skill_match'] ?? 0),
+                            (int) ($breakdown['experience_relevance'] ?? 0),
+                            (int) ($breakdown['education_fit'] ?? 0),
+                            (int) ($breakdown['cover_letter_relevance'] ?? 0),
+                            (int) ($breakdown['cv_relevance'] ?? 0)
+                        );
+
+                        if ($matchedSkills !== []) {
+                            $detailExtra[] = 'Matched Skills: ' . implode(', ', array_slice(array_map('strval', $matchedSkills), 0, 8));
                         }
 
-                        // Check if interview already exists (one interview per application rule)
-                        $hasActiveInterview = $this->hasActiveInterviewForApplication($application);
-                        $createInterviewUrl = $this->generateUrl('front_interview_create', [
-                            'applicationId' => (string) $application->getId(),
-                            'role' => $role
-                        ] + $request->query->all());
-                        $createInterviewCheckUrl = $this->generateUrl('front_application_interview_availability', [
-                            'applicationId' => (string) $application->getId(),
-                            'role' => $role,
-                        ] + $request->query->all());
-                        $acceptUrl = $this->generateUrl('front_application_set_status', [
-                            'applicationId' => (string) $application->getId(),
-                            'status' => 'accepted',
-                            'role' => $role
-                        ] + $request->query->all());
-                        $declineUrl = $this->generateUrl('front_application_set_status', [
-                            'applicationId' => (string) $application->getId(),
-                            'status' => 'declined',
-                            'role' => $role
-                        ] + $request->query->all());
+                        if ($missingSkills !== []) {
+                            $detailExtra[] = 'Missing Skills: ' . implode(', ', array_slice(array_map('strval', $missingSkills), 0, 8));
+                        }
 
-                        $cards[] = [
-                            'id' => (string) $application->getId(),
-                            'meta' => (string) $application->getCurrent_status(),
-                            'title' => 'Offer: ' . ($offer ? $offer->getTitle() : 'Unknown Offer'),
-                            'text' => $candidateName . ' | Applied on ' . $application->getApplied_at()->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
-                            'status' => (string) $application->getCurrent_status(),
-                            // From application-mangement: recruiter details
-                            'details_url' => $this->generateUrl('app_recruiter_application_details', ['applicationId' => $application->getId()]),
-                            'shortlist_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
-                            'reject_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
-                            // From interview: interview creation with one-per-application rule
-                            'create_interview_url' => $hasActiveInterview ? '#' : $createInterviewUrl,
-                            'create_interview_check_url' => $createInterviewCheckUrl,
-                            'can_create_interview' => !$hasActiveInterview,
-                            'interview_block_reason' => $hasActiveInterview ? 'Interview already created for this application.' : '',
-                            'accept_url' => $acceptUrl,
-                            'decline_url' => $declineUrl,
-                        ];
+                        $detailExtra[] = 'Inputs Used: job title, job description, required skills, candidate skills, experience years, education level, cover letter text, cv extracted text';
                     }
+
+                    $meta = (string) $application->getCurrent_status();
+                    if ($score !== null) {
+                        $meta .= ' | AI ' . $score . '/100';
+                    }
+
+                    $cards[] = [
+                        'id' => $applicationId,
+                        'meta' => $meta,
+                        'title' => 'Offer: ' . ($offer ? $offer->getTitle() : 'Unknown Offer'),
+                        'text' => $candidateName . ' | Applied on ' . $application->getApplied_at()->format('d M Y H:i') . ' | Phone: ' . $application->getPhone(),
+                        'status' => (string) $application->getCurrent_status(),
+                        'detail_extra' => $detailExtra,
+                        'ai_score' => $score,
+                        'ai_rationale' => $rationale,
+                        'ai_breakdown' => $breakdown,
+                        // From application-mangement: recruiter details
+                        'details_url' => $this->generateUrl('app_recruiter_application_details', ['applicationId' => $application->getId()]),
+                        'shortlist_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
+                        'reject_url' => $this->generateUrl('app_recruiter_application_update_status', ['applicationId' => $application->getId()]),
+                        // From interview: interview creation with one-per-application rule
+                        'create_interview_url' => $hasActiveInterview ? '#' : $createInterviewUrl,
+                        'create_interview_check_url' => $createInterviewCheckUrl,
+                        'can_create_interview' => !$hasActiveInterview,
+                        'interview_block_reason' => $hasActiveInterview ? 'Interview already created for this application.' : '',
+                        'accept_url' => $acceptUrl,
+                        'decline_url' => $declineUrl,
+                    ];
                 }
             }
         } elseif ($role === 'admin') {
             // ADMIN VIEW: read-only access to all applications with full inspection link
-            $applications = $this->doctrine->getRepository(Job_application::class)->findBy(
-                ['is_archived' => false],
-                ['applied_at' => 'DESC']
-            );
+            /** @var Job_applicationRepository $applicationRepository */
+            $applicationRepository = $this->doctrine->getRepository(Job_application::class);
+            $queryBuilder = $applicationRepository->createAdminListingQueryBuilder();
+            $pager = $this->createPagerFromQueryBuilder($queryBuilder, $page, $perPage);
+            $applications = iterator_to_array($pager->getCurrentPageResults());
+            $pagination = $this->buildPaginationView($pager, ['role' => 'admin']);
 
             foreach ($applications as $application) {
                 $offer = $application->getOffer_id();
@@ -688,10 +850,12 @@ class FrontPortalController extends AbstractController
             $candidate = $this->resolveCurrentCandidate($request);
 
             if ($candidate instanceof Candidate) {
-                $applications = $this->doctrine->getRepository(Job_application::class)->findBy(
-                    ['candidate_id' => $candidate, 'is_archived' => false],
-                    ['applied_at' => 'DESC']
-                );
+                /** @var Job_applicationRepository $applicationRepository */
+                $applicationRepository = $this->doctrine->getRepository(Job_application::class);
+                $queryBuilder = $applicationRepository->createCandidateListingQueryBuilder($candidate);
+                $pager = $this->createPagerFromQueryBuilder($queryBuilder, $page, $perPage);
+                $applications = iterator_to_array($pager->getCurrentPageResults());
+                $pagination = $this->buildPaginationView($pager, ['role' => 'candidate']);
 
                 foreach ($applications as $application) {
                     $offer = $application->getOffer_id();
@@ -726,6 +890,9 @@ class FrontPortalController extends AbstractController
         return $this->render('front/modules/job_applications.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
+            'applicationFilters' => $applicationFilters,
+            'aiRankingEnabled' => $rankingEnabled,
+            'pagination' => $pagination,
         ]);
     }
 
@@ -1826,6 +1993,63 @@ class FrontPortalController extends AbstractController
         }
 
         return $userId;
+    }
+
+    private function createPagerFromQueryBuilder(QueryBuilder $queryBuilder, int $page, int $perPage): Pagerfanta
+    {
+        $pager = new Pagerfanta(new QueryAdapter($queryBuilder, true, false));
+        $pager->setMaxPerPage($perPage);
+        try {
+            $pager->setCurrentPage($page);
+        } catch (\Throwable) {
+            $pager->setCurrentPage(1);
+        }
+
+        return $pager;
+    }
+
+    /**
+     * @param array<int, mixed> $items
+     */
+    private function createPagerFromArray(array $items, int $page, int $perPage): Pagerfanta
+    {
+        $pager = new Pagerfanta(new ArrayAdapter($items));
+        $pager->setMaxPerPage($perPage);
+        try {
+            $pager->setCurrentPage($page);
+        } catch (\Throwable) {
+            $pager->setCurrentPage(1);
+        }
+
+        return $pager;
+    }
+
+    /**
+     * @param array<string, mixed> $routeParamsBase
+     *
+     * @return array<string, mixed>
+     */
+    private function buildPaginationView(Pagerfanta $pager, array $routeParamsBase): array
+    {
+        $currentPage = $pager->getCurrentPage();
+        $totalPages = max(1, $pager->getNbPages());
+
+        $pages = [];
+        for ($i = 1; $i <= $totalPages; $i++) {
+            $pages[] = $i;
+        }
+
+        return [
+            'enabled' => $totalPages > 1,
+            'current_page' => $currentPage,
+            'total_pages' => $totalPages,
+            'has_previous' => $pager->hasPreviousPage(),
+            'has_next' => $pager->hasNextPage(),
+            'previous_page' => $pager->hasPreviousPage() ? $currentPage - 1 : 1,
+            'next_page' => $pager->hasNextPage() ? $currentPage + 1 : $totalPages,
+            'pages' => $pages,
+            'route_params_base' => $routeParamsBase,
+        ];
     }
 
     private function validateInterviewPayload(array $data): array

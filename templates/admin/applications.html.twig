@@ -15,42 +15,47 @@
 
     <div class="card border mb-3">
         <div class="card-body py-2">
-            <div class="row g-2 align-items-end">
-                <div class="col-12 col-xl-6">
-                    <label class="form-label mb-1">Search</label>
-                    <div class="input-icon">
-                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                        <input id="adminApplicationSearch" type="text" class="form-control" placeholder="Search by offer, candidate, phone, status...">
+            <form id="adminApplicationFiltersForm" method="get" action="{{ path('management_job_applications') }}" data-data-url="{{ data_url }}">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-xl-6">
+                        <label class="form-label mb-1" for="adminApplicationSearch">Search</label>
+                        <div class="input-icon">
+                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                            <input id="adminApplicationSearch" name="q" type="text" class="form-control" placeholder="Search by offer, candidate, phone, status..." value="{{ filters.q|default('') }}">
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <label class="form-label mb-1" for="adminApplicationStatusFilter">Filter by Status</label>
+                        <select id="adminApplicationStatusFilter" name="status" class="form-select">
+                            <option value="all" {{ filters.status|default('all') == 'all' ? 'selected' : '' }}>All Statuses</option>
+                            <option value="submitted" {{ filters.status|default('all') == 'submitted' ? 'selected' : '' }}>Submitted</option>
+                            <option value="in_review" {{ filters.status|default('all') == 'in_review' ? 'selected' : '' }}>In Review</option>
+                            <option value="shortlisted" {{ filters.status|default('all') == 'shortlisted' ? 'selected' : '' }}>Shortlisted</option>
+                            <option value="rejected" {{ filters.status|default('all') == 'rejected' ? 'selected' : '' }}>Rejected</option>
+                            <option value="interview" {{ filters.status|default('all') == 'interview' ? 'selected' : '' }}>Interview</option>
+                            <option value="hired" {{ filters.status|default('all') == 'hired' ? 'selected' : '' }}>Hired</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <label class="form-label mb-1" for="adminApplicationSortMode">Sort</label>
+                        <select id="adminApplicationSortMode" name="sort" class="form-select">
+                            <option value="default" {{ filters.sort|default('default') == 'default' ? 'selected' : '' }}>Default Order</option>
+                            <option value="title_asc" {{ filters.sort|default('default') == 'title_asc' ? 'selected' : '' }}>Title A-Z</option>
+                            <option value="title_desc" {{ filters.sort|default('default') == 'title_desc' ? 'selected' : '' }}>Title Z-A</option>
+                            <option value="date_desc" {{ filters.sort|default('default') == 'date_desc' ? 'selected' : '' }}>Date Newest</option>
+                            <option value="date_asc" {{ filters.sort|default('default') == 'date_asc' ? 'selected' : '' }}>Date Oldest</option>
+                        </select>
+                    </div>
+                    <div class="col-12 d-flex justify-content-end gap-2">
+                        <a href="{{ path('management_job_applications') }}" class="btn btn-outline-secondary">
+                            <i class="ti ti-rotate-clockwise-2 me-1"></i>Reset
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-filter me-1"></i>Apply
+                        </button>
                     </div>
                 </div>
-                <div class="col-12 col-md-6 col-xl-3">
-                    <label class="form-label mb-1">Filter by Status</label>
-                    <select id="adminApplicationStatusFilter" class="form-select">
-                        <option value="all">All Statuses</option>
-                        <option value="submitted">Submitted</option>
-                        <option value="in_review">In Review</option>
-                        <option value="shortlisted">Shortlisted</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="interview">Interview</option>
-                        <option value="hired">Hired</option>
-                    </select>
-                </div>
-                <div class="col-12 col-md-6 col-xl-3">
-                    <label class="form-label mb-1">Sort</label>
-                    <select id="adminApplicationSortMode" class="form-select">
-                        <option value="default">Default Order</option>
-                        <option value="title_asc">Title A-Z</option>
-                        <option value="title_desc">Title Z-A</option>
-                        <option value="date_desc">Date Newest</option>
-                        <option value="date_asc">Date Oldest</option>
-                    </select>
-                </div>
-                <div class="col-12 d-flex justify-content-end">
-                    <button id="adminApplicationReset" type="button" class="btn btn-outline-secondary">
-                        <i class="ti ti-rotate-clockwise-2 me-1"></i>Reset
-                    </button>
-                </div>
-            </div>
+            </form>
         </div>
     </div>
 
@@ -69,36 +74,8 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for row in rows %}
-                        <tr class="js-admin-application-row" data-search-text="{{ (row.offer_title ~ ' ' ~ row.candidate_name ~ ' ' ~ row.phone ~ ' ' ~ row.status)|lower }}" data-filter-status="{{ row.status|lower }}" data-sort-title="{{ row.offer_title|lower }}" data-sort-date="{{ row.applied_at|date('U') }}" data-archived="{{ row.is_archived ? '1' : '0' }}">
-                            <td>#{{ row.id }}</td>
-                            <td>{{ row.offer_title }}</td>
-                            <td>{{ row.candidate_name }}</td>
-                            <td>{{ row.phone }}</td>
-                            <td><span class="badge bg-primary text-white fw-semibold">{{ row.status }}</span></td>
-                            <td>{{ row.applied_at|date('d M Y H:i') }}</td>
-                            <td>
-                                <span class="badge {{ row.is_archived ? 'bg-danger text-white' : 'bg-success text-white' }} fw-semibold">
-                                    {{ row.is_archived ? 'ARCHIVED' : 'ACTIVE' }}
-                                </span>
-                            </td>
-                            <td>
-                                <div class="d-flex flex-wrap gap-2">
-                                    <a href="{{ row.details_url }}" class="btn btn-sm btn-primary"><i class="ti ti-eye me-1"></i>Inspect</a>
-                                    <form method="post" action="{{ row.is_archived ? row.unarchive_url : row.archive_url }}" class="d-inline">
-                                        <button type="submit" class="btn btn-sm {{ row.is_archived ? 'btn-outline-success' : 'btn-outline-danger' }}">
-                                            <i class="ti {{ row.is_archived ? 'ti-box' : 'ti-archive' }} me-1"></i>{{ row.is_archived ? 'Unarchive' : 'Archive' }}
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="8" class="text-center text-muted py-4">No applications found.</td>
-                        </tr>
-                    {% endfor %}
+                <tbody id="adminApplicationsTableBody">
+                    {% include 'admin/_application_rows.html.twig' with { rows: rows } %}
                 </tbody>
             </table>
         </div>
@@ -106,89 +83,92 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const rows = document.querySelectorAll('.js-admin-application-row');
+            const filterForm = document.getElementById('adminApplicationFiltersForm');
             const searchInput = document.getElementById('adminApplicationSearch');
-            const statusFilter = document.getElementById('adminApplicationStatusFilter');
-            const sortModeSelect = document.getElementById('adminApplicationSortMode');
-            const resetBtn = document.getElementById('adminApplicationReset');
-            const recordCountBadge = document.getElementById('adminApplicationRecordCount');
-            const tableBody = document.querySelector('table tbody');
-            if (!rows.length) {
+            const statusSelect = document.getElementById('adminApplicationStatusFilter');
+            const sortSelect = document.getElementById('adminApplicationSortMode');
+            const tableBody = document.getElementById('adminApplicationsTableBody');
+            const countBadge = document.getElementById('adminApplicationRecordCount');
+
+            if (!filterForm || !tableBody) {
                 return;
             }
 
-            const rowList = Array.from(rows);
+            const dataUrl = filterForm.getAttribute('data-data-url') || filterForm.getAttribute('action');
+            let debounceTimer = null;
+            let activeController = null;
 
-            const runFiltersAndSort = function () {
-                const query = ((searchInput && searchInput.value) || '').trim().toLowerCase();
-                const selectedStatus = ((statusFilter && statusFilter.value) || 'all').toLowerCase();
-                const sortMode = (sortModeSelect && sortModeSelect.value) || 'default';
-                let visibleCount = 0;
+            const buildQueryString = function () {
+                const params = new URLSearchParams(new FormData(filterForm));
+                return params.toString();
+            };
 
-                rowList.forEach(function (row) {
-                    const haystack = (row.getAttribute('data-search-text') || '').toLowerCase();
-                    const rowStatus = (row.getAttribute('data-filter-status') || '').toLowerCase();
+            const updateUrl = function (queryString) {
+                const actionUrl = filterForm.getAttribute('action') || window.location.pathname;
+                const nextUrl = queryString === '' ? actionUrl : actionUrl + '?' + queryString;
+                window.history.replaceState({}, '', nextUrl);
+            };
 
-                    const searchMatch = query === '' || haystack.includes(query);
-                    const statusMatch = selectedStatus === 'all' || rowStatus === selectedStatus;
-                    const visible = searchMatch && statusMatch;
-
-                    row.classList.toggle('d-none', !visible);
-                    if (visible) {
-                        visibleCount += 1;
-                    }
-                });
-
-                const sortedRows = rowList.slice().sort(function (a, b) {
-                    if (sortMode === 'title_asc') {
-                        return (a.getAttribute('data-sort-title') || '').localeCompare((b.getAttribute('data-sort-title') || ''));
-                    }
-                    if (sortMode === 'title_desc') {
-                        return (b.getAttribute('data-sort-title') || '').localeCompare((a.getAttribute('data-sort-title') || ''));
-                    }
-                    if (sortMode === 'date_desc') {
-                        return Number(b.getAttribute('data-sort-date') || 0) - Number(a.getAttribute('data-sort-date') || 0);
-                    }
-                    if (sortMode === 'date_asc') {
-                        return Number(a.getAttribute('data-sort-date') || 0) - Number(b.getAttribute('data-sort-date') || 0);
-                    }
-                    return 0;
-                });
-
-                sortedRows.forEach(function (row) {
-                    tableBody.appendChild(row);
-                });
-
-                if (recordCountBadge) {
-                    recordCountBadge.textContent = visibleCount + ' records';
+            const fetchRows = function () {
+                if (activeController) {
+                    activeController.abort();
                 }
+
+                activeController = new AbortController();
+
+                const queryString = buildQueryString();
+                const endpoint = queryString === '' ? dataUrl : dataUrl + '?' + queryString;
+
+                fetch(endpoint, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    signal: activeController.signal
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to load applications.');
+                        }
+
+                        return response.json();
+                    })
+                    .then(function (payload) {
+                        tableBody.innerHTML = payload.rowsHtml || '';
+                        if (countBadge) {
+                            countBadge.textContent = String(payload.count || 0) + ' records';
+                        }
+                        updateUrl(queryString);
+                    })
+                    .catch(function (error) {
+                        if (error.name === 'AbortError') {
+                            return;
+                        }
+                    });
+            };
+
+            const scheduleFetch = function () {
+                if (debounceTimer) {
+                    window.clearTimeout(debounceTimer);
+                }
+
+                debounceTimer = window.setTimeout(fetchRows, 250);
             };
 
             if (searchInput) {
-                searchInput.addEventListener('input', runFiltersAndSort);
+                searchInput.addEventListener('input', scheduleFetch);
             }
-            if (statusFilter) {
-                statusFilter.addEventListener('change', runFiltersAndSort);
+            if (statusSelect) {
+                statusSelect.addEventListener('change', scheduleFetch);
             }
-            if (sortModeSelect) {
-                sortModeSelect.addEventListener('change', runFiltersAndSort);
-            }
-            if (resetBtn) {
-                resetBtn.addEventListener('click', function () {
-                    if (searchInput) {
-                        searchInput.value = '';
-                    }
-                    if (statusFilter) {
-                        statusFilter.value = 'all';
-                    }
-                    if (sortModeSelect) {
-                        sortModeSelect.value = 'default';
-                    }
-                    runFiltersAndSort();
-                });
+            if (sortSelect) {
+                sortSelect.addEventListener('change', scheduleFetch);
             }
 
-            runFiltersAndSort();
+            filterForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                fetchRows();
+            });
         });
     </script>
+
 {% endblock %}

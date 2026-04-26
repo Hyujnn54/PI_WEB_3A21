@@ -3,12 +3,14 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
+use App\Repository\Job_applicationRepository;
 
 use App\Entity\Candidate;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Interview;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: Job_applicationRepository::class)]
 class Job_application
 {
 
@@ -19,16 +21,30 @@ class Job_application
 
         #[ORM\ManyToOne(targetEntity: Job_offer::class, inversedBy: "job_applications")]
     #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+        #[Assert\NotNull(message: 'A job offer is required.')]
     private Job_offer $offer_id;
 
         #[ORM\ManyToOne(targetEntity: Candidate::class, inversedBy: "job_applications")]
     #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+        #[Assert\NotNull(message: 'A candidate is required.')]
     private Candidate $candidate_id;
 
     #[ORM\Column(type: "string", length: 30)]
+        #[Assert\NotBlank(message: 'Phone number cannot be empty.')]
+        #[Assert\Regex(
+            pattern: '/^(?:\+216|216|0)?[259][0-9]{7}$/',
+            message: 'Please enter a valid Tunisian phone number (+216XXXXXXXX, 216XXXXXXXX, 0XXXXXXXX or XXXXXXXX).'
+        )]
     private string $phone;
 
     #[ORM\Column(type: "text")]
+        #[Assert\NotBlank(message: 'Cover letter cannot be empty.')]
+        #[Assert\Length(
+            min: 50,
+            max: 2000,
+            minMessage: 'Cover letter must be at least {{ limit }} characters.',
+            maxMessage: 'Cover letter must not exceed {{ limit }} characters.'
+        )]
     private string $cover_letter;
 
     #[ORM\Column(type: "string", length: 255)]
@@ -80,7 +96,7 @@ class Job_application
 
     public function setPhone($value)
     {
-        $this->phone = $value;
+        $this->phone = trim((string) ($value ?? ''));
     }
 
     public function getCover_letter()
@@ -95,7 +111,7 @@ class Job_application
 
     public function setCover_letter($value)
     {
-        $this->cover_letter = $value;
+        $this->cover_letter = trim((string) ($value ?? ''));
     }
 
     public function setCoverLetter($value)

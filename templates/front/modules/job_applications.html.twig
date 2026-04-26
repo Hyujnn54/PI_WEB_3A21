@@ -4,6 +4,7 @@
 
 {% block body %}
 {% set role = authUser.role|default('candidate') %}
+{% set filters = applicationFilters|default({'search': '', 'status': 'all', 'sort': 'date_desc'}) %}
 <style>
     .tb-create-locked,
     .tb-create-locked:hover,
@@ -42,32 +43,101 @@
                 <div class="col-12 col-xl-8">
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
-                    <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#applicationCardsGrid">
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                            <input type="text" class="form-control" placeholder="Search applications by id, offer, status..." data-filter-search>
+                    {% if role == 'recruiter' %}
+                        <form method="get" action="{{ path('front_job_applications') }}" class="d-flex flex-wrap align-items-center gap-2">
+                            <input type="hidden" name="role" value="recruiter">
+                            <input type="hidden" name="ai_rank" value="{{ filters.ai_rank|default(false) ? '1' : '0' }}">
+                            <input type="hidden" name="page" value="1">
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                                <input type="text" name="search" class="form-control" value="{{ filters.search|default('') }}" placeholder="Search by offer, candidate, phone, status...">
+                            </div>
+                            <select name="status" class="form-select" style="max-width: 220px;">
+                                <option value="all" {{ (filters.status|default('all')) == 'all' ? 'selected' : '' }}>All Statuses</option>
+                                <option value="submitted" {{ (filters.status|default('all')) == 'submitted' ? 'selected' : '' }}>Submitted</option>
+                                <option value="in_review" {{ (filters.status|default('all')) == 'in_review' ? 'selected' : '' }}>In Review</option>
+                                <option value="shortlisted" {{ (filters.status|default('all')) == 'shortlisted' ? 'selected' : '' }}>Shortlisted</option>
+                                <option value="rejected" {{ (filters.status|default('all')) == 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                <option value="interview" {{ (filters.status|default('all')) == 'interview' ? 'selected' : '' }}>Interview</option>
+                                <option value="hired" {{ (filters.status|default('all')) == 'hired' ? 'selected' : '' }}>Hired</option>
+                            </select>
+                            <select name="sort" class="form-select" style="max-width: 230px;">
+                                <option value="date_desc" {{ (filters.sort|default('date_desc')) == 'date_desc' ? 'selected' : '' }}>Date Newest</option>
+                                <option value="date_asc" {{ (filters.sort|default('date_desc')) == 'date_asc' ? 'selected' : '' }}>Date Oldest</option>
+                                <option value="title_asc" {{ (filters.sort|default('date_desc')) == 'title_asc' ? 'selected' : '' }}>Title A-Z</option>
+                                <option value="title_desc" {{ (filters.sort|default('date_desc')) == 'title_desc' ? 'selected' : '' }}>Title Z-A</option>
+                                <option value="status_asc" {{ (filters.sort|default('date_desc')) == 'status_asc' ? 'selected' : '' }}>Status A-Z</option>
+                                <option value="status_desc" {{ (filters.sort|default('date_desc')) == 'status_desc' ? 'selected' : '' }}>Status Z-A</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary" onclick="this.form.querySelector('input[name=ai_rank]').value='{{ filters.ai_rank|default(false) ? '1' : '0' }}';"><i class="ti ti-filter me-1"></i>Apply</button>
+                            <button type="submit" class="btn btn-outline-primary" onclick="this.form.querySelector('input[name=ai_rank]').value='1';"><i class="ti ti-robot me-1"></i>Ranking using AI</button>
+                            <a href="{{ path('front_job_applications', {role: 'recruiter'}) }}" class="btn btn-outline-secondary"><i class="ti ti-rotate-clockwise-2 me-1"></i>Reset</a>
+                            {% if filters.ai_rank|default(false) %}
+                                <span class="badge bg-purple-lt text-purple">AI ranking enabled</span>
+                            {% endif %}
+                            <div class="small text-secondary ms-auto">{{ cards|length }} result(s)</div>
+                        </form>
+                        <form id="recruiterBulkStatusForm" method="post" action="{{ path('app_recruiter_application_bulk_update_status') }}" class="d-flex flex-wrap align-items-center gap-2 mt-2 pt-2 border-top">
+                            <input type="hidden" name="search" value="{{ filters.search|default('') }}">
+                            <input type="hidden" name="status_filter" value="{{ filters.status|default('all') }}">
+                            <input type="hidden" name="sort" value="{{ filters.sort|default('date_desc') }}">
+                            <div class="form-check m-0">
+                                <input class="form-check-input" type="checkbox" id="recruiterBulkSelectAll">
+                                <label class="form-check-label small" for="recruiterBulkSelectAll">Select all</label>
+                            </div>
+                            <select id="recruiterBulkStatusSelect" name="status" class="form-select" style="max-width: 220px;" required>
+                                <option value="">Bulk status...</option>
+                                <option value="SUBMITTED">Submitted</option>
+                                <option value="IN_REVIEW">In Review</option>
+                                <option value="SHORTLISTED">Shortlisted</option>
+                                <option value="REJECTED">Rejected</option>
+                                <option value="INTERVIEW">Interview</option>
+                                <option value="HIRED">Hired</option>
+                            </select>
+                            <input type="text" name="note" class="form-control" style="max-width: 340px;" placeholder="Optional note for all selected applications">
+                            <button id="recruiterBulkSubmitBtn" type="submit" class="btn btn-primary" disabled>
+                                <i class="ti ti-checks me-1"></i>Apply to selected
+                            </button>
+                            <span class="small text-secondary" id="recruiterBulkCount">0 selected</span>
+                        </form>
+                    {% else %}
+                        <div class="tb-filter-form d-flex flex-wrap align-items-center gap-2" data-target="#applicationCardsGrid">
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                                <input type="text" class="form-control" placeholder="Search applications by id, offer, status..." data-filter-search>
+                            </div>
+                            <select class="form-select" style="max-width: 220px;" data-filter-criteria>
+                                <option value="all">Search In: All</option>
+                                <option value="title">Title</option>
+                                <option value="meta">Meta</option>
+                                <option value="description">Description</option>
+                            </select>
+                            <select class="form-select" style="max-width: 230px;" data-filter-sort>
+                                <option value="default">Default Order</option>
+                                <option value="title_asc">Title A-Z</option>
+                                <option value="title_desc">Title Z-A</option>
+                                <option value="meta_asc">Meta A-Z</option>
+                                <option value="meta_desc">Meta Z-A</option>
+                            </select>
+                            <div class="small text-secondary ms-auto" data-filter-results></div>
                         </div>
-                        <select class="form-select" style="max-width: 220px;" data-filter-criteria>
-                            <option value="all">Search In: All</option>
-                            <option value="title">Title</option>
-                            <option value="meta">Meta</option>
-                            <option value="description">Description</option>
-                        </select>
-                        <select class="form-select" style="max-width: 230px;" data-filter-sort>
-                            <option value="default">Default Order</option>
-                            <option value="title_asc">Title A-Z</option>
-                            <option value="title_desc">Title Z-A</option>
-                            <option value="meta_asc">Meta A-Z</option>
-                            <option value="meta_desc">Meta Z-A</option>
-                        </select>
-                        <div class="small text-secondary ms-auto" data-filter-results></div>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
 
             <div id="applicationCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     {% set canCreateInterview = card.can_create_interview|default(true) %}
+                    {% set detailExtra = card.detail_extra|default([]) %}
+                    {% if detailExtra is empty %}
+                        {% set detailExtra = ['Status: ' ~ card.meta, card.title] %}
+                    {% endif %}
+                    {% if role == 'admin' %}
+                        {% set detailExtra = detailExtra|merge(['Inspect URL: ' ~ card.details_url|default('#')]) %}
+                    {% endif %}
+                    {% if role == 'recruiter' and not canCreateInterview %}
+                        {% set detailExtra = detailExtra|merge(['Reason: ' ~ card.interview_block_reason|default('Interview already created for this application.')]) %}
+                    {% endif %}
                     <div class="col-md-6 col-xl-4 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
                         <div class="tb-module-card h-100" 
                             data-application-id="{{ card.id|default(0) }}" 
@@ -96,10 +166,28 @@
                             {% if role == 'admin' %}
                                 data-details-url="{{ card.details_url|default('#') }}"
                             {% endif %}
-                            data-detail-extra="Status: {{ card.meta }}||{{ card.title }}{% if role == 'admin' %}||Inspect URL: {{ card.details_url|default('#') }}{% endif %}{% if role == 'recruiter' and not canCreateInterview %}||Reason: {{ card.interview_block_reason|default('Interview already created for this application.') }}{% endif %}">
+                            data-detail-extra="{{ detailExtra|join('||')|e('html_attr') }}">
+                            {% if role == 'recruiter' %}
+                                <div class="form-check mb-2" onclick="event.stopPropagation();">
+                                    <input
+                                        class="form-check-input tb-bulk-app-checkbox"
+                                        type="checkbox"
+                                        name="application_ids[]"
+                                        value="{{ card.id|default(0) }}"
+                                        form="recruiterBulkStatusForm"
+                                        id="bulkApplication{{ loop.index }}"
+                                    >
+                                    <label class="form-check-label small text-secondary" for="bulkApplication{{ loop.index }}">Select</label>
+                                </div>
+                            {% endif %}
                             <div class="tb-module-meta">{{ card.meta }}</div>
                             <h3>{{ card.title }}</h3>
                             <p>{{ card.text }}</p>
+                            {% if role == 'recruiter' and card.ai_score is not null %}
+                                <div class="mt-2">
+                                    <span class="badge bg-purple text-white">AI {{ card.ai_score }}/100</span>
+                                </div>
+                            {% endif %}
                             {# Recruiter inline buttons for quick actions #}
                             {% if role == 'recruiter' %}
                                 <div class="d-flex flex-wrap gap-2 mt-3">
@@ -156,6 +244,34 @@
                     </div>
                 {% endfor %}
             </div>
+
+            {% set pager = pagination|default({}) %}
+            {% if pager.enabled|default(false) %}
+                {% set baseParams = pager.route_params_base|default({'role': role}) %}
+                <div class="d-flex justify-content-center mt-3">
+                    <nav aria-label="Applications pagination">
+                        <ul class="pagination mb-0">
+                            <li class="page-item {{ pager.has_previous|default(false) ? '' : 'disabled' }}">
+                                <a class="page-link" href="{{ pager.has_previous|default(false) ? path('front_job_applications', baseParams|merge({'page': pager.previous_page|default(1)})) : '#' }}" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+
+                            {% for p in pager.pages|default([1]) %}
+                                <li class="page-item {{ p == (pager.current_page|default(1)) ? 'active' : '' }}">
+                                    <a class="page-link" href="{{ path('front_job_applications', baseParams|merge({'page': p})) }}">{{ p }}</a>
+                                </li>
+                            {% endfor %}
+
+                            <li class="page-item {{ pager.has_next|default(false) ? '' : 'disabled' }}">
+                                <a class="page-link" href="{{ pager.has_next|default(false) ? path('front_job_applications', baseParams|merge({'page': pager.next_page|default(1)})) : '#' }}" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            {% endif %}
 
                 </div>
                 <div class="col-12 col-xl-4">
@@ -253,7 +369,90 @@
         const onsiteField = formEl.querySelector('[data-onsite-field]');
         const notesInput = formEl.querySelector('textarea[name="notes"]');
         const notesCount = formEl.querySelector('[data-notes-count]');
+        const bulkForm = document.getElementById('recruiterBulkStatusForm');
+        const bulkSelectAll = document.getElementById('recruiterBulkSelectAll');
+        const bulkStatusSelect = document.getElementById('recruiterBulkStatusSelect');
+        const bulkSubmitBtn = document.getElementById('recruiterBulkSubmitBtn');
+        const bulkCount = document.getElementById('recruiterBulkCount');
+        const bulkCheckboxes = Array.from(document.querySelectorAll('.tb-bulk-app-checkbox'));
         let selectedCard = null;
+
+        const syncBulkSelection = function () {
+            if (!bulkCheckboxes.length) {
+                return;
+            }
+
+            const selectedCount = bulkCheckboxes.filter(function (checkbox) {
+                return checkbox.checked;
+            }).length;
+
+            if (bulkCount) {
+                bulkCount.textContent = selectedCount + ' selected';
+            }
+
+            if (bulkSelectAll) {
+                bulkSelectAll.checked = selectedCount > 0 && selectedCount === bulkCheckboxes.length;
+                bulkSelectAll.indeterminate = selectedCount > 0 && selectedCount < bulkCheckboxes.length;
+            }
+
+            if (bulkSubmitBtn) {
+                const hasStatus = bulkStatusSelect && bulkStatusSelect.value !== '';
+                bulkSubmitBtn.disabled = !(selectedCount > 0 && hasStatus);
+            }
+        };
+
+        if (bulkCheckboxes.length) {
+            bulkCheckboxes.forEach(function (checkbox) {
+                checkbox.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                });
+
+                checkbox.addEventListener('change', function () {
+                    syncBulkSelection();
+                });
+            });
+        }
+
+        if (bulkSelectAll && bulkCheckboxes.length) {
+            bulkSelectAll.addEventListener('change', function () {
+                bulkCheckboxes.forEach(function (checkbox) {
+                    checkbox.checked = bulkSelectAll.checked;
+                });
+                syncBulkSelection();
+            });
+        }
+
+        if (bulkStatusSelect) {
+            bulkStatusSelect.addEventListener('change', function () {
+                syncBulkSelection();
+            });
+        }
+
+        if (bulkForm) {
+            bulkForm.addEventListener('submit', function (event) {
+                const selectedCount = bulkCheckboxes.filter(function (checkbox) {
+                    return checkbox.checked;
+                }).length;
+
+                if (selectedCount === 0) {
+                    event.preventDefault();
+                    alert('Please select at least one application.');
+                    return;
+                }
+
+                if (!bulkStatusSelect || bulkStatusSelect.value === '') {
+                    event.preventDefault();
+                    alert('Please select a status for bulk update.');
+                    return;
+                }
+
+                if (!confirm('Apply this status to ' + selectedCount + ' selected application(s)?')) {
+                    event.preventDefault();
+                }
+            });
+
+            syncBulkSelection();
+        }
 
         const now = new Date();
         const minValue = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);

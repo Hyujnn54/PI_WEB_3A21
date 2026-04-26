@@ -75,7 +75,29 @@
                                 </div>
                                 <div class="col-12">
                                     <div class="small text-secondary mb-1">Cover Letter</div>
-                                    <div class="p-3 border rounded bg-light-subtle">{{ application.cover_letter }}</div>
+                                    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                        <button type="button" id="detectCoverLetterLanguageBtn" class="btn btn-sm btn-outline-primary">
+                                            <i class="ti ti-language me-1"></i>Detect Language
+                                        </button>
+                                        <select id="coverLetterTargetLanguage" class="form-select form-select-sm" style="max-width: 190px;" disabled>
+                                            <option value="">Translate to...</option>
+                                        </select>
+                                        <button type="button" id="translateCoverLetterBtn" class="btn btn-sm btn-primary" disabled>
+                                            <i class="ti ti-arrows-exchange me-1"></i>Translate
+                                        </button>
+                                        <button type="button" id="restoreCoverLetterBtn" class="btn btn-sm btn-outline-secondary" disabled>
+                                            <i class="ti ti-rotate-2 me-1"></i>Show Original
+                                        </button>
+                                        <span id="coverLetterSourceBadge" class="badge bg-secondary-subtle text-secondary-emphasis">Source: Unknown</span>
+                                    </div>
+                                    <div id="coverLetterTranslateFeedback" class="small text-secondary mb-2"></div>
+                                    <div
+                                        id="recruiterCoverLetterText"
+                                        class="p-3 border rounded bg-light-subtle"
+                                        style="white-space: pre-line;"
+                                        data-detect-url="{{ path('app_recruiter_cover_letter_detect_language', {'applicationId': application.id}) }}"
+                                        data-translate-url="{{ path('app_recruiter_cover_letter_translate', {'applicationId': application.id}) }}"
+                                    >{{ application.cover_letter }}</div>
                                 </div>
                             </div>
                         </div>
@@ -133,7 +155,7 @@
                                                         <div class="small text-muted mt-1">Not editable (auto-generated or created by another user)</div>
                                                     {% endif %}
                                                 </div>
-                                                <div class="small text-secondary">{{ entry.changed_at|date('d M Y H:i') }}</div>
+                                                <div class="small text-secondary">{{ entry.changed_at|date('d M Y H:i') }} ({{ entry.changed_at|time_diff }})</div>
                                             </div>
                                         </div>
                                     {% endfor %}
@@ -151,6 +173,150 @@
 
 <script>
     (function () {
+        const coverLetterContainer = document.getElementById('recruiterCoverLetterText');
+        const detectBtn = document.getElementById('detectCoverLetterLanguageBtn');
+        const translateBtn = document.getElementById('translateCoverLetterBtn');
+        const restoreBtn = document.getElementById('restoreCoverLetterBtn');
+        const targetSelect = document.getElementById('coverLetterTargetLanguage');
+        const sourceBadge = document.getElementById('coverLetterSourceBadge');
+        const feedback = document.getElementById('coverLetterTranslateFeedback');
+
+        if (coverLetterContainer && detectBtn && translateBtn && restoreBtn && targetSelect && sourceBadge && feedback) {
+            const detectUrl = coverLetterContainer.getAttribute('data-detect-url') || '';
+            const translateUrl = coverLetterContainer.getAttribute('data-translate-url') || '';
+            const originalCoverLetter = (coverLetterContainer.textContent || '').trim();
+            let sourceLanguage = '';
+
+            const setFeedback = function (message, isError) {
+                feedback.textContent = message;
+                feedback.classList.remove('text-danger', 'text-secondary', 'text-success');
+                feedback.classList.add(isError ? 'text-danger' : 'text-success');
+                if (!message) {
+                    feedback.classList.remove('text-success');
+                    feedback.classList.add('text-secondary');
+                }
+            };
+
+            const resetTargets = function () {
+                targetSelect.innerHTML = '<option value="">Translate to...</option>';
+                targetSelect.disabled = true;
+                translateBtn.disabled = true;
+            };
+
+            const fillTargets = function (targets) {
+                resetTargets();
+
+                if (!Array.isArray(targets) || targets.length === 0) {
+                    return;
+                }
+
+                targets.forEach(function (target) {
+                    const option = document.createElement('option');
+                    option.value = target.code;
+                    option.textContent = target.label;
+                    targetSelect.appendChild(option);
+                });
+
+                targetSelect.disabled = false;
+            };
+
+            targetSelect.addEventListener('change', function () {
+                translateBtn.disabled = targetSelect.value === '' || sourceLanguage === '';
+            });
+
+            detectBtn.addEventListener('click', async function () {
+                if (detectUrl === '') {
+                    setFeedback('Language detection endpoint is unavailable.', true);
+                    return;
+                }
+
+                const previousText = detectBtn.innerHTML;
+                detectBtn.disabled = true;
+                detectBtn.innerHTML = '<i class="ti ti-loader-2 me-1"></i>Detecting...';
+                setFeedback('', false);
+
+                try {
+                    const response = await fetch(detectUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    const result = await response.json();
+
+                    if (!response.ok || !result.ok) {
+                        throw new Error(result.error || 'Failed to detect language.');
+                    }
+
+                    sourceLanguage = String(result.sourceLanguage || '').toLowerCase();
+                    sourceBadge.textContent = 'Source: ' + (result.sourceLabel || sourceLanguage.toUpperCase());
+                    fillTargets(result.targets || []);
+                    translateBtn.disabled = targetSelect.value === '';
+                    setFeedback('Language detected. You can translate to another language now.', false);
+                } catch (error) {
+                    resetTargets();
+                    sourceLanguage = '';
+                    sourceBadge.textContent = 'Source: Unknown';
+                    setFeedback(error instanceof Error ? error.message : 'Failed to detect language.', true);
+                } finally {
+                    detectBtn.disabled = false;
+                    detectBtn.innerHTML = previousText;
+                }
+            });
+
+            translateBtn.addEventListener('click', async function () {
+                if (translateUrl === '') {
+                    setFeedback('Translation endpoint is unavailable.', true);
+                    return;
+                }
+
+                const targetLanguage = (targetSelect.value || '').toLowerCase();
+                if (sourceLanguage === '' || targetLanguage === '') {
+                    setFeedback('Detect source language and select a target language first.', true);
+                    return;
+                }
+
+                const previousText = translateBtn.innerHTML;
+                translateBtn.disabled = true;
+                translateBtn.innerHTML = '<i class="ti ti-loader-2 me-1"></i>Translating...';
+                setFeedback('', false);
+
+                const payload = new FormData();
+                payload.append('source_language', sourceLanguage);
+                payload.append('target_language', targetLanguage);
+
+                try {
+                    const response = await fetch(translateUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: payload
+                    });
+                    const result = await response.json();
+
+                    if (!response.ok || !result.ok) {
+                        throw new Error(result.error || 'Failed to translate cover letter.');
+                    }
+
+                    coverLetterContainer.textContent = result.translatedText || '';
+                    restoreBtn.disabled = false;
+                    setFeedback('Cover letter translated to ' + (result.targetLabel || targetLanguage.toUpperCase()) + '.', false);
+                } catch (error) {
+                    setFeedback(error instanceof Error ? error.message : 'Failed to translate cover letter.', true);
+                } finally {
+                    translateBtn.disabled = targetSelect.value === '' || sourceLanguage === '';
+                    translateBtn.innerHTML = previousText;
+                }
+            });
+
+            restoreBtn.addEventListener('click', function () {
+                coverLetterContainer.textContent = originalCoverLetter;
+                restoreBtn.disabled = true;
+                setFeedback('Original cover letter restored.', false);
+            });
+        }
+
         const forms = document.querySelectorAll('.js-note-edit-form');
         if (!forms.length) {
             return;

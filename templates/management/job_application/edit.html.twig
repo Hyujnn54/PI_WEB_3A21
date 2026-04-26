@@ -3,6 +3,7 @@
 {% block title %}Edit Application{% endblock %}
 
 {% block body %}
+{% set coverLetterGenerateUrl = offer ? path('app_candidate_cover_letter_generate', {'offerId': offer.id}) : '' %}
 <style>
     .tb-apply-hero {
         background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
@@ -85,6 +86,19 @@
         background: #f8fbff;
     }
 
+    .tb-ai-helper {
+        font-size: 0.88rem;
+        margin-top: 0.45rem;
+    }
+
+    .tb-ai-helper.is-success {
+        color: #1d6f42;
+    }
+
+    .tb-ai-helper.is-error {
+        color: #a23333;
+    }
+
     @media (max-width: 991.98px) {
         .tb-apply-layout {
             grid-template-columns: 1fr;
@@ -118,7 +132,7 @@
                             <h3 class="card-title mb-0">Update Job Application</h3>
                         </div>
                         <div class="card-body">
-                            {{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+                            {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'data-cover-letter-generate-url': coverLetterGenerateUrl}}) }}
 
                             {{ form_errors(form) }}
 
@@ -132,10 +146,16 @@
 
                             <div class="tb-apply-section-title">Application Details</div>
                             <div class="mb-3 tb-apply-field">
-                                {{ form_label(form.cover_letter) }}
+                                <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                                    {{ form_label(form.cover_letter) }}
+                                    <button type="button" id="generate-cover-letter-btn" class="btn btn-sm btn-outline-primary" {{ coverLetterGenerateUrl == '' ? 'disabled' : '' }}>
+                                        <i class="ti ti-sparkles me-1"></i>Generate with AI
+                                    </button>
+                                </div>
                                 {{ form_widget(form.cover_letter, {'attr': {'class': 'form-control', 'rows': '6', 'placeholder': 'Briefly describe why your profile matches this role...'}}) }}
                                 {{ form_errors(form.cover_letter) }}
                                 <div id="cover-letter-js-error" class="invalid-feedback d-block" style="display:none;"></div>
+                                <div id="cover-letter-ai-feedback" class="tb-ai-helper text-secondary"></div>
                             </div>
 
                             <div class="tb-apply-section-title">Curriculum Vitae</div>
@@ -147,6 +167,7 @@
                                     </label>
                                     <small class="form-hint text-secondary">If selected, we will use the CV currently stored in your profile.</small>
                                     {{ form_errors(form.use_profile_cv) }}
+                                    <div id="profile-cv-js-error" class="invalid-feedback d-block" style="display:none;"></div>
                                 </div>
 
                                 <div id="cv-upload-wrapper" class="tb-apply-field mb-0">
@@ -200,10 +221,17 @@
         const phoneInput = document.getElementById('{{ form.phone.vars.id }}');
         const coverLetterInput = document.getElementById('{{ form.cover_letter.vars.id }}');
         const useProfileCvCheckbox = document.getElementById('{{ form.use_profile_cv.vars.id }}');
+        const hasProfileCv = {{ (candidate.cvPath is defined and candidate.cvPath) ? 'true' : 'false' }};
+        const hasExistingCv = {{ (application.cvPath is defined and application.cvPath) ? 'true' : 'false' }};
+        const applicationId = '{{ application.id }}';
         const cvUploadWrapper = document.getElementById('cv-upload-wrapper');
         const cvFileInput = document.getElementById('{{ form.cv_file.vars.id }}');
+        const generateCoverLetterBtn = document.getElementById('generate-cover-letter-btn');
+        const aiFeedback = document.getElementById('cover-letter-ai-feedback');
+        const generateCoverLetterUrl = form.getAttribute('data-cover-letter-generate-url') || '';
         const phoneError = document.getElementById('phone-js-error');
         const coverLetterError = document.getElementById('cover-letter-js-error');
+        const profileCvError = document.getElementById('profile-cv-js-error');
         const cvError = document.getElementById('cv-js-error');
 
         if (!useProfileCvCheckbox || !cvUploadWrapper) {
@@ -228,6 +256,27 @@
                 errorElement.textContent = '';
                 errorElement.style.display = 'none';
             }
+        };
+
+        const setAiFeedback = function (message, type) {
+            if (!aiFeedback) {
+                return;
+            }
+
+            aiFeedback.textContent = message;
+            aiFeedback.classList.remove('is-success', 'is-error', 'text-secondary');
+
+            if (type === 'success') {
+                aiFeedback.classList.add('is-success');
+                return;
+            }
+
+            if (type === 'error') {
+                aiFeedback.classList.add('is-error');
+                return;
+            }
+
+            aiFeedback.classList.add('text-secondary');
         };
 
         const getTunisianLocalNumber = function (value) {
@@ -296,13 +345,26 @@
 
         const validateCvSource = function () {
             if (useProfileCvCheckbox.checked) {
+                if (!hasProfileCv) {
+                    showError(useProfileCvCheckbox, profileCvError, 'No CV found in your profile. Uncheck this option and upload a CV.');
+                    return false;
+                }
+
+                clearError(useProfileCvCheckbox, profileCvError);
                 clearError(cvFileInput, cvError);
                 return true;
             }
 
+            clearError(useProfileCvCheckbox, profileCvError);
+
             if (!cvFileInput || !cvFileInput.files || cvFileInput.files.length === 0) {
-                clearError(cvFileInput, cvError);
-                return true;
+                if (hasExistingCv) {
+                    clearError(cvFileInput, cvError);
+                    return true;
+                }
+
+                showError(cvFileInput, cvError, 'Please upload a CV file or choose the profile CV option.');
+                return false;
             }
 
             clearError(cvFileInput, cvError);
@@ -335,6 +397,68 @@
 
         if (cvFileInput) {
             cvFileInput.addEventListener('change', validateCvSource);
+        }
+
+        if (generateCoverLetterBtn) {
+            generateCoverLetterBtn.addEventListener('click', async function () {
+                if (generateCoverLetterUrl === '') {
+                    setAiFeedback('Cover letter generation is not available for this application.', 'error');
+                    return;
+                }
+
+                const useProfileCv = !!(useProfileCvCheckbox && useProfileCvCheckbox.checked);
+
+                if (useProfileCv && !hasProfileCv) {
+                    setAiFeedback('No CV found in your profile. Uncheck "Use CV from profile", upload a CV, then generate.', 'error');
+                    return;
+                }
+
+                if (!useProfileCv && (!cvFileInput || !cvFileInput.files || cvFileInput.files.length === 0)) {
+                    if (!hasExistingCv) {
+                        setAiFeedback('Upload a CV first, then click Generate with AI.', 'error');
+                        return;
+                    }
+                }
+
+                const previousHtml = generateCoverLetterBtn.innerHTML;
+                generateCoverLetterBtn.disabled = true;
+                generateCoverLetterBtn.innerHTML = '<i class="ti ti-loader-2 me-1"></i>Generating...';
+                setAiFeedback('Generating cover letter from your profile and CV...', 'info');
+
+                const payload = new FormData();
+                payload.append('use_profile_cv', useProfileCv ? '1' : '0');
+                payload.append('application_id', applicationId);
+                if (!useProfileCv && cvFileInput && cvFileInput.files && cvFileInput.files[0]) {
+                    payload.append('cv_file', cvFileInput.files[0]);
+                }
+
+                try {
+                    const response = await fetch(generateCoverLetterUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: payload
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok || !result.ok) {
+                        throw new Error(result.error || 'Unable to generate cover letter right now.');
+                    }
+
+                    if (coverLetterInput) {
+                        coverLetterInput.value = result.cover_letter || '';
+                    }
+
+                    validateCoverLetter();
+                    setAiFeedback('Cover letter generated. Review it and submit when ready.', 'success');
+                } catch (error) {
+                    setAiFeedback(error instanceof Error ? error.message : 'Unable to generate cover letter right now.', 'error');
+                } finally {
+                    generateCoverLetterBtn.disabled = false;
+                    generateCoverLetterBtn.innerHTML = previousHtml;
+                }
+            });
         }
 
         form.addEventListener('submit', function (event) {

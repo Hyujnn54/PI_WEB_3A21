@@ -5,10 +5,13 @@ namespace App\Controller\Management\JobApplication;
 use App\Entity\Admin;
 use App\Entity\Application_status_history;
 use App\Entity\Job_application;
-use App\Entity\Job_offer;
+use App\Repository\Application_status_historyRepository;
+use App\Repository\Job_applicationRepository;
+use App\Repository\Job_offerRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -24,10 +27,10 @@ class JobApplicationManagementController extends AbstractController
     ];
 
     #[Route('/applicationmanagement/admin/applications-statistics', name: 'management_job_applications_statistics')]
-    public function statistics(EntityManagerInterface $em): Response
+    public function statistics(Job_offerRepository $jobOfferRepository, Job_applicationRepository $jobApplicationRepository): Response
     {
-        $offers = $em->getRepository(Job_offer::class)->findBy([], ['created_at' => 'DESC']);
-        $applications = $em->getRepository(Job_application::class)->findBy([]);
+        $offers = $jobOfferRepository->findAllOrderedByCreatedAtDesc();
+        $applications = $jobApplicationRepository->findAllForStatistics();
 
         $offerRows = [];
         foreach ($offers as $offer) {
@@ -117,25 +120,51 @@ class JobApplicationManagementController extends AbstractController
     }
 
     #[Route('/applicationmanagement/admin/job-applications', name: 'management_job_applications')]
-    public function index(EntityManagerInterface $em): Response
+    public function index(Request $request, Job_applicationRepository $jobApplicationRepository): Response
     {
-        $applications = $em->getRepository(Job_application::class)->findBy([], ['applied_at' => 'DESC']);
+        $filters = $this->normalizeDashboardFilters($request);
 
+        $applications = $jobApplicationRepository->findForAdminDashboard($filters['q'], $filters['status'], $filters['sort']);
+        $rows = $this->buildAdminApplicationRows($applications);
+
+        return $this->render('admin/applications.html.twig', [
+            'rows' => $rows,
+            'filters' => $filters,
+            'data_url' => $this->generateUrl('management_job_applications_data'),
+            'authUser' => ['role' => 'admin'],
+        ]);
+    }
+
+    #[Route('/applicationmanagement/admin/job-applications/data', name: 'management_job_applications_data', methods: ['GET'])]
+    public function data(Request $request, Job_applicationRepository $jobApplicationRepository): JsonResponse
+    {
+        $filters = $this->normalizeDashboardFilters($request);
+        $applications = $jobApplicationRepository->findForAdminDashboard($filters['q'], $filters['status'], $filters['sort']);
+        $rows = $this->buildAdminApplicationRows($applications);
+
+        $rowsHtml = $this->renderView('admin/_application_rows.html.twig', [
+            'rows' => $rows,
+        ]);
+
+        return $this->json([
+            'count' => count($rows),
+            'rowsHtml' => $rowsHtml,
+        ]);
+    }
+
+    /**
+     * @param Job_application[] $applications
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildAdminApplicationRows(array $applications): array
+    {
         $rows = [];
+
         foreach ($applications as $application) {
             $offer = $application->getOffer_id();
             $candidate = $application->getCandidate_id();
-            $candidateUser = $candidate ? $candidate->getId() : null;
-
-            $candidateName = 'Candidate';
-            if ($candidateUser) {
-                $firstName = method_exists($candidateUser, 'getFirst_name') ? (string) $candidateUser->getFirst_name() : '';
-                $lastName = method_exists($candidateUser, 'getLast_name') ? (string) $candidateUser->getLast_name() : '';
-                $fullName = trim($firstName . ' ' . $lastName);
-                if ($fullName !== '') {
-                    $candidateName = $fullName;
-                }
-            }
+            $candidateName = $this->resolveCandidateDisplayName($candidate);
 
             $rows[] = [
                 'id' => $application->getId(),
@@ -151,14 +180,68 @@ class JobApplicationManagementController extends AbstractController
             ];
         }
 
-        return $this->render('admin/applications.html.twig', [
-            'rows' => $rows,
-            'authUser' => ['role' => 'admin'],
-        ]);
+        return $rows;
+    }
+
+    private function resolveCandidateDisplayName(mixed $candidate): string
+    {
+        if (!is_object($candidate)) {
+            return 'Candidate';
+        }
+
+        $firstName = method_exists($candidate, 'getFirstName')
+            ? trim((string) $candidate->getFirstName())
+            : '';
+        $lastName = method_exists($candidate, 'getLastName')
+            ? trim((string) $candidate->getLastName())
+            : '';
+        $email = method_exists($candidate, 'getEmail')
+            ? trim((string) $candidate->getEmail())
+            : '';
+        $candidateId = method_exists($candidate, 'getId')
+            ? trim((string) $candidate->getId())
+            : '';
+
+        $fullName = trim($firstName . ' ' . $lastName);
+        if ($fullName !== '') {
+            $normalized = strtolower($fullName);
+
+            if ($email !== '' && in_array($normalized, ['candidate user', 'candidate'], true)) {
+                return $fullName . ' (' . $email . ')';
+            }
+
+            return $fullName;
+        }
+
+        if ($email !== '') {
+            return $email;
+        }
+
+        if ($candidateId !== '') {
+            return 'Candidate #' . $candidateId;
+        }
+
+        return 'Candidate';
+    }
+
+    /**
+     * @return array{q: string, status: string, sort: string}
+     */
+    private function normalizeDashboardFilters(Request $request): array
+    {
+        return [
+            'q' => trim((string) $request->query->get('q', '')),
+            'status' => strtolower(trim((string) $request->query->get('status', 'all'))),
+            'sort' => strtolower(trim((string) $request->query->get('sort', 'default'))),
+        ];
     }
 
     #[Route('/applicationmanagement/admin/job-applications/{applicationId}/details', name: 'management_job_applications_details')]
-    public function details(int $applicationId, EntityManagerInterface $em): Response
+    public function details(
+        int $applicationId,
+        EntityManagerInterface $em,
+        Application_status_historyRepository $historyRepository
+    ): Response
     {
         $application = $em->getRepository(Job_application::class)->find($applicationId);
         if (!$application) {
@@ -167,10 +250,7 @@ class JobApplicationManagementController extends AbstractController
             return $this->redirectToRoute('management_job_applications');
         }
 
-        $historyEntries = $em->getRepository(Application_status_history::class)->findBy(
-            ['application_id' => $application],
-            ['changed_at' => 'DESC']
-        );
+        $historyEntries = $historyRepository->findForApplication($application);
 
         $statusOptions = [
             ['value' => 'SUBMITTED', 'label' => 'Submitted'],
@@ -194,35 +274,23 @@ class JobApplicationManagementController extends AbstractController
     }
 
     #[Route('/applicationmanagement/admin/job-applications/{applicationId}/archive', name: 'management_job_applications_archive', methods: ['POST'])]
-    public function archive(int $applicationId, Request $request, EntityManagerInterface $em): Response
+    public function archive(int $applicationId, Request $request, EntityManagerInterface $em, Job_applicationRepository $jobApplicationRepository): Response
     {
-        $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$application) {
+        $admin = $em->getRepository(Admin::class)->find(1);
+        $result = $jobApplicationRepository->archiveById($applicationId, $admin);
+
+        if ($result === 'not_found') {
             $this->addFlash('error', 'Application not found.');
 
             return $this->redirectToRoute('management_job_applications');
         }
 
-        if ($application->getIs_archived()) {
+        if ($result === 'already_archived') {
             $this->addFlash('warning', 'Application is already archived.');
 
             return $this->redirectToRoute('management_job_applications');
         }
 
-        $application->setIs_archived(true);
-
-        $admin = $em->getRepository(Admin::class)->find(1);
-        if ($admin && $admin->getId()) {
-            $history = new Application_status_history();
-            $history->setApplication_id($application);
-            $history->setStatus('ARCHIVED');
-            $history->setChanged_at(new \DateTime());
-            $history->setChanged_by($admin);
-            $history->setNote('Admin archived this application.');
-            $em->persist($history);
-        }
-
-        $em->flush();
         $this->addFlash('success', 'Application archived successfully.');
 
         $returnTo = strtolower(trim((string) $request->request->get('return_to', 'list')));
@@ -234,35 +302,23 @@ class JobApplicationManagementController extends AbstractController
     }
 
     #[Route('/applicationmanagement/admin/job-applications/{applicationId}/unarchive', name: 'management_job_applications_unarchive', methods: ['POST'])]
-    public function unarchive(int $applicationId, Request $request, EntityManagerInterface $em): Response
+    public function unarchive(int $applicationId, Request $request, EntityManagerInterface $em, Job_applicationRepository $jobApplicationRepository): Response
     {
-        $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$application) {
+        $admin = $em->getRepository(Admin::class)->find(1);
+        $result = $jobApplicationRepository->unarchiveById($applicationId, $admin);
+
+        if ($result === 'not_found') {
             $this->addFlash('error', 'Application not found.');
 
             return $this->redirectToRoute('management_job_applications');
         }
 
-        if (!$application->getIs_archived()) {
+        if ($result === 'already_unarchived') {
             $this->addFlash('warning', 'Application is not archived.');
 
             return $this->redirectToRoute('management_job_applications');
         }
 
-        $application->setIs_archived(false);
-
-        $admin = $em->getRepository(Admin::class)->find(1);
-        if ($admin && $admin->getId()) {
-            $history = new Application_status_history();
-            $history->setApplication_id($application);
-            $history->setStatus('UNARCHIVED');
-            $history->setChanged_at(new \DateTime());
-            $history->setChanged_by($admin);
-            $history->setNote('Admin unarchived this application.');
-            $em->persist($history);
-        }
-
-        $em->flush();
         $this->addFlash('success', 'Application unarchived successfully.');
 
         $returnTo = strtolower(trim((string) $request->request->get('return_to', 'list')));
@@ -318,7 +374,13 @@ class JobApplicationManagementController extends AbstractController
     }
 
     #[Route('/applicationmanagement/admin/job-applications/{applicationId}/history/{historyId}/note', name: 'management_job_applications_history_note_update', methods: ['POST'])]
-    public function updateHistoryNote(int $applicationId, int $historyId, Request $request, EntityManagerInterface $em): Response
+    public function updateHistoryNote(
+        int $applicationId,
+        int $historyId,
+        Request $request,
+        EntityManagerInterface $em,
+        Application_status_historyRepository $historyRepository
+    ): Response
     {
         $application = $em->getRepository(Job_application::class)->find($applicationId);
         if (!$application) {
@@ -327,16 +389,23 @@ class JobApplicationManagementController extends AbstractController
             return $this->redirectToRoute('management_job_applications');
         }
 
-        $history = $em->getRepository(Application_status_history::class)->find($historyId);
-        if (!$history || $history->getApplication_id() !== $application) {
+        $history = $historyRepository->findForApplicationById($application, $historyId);
+        if (!$history) {
             $this->addFlash('error', 'History entry not found.');
 
             return $this->redirectToRoute('management_job_applications_details', ['applicationId' => $applicationId]);
         }
 
+        $currentNote = trim((string) $history->getNote());
         $newNote = trim((string) $request->request->get('note', ''));
         if ($newNote === '') {
             $this->addFlash('warning', 'Note cannot be empty.');
+
+            return $this->redirectToRoute('management_job_applications_details', ['applicationId' => $applicationId]);
+        }
+
+        if ($newNote === $currentNote) {
+            $this->addFlash('info', 'No changes detected in the note.');
 
             return $this->redirectToRoute('management_job_applications_details', ['applicationId' => $applicationId]);
         }
@@ -349,7 +418,12 @@ class JobApplicationManagementController extends AbstractController
     }
 
     #[Route('/applicationmanagement/admin/job-applications/{applicationId}/history/{historyId}/delete', name: 'management_job_applications_history_delete', methods: ['POST'])]
-    public function deleteHistory(int $applicationId, int $historyId, EntityManagerInterface $em): Response
+    public function deleteHistory(
+        int $applicationId,
+        int $historyId,
+        EntityManagerInterface $em,
+        Application_status_historyRepository $historyRepository
+    ): Response
     {
         $application = $em->getRepository(Job_application::class)->find($applicationId);
         if (!$application) {
@@ -358,8 +432,8 @@ class JobApplicationManagementController extends AbstractController
             return $this->redirectToRoute('management_job_applications');
         }
 
-        $history = $em->getRepository(Application_status_history::class)->find($historyId);
-        if (!$history || $history->getApplication_id() !== $application) {
+        $history = $historyRepository->findForApplicationById($application, $historyId);
+        if (!$history) {
             $this->addFlash('error', 'History entry not found.');
 
             return $this->redirectToRoute('management_job_applications_details', ['applicationId' => $applicationId]);

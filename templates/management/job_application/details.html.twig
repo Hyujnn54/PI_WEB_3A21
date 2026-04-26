@@ -114,7 +114,7 @@
                                                     <div class="fw-semibold">{{ entry.status }}</div>
                                                     <div class="text-secondary">{{ entry.note }}</div>
                                                 </div>
-                                                <div class="small text-secondary">{{ entry.changed_at|date('d M Y H:i') }}</div>
+                                                <div class="small text-secondary">{{ entry.changed_at|date('d M Y H:i') }} ({{ entry.changed_at|time_diff }})</div>
                                             </div>
                                         </div>
                                     {% endfor %}

@@ -1,0 +1,29 @@
+{% for row in rows %}
+    <tr>
+        <td>#{{ row.id }}</td>
+        <td>{{ row.offer_title }}</td>
+        <td>{{ row.candidate_name }}</td>
+        <td>{{ row.phone }}</td>
+        <td><span class="badge bg-primary text-white fw-semibold">{{ row.status }}</span></td>
+        <td>{{ row.applied_at|date('d M Y H:i') }}</td>
+        <td>
+            <span class="badge {{ row.is_archived ? 'bg-danger text-white' : 'bg-success text-white' }} fw-semibold">
+                {{ row.is_archived ? 'ARCHIVED' : 'ACTIVE' }}
+            </span>
+        </td>
+        <td>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ row.details_url }}" class="btn btn-sm btn-primary"><i class="ti ti-eye me-1"></i>Inspect</a>
+                <form method="post" action="{{ row.is_archived ? row.unarchive_url : row.archive_url }}" class="d-inline">
+                    <button type="submit" class="btn btn-sm {{ row.is_archived ? 'btn-outline-success' : 'btn-outline-danger' }}">
+                        <i class="ti {{ row.is_archived ? 'ti-box' : 'ti-archive' }} me-1"></i>{{ row.is_archived ? 'Unarchive' : 'Archive' }}
+                    </button>
+                </form>
+            </div>
+        </td>
+    </tr>
+{% else %}
+    <tr>
+        <td colspan="8" class="text-center text-muted py-4">No applications found.</td>
+    </tr>
+{% endfor %}
