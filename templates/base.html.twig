@@ -52,7 +52,6 @@
                     <div class="collapse navbar-collapse" id="tbMainNav">
                         <ul class="navbar-nav tb-main-nav me-auto">
                             {% if isAdminPage %}
-                        (function () {
                                 <li class="nav-item"><a class="nav-link" href="{{ path('management_users') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('back_dashboard') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span><span class="nav-link-title">Admin Dashboard</span></a></li>
                             {% else %}
@@ -380,7 +379,6 @@
             });
 
             disableClientValidation(document);
-            })();
         </script>
     </body>
 </html>
