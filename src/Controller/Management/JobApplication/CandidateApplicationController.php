@@ -38,16 +38,14 @@ class CandidateApplicationController extends AbstractController
         GroqCoverLetterGenerator $groqCoverLetterGenerator,
         Job_applicationRepository $jobApplicationRepository
     ): JsonResponse {
-        $roles = (array) $request->getSession()->get('user_roles', []);
-        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+        if (!$this->isCandidateContext($request)) {
             return $this->json([
                 'ok' => false,
                 'error' => 'Only candidates can generate a cover letter.',
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $candidateId = (string) $request->getSession()->get('user_id', '');
-        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        $candidate = $this->resolveCurrentCandidate($request, $em);
         $offer = $em->getRepository(Job_offer::class)->find($offerId);
 
         if (!$candidate || !$offer) {
@@ -171,16 +169,13 @@ class CandidateApplicationController extends AbstractController
         MailerInterface $mailer,
         LoggerInterface $logger
     ): Response {
-        $roles = (array) $request->getSession()->get('user_roles', []);
-        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+        if (!$this->isCandidateContext($request)) {
             $this->addFlash('warning', 'Only candidates can apply for job offers.');
             return $this->redirectToRoute('front_job_offers');
         }
 
-        $candidateId = (string) $request->getSession()->get('user_id', '');
-
         // Fetch the candidate and the job offer
-        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        $candidate = $this->resolveCurrentCandidate($request, $em);
         $jobOffer = $em->getRepository(Job_offer::class)->find($offerId);
 
         if (!$candidate || !$jobOffer) {
@@ -306,15 +301,12 @@ class CandidateApplicationController extends AbstractController
         EntityManagerInterface $em,
         Job_applicationRepository $jobApplicationRepository
     ): Response {
-        $roles = (array) $request->getSession()->get('user_roles', []);
-        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+        if (!$this->isCandidateContext($request)) {
             $this->addFlash('warning', 'Only candidates can manage candidate applications.');
             return $this->redirectToRoute('front_job_offers');
         }
 
-        $candidateId = (string) $request->getSession()->get('user_id', '');
-
-        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        $candidate = $this->resolveCurrentCandidate($request, $em);
         if (!$candidate) {
             $this->addFlash('error', 'Candidate not found.');
 
@@ -351,15 +343,12 @@ class CandidateApplicationController extends AbstractController
         Job_applicationRepository $jobApplicationRepository,
         Application_status_historyRepository $historyRepository
     ): Response {
-        $roles = (array) $request->getSession()->get('user_roles', []);
-        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+        if (!$this->isCandidateContext($request)) {
             $this->addFlash('warning', 'Only candidates can access candidate application details.');
             return $this->redirectToRoute('front_job_offers');
         }
 
-        $candidateId = (string) $request->getSession()->get('user_id', '');
-
-        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        $candidate = $this->resolveCurrentCandidate($request, $em);
         if (!$candidate) {
             $this->addFlash('error', 'Candidate not found.');
 
@@ -391,15 +380,12 @@ class CandidateApplicationController extends AbstractController
         SluggerInterface $slugger,
         Job_applicationRepository $jobApplicationRepository
     ): Response {
-        $roles = (array) $request->getSession()->get('user_roles', []);
-        if (!in_array('ROLE_CANDIDATE', $roles, true)) {
+        if (!$this->isCandidateContext($request)) {
             $this->addFlash('warning', 'Only candidates can edit candidate applications.');
             return $this->redirectToRoute('front_job_offers');
         }
 
-        $candidateId = (string) $request->getSession()->get('user_id', '');
-
-        $candidate = $em->getRepository(Candidate::class)->find($candidateId);
+        $candidate = $this->resolveCurrentCandidate($request, $em);
         if (!$candidate) {
             $this->addFlash('error', 'Candidate not found.');
 
@@ -509,6 +495,42 @@ class CandidateApplicationController extends AbstractController
             'offer' => $application->getOffer_id(),
             'candidate' => $candidate,
         ]);
+    }
+
+    private function isCandidateContext(Request $request): bool
+    {
+        if ($this->isGranted('ROLE_CANDIDATE')) {
+            return true;
+        }
+
+        $roles = (array) $request->getSession()->get('user_roles', []);
+
+        return in_array('ROLE_CANDIDATE', $roles, true);
+    }
+
+    private function resolveCurrentCandidate(Request $request, EntityManagerInterface $em): ?Candidate
+    {
+        $user = $this->getUser();
+        if ($user instanceof Candidate) {
+            return $user;
+        }
+
+        $userId = '';
+        if (is_object($user) && method_exists($user, 'getId')) {
+            $userId = (string) $user->getId();
+        }
+
+        if ($userId === '') {
+            $userId = (string) $request->getSession()->get('user_id', '');
+        }
+
+        if ($userId === '') {
+            return null;
+        }
+
+        $candidate = $em->getRepository(Candidate::class)->find($userId);
+
+        return $candidate instanceof Candidate ? $candidate : null;
     }
 
     private function verifyApplyFormInController(

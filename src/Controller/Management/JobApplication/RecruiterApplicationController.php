@@ -42,8 +42,7 @@ class RecruiterApplicationController extends AbstractController
         Application_status_historyRepository $historyRepository
     ): Response
     {
-        $recruiterId = (string) $request->getSession()->get('user_id', '');
-        $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
+        $recruiter = $this->resolveCurrentRecruiter($request, $em);
 
         if (!$recruiter) {
             $this->addFlash('error', 'Recruiter not found.');
@@ -87,8 +86,7 @@ class RecruiterApplicationController extends AbstractController
     #[Route('/applicationmanagement/recruiter/applications/{applicationId}/status', name: 'app_recruiter_application_update_status', methods: ['POST'])]
     public function updateStatus(int $applicationId, Request $request, EntityManagerInterface $em): Response
     {
-        $recruiterId = (string) $request->getSession()->get('user_id', '');
-        $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
+        $recruiter = $this->resolveCurrentRecruiter($request, $em);
 
         if (!$recruiter) {
             $this->addFlash('error', 'Recruiter not found.');
@@ -152,8 +150,7 @@ class RecruiterApplicationController extends AbstractController
         EntityManagerInterface $em,
         GroqLanguageDetector $groqLanguageDetector
     ): JsonResponse {
-        $recruiterId = (string) $request->getSession()->get('user_id', '');
-        $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
+        $recruiter = $this->resolveCurrentRecruiter($request, $em);
 
         if (!$recruiter) {
             return $this->json([
@@ -215,8 +212,7 @@ class RecruiterApplicationController extends AbstractController
         LibreTranslateClient $libreTranslateClient,
         GroqTranslator $groqTranslator
     ): JsonResponse {
-        $recruiterId = (string) $request->getSession()->get('user_id', '');
-        $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
+        $recruiter = $this->resolveCurrentRecruiter($request, $em);
 
         if (!$recruiter) {
             return $this->json([
@@ -311,8 +307,7 @@ class RecruiterApplicationController extends AbstractController
         EntityManagerInterface $em,
         Job_applicationRepository $jobApplicationRepository
     ): Response {
-        $recruiterId = (string) $request->getSession()->get('user_id', '');
-        $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
+        $recruiter = $this->resolveCurrentRecruiter($request, $em);
 
         if (!$recruiter) {
             $this->addFlash('error', 'Recruiter not found.');
@@ -385,8 +380,7 @@ class RecruiterApplicationController extends AbstractController
         EntityManagerInterface $em,
         Application_status_historyRepository $historyRepository
     ): Response {
-        $recruiterId = (string) $request->getSession()->get('user_id', '');
-        $recruiter = $em->getRepository(Recruiter::class)->find($recruiterId);
+        $recruiter = $this->resolveCurrentRecruiter($request, $em);
 
         if (!$recruiter) {
             $this->addFlash('error', 'Recruiter not found.');
@@ -434,6 +428,31 @@ class RecruiterApplicationController extends AbstractController
         $this->addFlash('success', 'Status note updated successfully.');
 
         return $this->redirectToRoute('app_recruiter_application_details', ['applicationId' => $applicationId]);
+    }
+
+    private function resolveCurrentRecruiter(Request $request, EntityManagerInterface $em): ?Recruiter
+    {
+        $user = $this->getUser();
+        if ($user instanceof Recruiter) {
+            return $user;
+        }
+
+        $userId = '';
+        if (is_object($user) && method_exists($user, 'getId')) {
+            $userId = (string) $user->getId();
+        }
+
+        if ($userId === '') {
+            $userId = (string) $request->getSession()->get('user_id', '');
+        }
+
+        if ($userId === '') {
+            return null;
+        }
+
+        $recruiter = $em->getRepository(Recruiter::class)->find($userId);
+
+        return $recruiter instanceof Recruiter ? $recruiter : null;
     }
 
     private function recruiterOwnsApplication(Recruiter $recruiter, ?Job_application $application): bool
