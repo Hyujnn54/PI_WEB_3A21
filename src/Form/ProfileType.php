@@ -2,19 +2,23 @@
 
 namespace App\Form;
 
+use App\Entity\Candidate;
+use App\Entity\Recruiter;
+use App\Entity\Users;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\EmailType;
+use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
-use Symfony\Component\Validator\Constraints\Length;
-use Symfony\Component\Validator\Constraints\NotBlank;
 
 class ProfileType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        $data = $options['data'] ?? null;
+
         $builder
             ->add('firstName', TextType::class, [
                 'label' => 'First Name',
@@ -36,27 +40,52 @@ class ProfileType extends AbstractType
             ->add('plainPassword', PasswordType::class, [
                 'label' => 'New Password',
                 'required' => false,
-                'mapped' => false, // Set to false if this isn't a direct property of your User entity
+                'mapped' => true,
                 'attr' => [
                     'autocomplete' => 'new-password',
                     'placeholder' => 'Leave blank to keep current password'
                 ],
-                'constraints' => [
-                    new Length([
-                        'min' => 6,
-                        'minMessage' => 'Your password should be at least {{ limit }} characters',
-                        'max' => 4096,
-                    ]),
-                ],
             ])
         ;
-    }
-// src/Form/ProfileType.php
 
-public function configureOptions(OptionsResolver $resolver): void
-{
-    $resolver->setDefaults([
-        'data_class' => \App\Entity\Users::class,
-    ]);
-}
+        if ($data instanceof Recruiter) {
+            $builder
+                ->add('companyName', TextType::class, [
+                    'label' => 'Company Name',
+                    'required' => true,
+                    'attr' => ['placeholder' => 'e.g. Talent Bridge Inc.'],
+                ])
+                ->add('companyLocation', TextType::class, [
+                    'label' => 'Company Location',
+                    'required' => false,
+                    'attr' => ['placeholder' => 'e.g. Tunis, Tunisia'],
+                ]);
+        }
+
+        if ($data instanceof Candidate) {
+            $builder
+                ->add('location', TextType::class, [
+                    'label' => 'City / Location',
+                    'required' => false,
+                    'attr' => ['placeholder' => 'e.g. Sousse, Tunisia'],
+                ])
+                ->add('educationLevel', TextType::class, [
+                    'label' => 'Education Level',
+                    'required' => false,
+                    'attr' => ['placeholder' => 'e.g. Bachelor in CS'],
+                ])
+                ->add('experienceYears', IntegerType::class, [
+                    'label' => 'Experience (Years)',
+                    'required' => false,
+                    'attr' => ['min' => 1, 'max' => 60],
+                ]);
+        }
+    }
+
+    public function configureOptions(OptionsResolver $resolver): void
+    {
+        $resolver->setDefaults([
+            'data_class' => Users::class,
+        ]);
+    }
 }

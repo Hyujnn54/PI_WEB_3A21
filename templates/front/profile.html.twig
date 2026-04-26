@@ -22,7 +22,7 @@
             </div>
         </div>
 
-        <div class="col-12 col-xl-7">
+        <div class="col-12 col-xl-8">
             <div class="card shadow-sm">
                 <div class="card-header">
                     <h3 class="card-title mb-0">Account Information</h3>
@@ -48,6 +48,48 @@
                                 {{ form_row(form.phone) }}
                             </div>
 
+                            {% if form.companyName is defined %}
+                                <div class="col-12">
+                                    {{ form_row(form.companyName) }}
+                                </div>
+                            {% endif %}
+
+                            {% if form.companyLocation is defined %}
+                                <div class="col-12">
+                                    <label class="form-label" for="profile_company_location">Company Location</label>
+                                    <div class="d-flex gap-2">
+                                        {{ form_widget(form.companyLocation, {
+                                            attr: {
+                                                id: 'profile_company_location',
+                                                class: 'form-control',
+                                                readonly: 'readonly',
+                                                placeholder: 'Pick on map...'
+                                            }
+                                        }) }}
+                                        <button type="button" class="btn btn-outline-primary" id="openProfileMapPicker">Pick</button>
+                                    </div>
+                                    {{ form_errors(form.companyLocation) }}
+                                </div>
+                            {% endif %}
+
+                            {% if form.location is defined %}
+                                <div class="col-12">
+                                    {{ form_row(form.location) }}
+                                </div>
+                            {% endif %}
+
+                            {% if form.educationLevel is defined %}
+                                <div class="col-md-8">
+                                    {{ form_row(form.educationLevel) }}
+                                </div>
+                            {% endif %}
+
+                            {% if form.experienceYears is defined %}
+                                <div class="col-md-4">
+                                    {{ form_row(form.experienceYears) }}
+                                </div>
+                            {% endif %}
+
                             <div class="col-12">
                                 {{ form_row(form.plainPassword) }}
                             </div>
@@ -63,12 +105,44 @@
                             Profile form not ready yet.
                         </div>
                     {% endif %}
+
+                    {% if profileUser is defined %}
+                            <div class="col-12 mt-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h4 class="h5 mb-2">Face Login</h4>
+                                        <p class="text-secondary mb-3">Enable face authentication using Luxand by uploading a clear face photo.</p>
+
+                                        {% if profileUser.faceEnabled %}
+                                            <div class="alert alert-success py-2 mb-3">Face login is enabled for your account.</div>
+                                        {% else %}
+                                            <div class="alert alert-warning py-2 mb-3">Face login is currently disabled.</div>
+                                        {% endif %}
+
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <form method="post" action="{{ path('app_face_enable') }}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('face_enable') }}">
+                                                <input type="file" name="face_photo" accept="image/png,image/jpeg" class="form-control" style="min-width:260px;" required>
+                                                <button type="submit" class="btn btn-outline-primary">Enable / Update Face</button>
+                                            </form>
+
+                                            {% if profileUser.faceEnabled %}
+                                                <form method="post" action="{{ path('app_face_disable') }}">
+                                                    <input type="hidden" name="_token" value="{{ csrf_token('face_disable') }}">
+                                                    <button type="submit" class="btn btn-outline-danger">Disable Face Login</button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
 
         {% if role == 'candidate' %}
-            <div class="col-12 col-xl-5">
+            <div class="col-12 col-xl-4">
                 <div class="card shadow-sm">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h3 class="card-title mb-0">My Skills</h3>
@@ -79,7 +153,17 @@
                             <input type="hidden" name="profile_action" value="skill_add">
                             <div class="col-12">
                                 <label class="form-label mb-1">Skill Name</label>
-                                <input type="text" name="skill_name" class="form-control" placeholder="e.g. Symfony, React, QA Automation" maxlength="100">
+                                    <input
+                                        type="text"
+                                        name="skill_name"
+                                        id="skillInput"
+                                        class="form-control"
+                                        placeholder="e.g. Symfony, React, QA Automation"
+                                        maxlength="100"
+                                        autocomplete="off"
+                                    >
+
+                                    <div id="skillSuggestions" class="list-group mt-1"></div>
                             </div>
                             <div class="col-8">
                                 <label class="form-label mb-1">Level</label>
@@ -157,4 +241,249 @@
         </div>
     </div>
 </div>
+
+{% if role == 'recruiter' %}
+<div id="profileMapModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:9999;">
+    <div style="width:90%;max-width:900px;height:80%;background:white;margin:40px auto;border-radius:14px;padding:15px;position:relative;">
+        <div class="d-flex justify-content-between mb-2">
+            <h4>Select Company Location</h4>
+            <button class="btn btn-danger btn-sm" type="button" id="closeProfileMapPicker">X</button>
+        </div>
+        <div id="profileMap" style="height:92%; border-radius:12px;"></div>
+    </div>
+</div>
+{% endif %}
+
+
+
+
+<script>
+(() => {
+    const endpoint = "{{ path('api_skill_suggestions') }}";
+
+    const initSkillSuggestions = () => {
+        const input = document.getElementById("skillInput");
+        const suggestionsBox = document.getElementById("skillSuggestions");
+        if (!input || !suggestionsBox || input.dataset.suggestBound === "1") {
+            return;
+        }
+
+        input.dataset.suggestBound = "1";
+
+        let debounceTimer = null;
+        let abortController = null;
+        const localCache = new Map();
+
+        const clearSuggestions = () => {
+            suggestionsBox.innerHTML = "";
+            suggestionsBox.classList.add("d-none");
+        };
+
+        const renderSuggestions = (skills) => {
+            suggestionsBox.innerHTML = "";
+
+            if (!Array.isArray(skills) || skills.length === 0) {
+                clearSuggestions();
+                return;
+            }
+
+            skills.forEach((skill) => {
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className = "list-group-item list-group-item-action";
+                item.textContent = skill;
+                item.addEventListener("click", () => {
+                    input.value = skill;
+                    clearSuggestions();
+                    input.focus();
+                });
+                suggestionsBox.appendChild(item);
+            });
+
+            suggestionsBox.classList.remove("d-none");
+        };
+
+        input.addEventListener("input", () => {
+            const query = input.value.trim();
+
+            if (query.length < 2) {
+                clearTimeout(debounceTimer);
+                if (abortController) {
+                    abortController.abort();
+                }
+                clearSuggestions();
+                return;
+            }
+
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const normalized = query.toLowerCase();
+                if (localCache.has(normalized)) {
+                    renderSuggestions(localCache.get(normalized));
+                    return;
+                }
+
+                if (abortController) {
+                    abortController.abort();
+                }
+                abortController = new AbortController();
+
+                fetch(endpoint + "?q=" + encodeURIComponent(query), {
+                    signal: abortController.signal,
+                    headers: { "X-Requested-With": "XMLHttpRequest" }
+                })
+                    .then((response) => response.ok ? response.json() : [])
+                    .then((data) => {
+                        localCache.set(normalized, data);
+                        renderSuggestions(data);
+                    })
+                    .catch((error) => {
+                        if (error.name !== "AbortError") {
+                            clearSuggestions();
+                        }
+                    });
+            }, 220);
+        });
+
+        input.addEventListener("blur", () => {
+            setTimeout(clearSuggestions, 120);
+        });
+
+        input.addEventListener("focus", () => {
+            const query = input.value.trim().toLowerCase();
+            if (query.length >= 2 && localCache.has(query)) {
+                renderSuggestions(localCache.get(query));
+            }
+        });
+    };
+
+    document.addEventListener("DOMContentLoaded", initSkillSuggestions);
+    document.addEventListener("turbo:load", initSkillSuggestions);
+})();
+
+(() => {
+    const role = "{{ role }}";
+
+    let map = null;
+    let marker = null;
+    let leafletLoadingPromise = null;
+
+    const ensureLeafletLoaded = () => {
+        if (typeof window.L !== "undefined") {
+            return Promise.resolve();
+        }
+
+        if (leafletLoadingPromise) {
+            return leafletLoadingPromise;
+        }
+
+        leafletLoadingPromise = new Promise((resolve, reject) => {
+            if (!document.querySelector('link[data-leaflet-profile="1"]')) {
+                const css = document.createElement("link");
+                css.rel = "stylesheet";
+                css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+                css.setAttribute("data-leaflet-profile", "1");
+                document.head.appendChild(css);
+            }
+
+            const existingScript = document.querySelector('script[data-leaflet-profile="1"]');
+            if (existingScript) {
+                existingScript.addEventListener("load", () => resolve(), { once: true });
+                existingScript.addEventListener("error", () => reject(new Error("Leaflet load failed")), { once: true });
+                return;
+            }
+
+            const js = document.createElement("script");
+            js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+            js.setAttribute("data-leaflet-profile", "1");
+            js.onload = () => resolve();
+            js.onerror = () => reject(new Error("Leaflet load failed"));
+            document.body.appendChild(js);
+        });
+
+        return leafletLoadingPromise;
+    };
+
+    const initRecruiterMapPicker = () => {
+        if (role !== "recruiter") {
+            return;
+        }
+
+        const modal = document.getElementById("profileMapModal");
+        const openBtn = document.getElementById("openProfileMapPicker");
+        const closeBtn = document.getElementById("closeProfileMapPicker");
+        const locationInput = document.getElementById("profile_company_location")
+            || document.querySelector('input[name$="[companyLocation]"]');
+
+        if (!modal || !openBtn || !closeBtn || !locationInput || openBtn.dataset.mapBound === "1") {
+            return;
+        }
+
+        openBtn.dataset.mapBound = "1";
+
+        const closeModal = () => {
+            modal.style.display = "none";
+        };
+
+        const initMap = () => {
+            if (map || typeof window.L === "undefined") {
+                return;
+            }
+
+            map = window.L.map("profileMap").setView([36.8065, 10.1815], 6);
+
+            window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap"
+            }).addTo(map);
+
+            map.on("click", function (e) {
+                const lat = e.latlng.lat.toFixed(6);
+                const lng = e.latlng.lng.toFixed(6);
+
+                if (marker) {
+                    map.removeLayer(marker);
+                }
+
+                marker = window.L.marker([lat, lng]).addTo(map);
+
+                fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lng)
+                    .then((response) => response.json())
+                    .then((data) => {
+                        locationInput.value = data.display_name ? data.display_name : (lat + ", " + lng);
+                        closeModal();
+                    })
+                    .catch(() => {
+                        locationInput.value = lat + ", " + lng;
+                        closeModal();
+                    });
+            });
+        };
+
+        openBtn.addEventListener("click", async () => {
+            modal.style.display = "block";
+
+            try {
+                await ensureLeafletLoaded();
+                initMap();
+                if (map) {
+                    setTimeout(() => map.invalidateSize(), 150);
+                }
+            } catch (_) {
+                closeModal();
+            }
+        });
+
+        closeBtn.addEventListener("click", closeModal);
+        modal.addEventListener("click", (event) => {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+    };
+
+    document.addEventListener("DOMContentLoaded", initRecruiterMapPicker);
+    document.addEventListener("turbo:load", initRecruiterMapPicker);
+})();
+</script>
 {% endblock %}

@@ -29,14 +29,16 @@
     {% set routeName = app.request.attributes.get('_route') %}
     {% set isAdminPage = routeName starts with 'management_' or routeName == 'back_dashboard' or routeName starts with 'app_admin' %}
     <body class="tb-body {{ isAdminPage ? 'tb-admin-body' : 'tb-front-body' }}">
-        {% set userRoles = app.session.get('user_roles')|default([]) %}
-        {% set isLoggedIn = app.session.get('user_id') is not empty %}
+        {% set isLoggedIn = app.user is not null %}
+        {% set userRoles = isLoggedIn ? app.user.roles|default([]) : [] %}
         {% set currentRole = 'candidate' %}
-        {% if 'ROLE_RECRUITER' in userRoles %}
+        {% if is_granted('ROLE_RECRUITER') %}
             {% set currentRole = 'recruiter' %}
+        {% elseif is_granted('ROLE_ADMIN') %}
+            {% set currentRole = 'admin' %}
         {% endif %}
         <div class="page tb-page-shell">
-            {% if not isAdminPage and routeName != 'app_login' and routeName != 'app_register' %}
+            {% if not isAdminPage and routeName != 'app_login' and routeName != 'app_register' and routeName != 'app_forgot_password' and routeName != 'app_forgot_password_verify' and routeName != '2fa_login' and routeName != 'app_2fa_setup' %}
             <header class="navbar navbar-expand-md navbar-light d-print-none tb-topbar">
                 <div class="container-xl">
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#tbMainNav" aria-controls="tbMainNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -50,6 +52,7 @@
                     <div class="collapse navbar-collapse" id="tbMainNav">
                         <ul class="navbar-nav tb-main-nav me-auto">
                             {% if isAdminPage %}
+                        (function () {
                                 <li class="nav-item"><a class="nav-link" href="{{ path('management_users') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('back_dashboard') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span><span class="nav-link-title">Admin Dashboard</span></a></li>
                             {% else %}
@@ -57,14 +60,14 @@
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_job_offers') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-briefcase-2"></i></span><span class="nav-link-title">Job Offers</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_job_applications') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-check"></i></span><span class="nav-link-title">Applications</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_events') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-event"></i></span><span class="nav-link-title">Events</span></a></li>
-                                <li class="nav-item"><a class="nav-link" href="{{ 'ROLE_RECRUITER' in userRoles ? path('recruiter_event_registrations') : ('ROLE_ADMIN' in userRoles ? path('admin_event_registrations') : path('front_event_registrations')) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-check"></i></span><span class="nav-link-title">Registrations</span></a></li>
+                                <li class="nav-item"><a class="nav-link" href="{{ is_granted('ROLE_RECRUITER') ? path('recruiter_event_registrations') : (is_granted('ROLE_ADMIN') ? path('admin_event_registrations') : path('front_event_registrations')) }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-check"></i></span><span class="nav-link-title">Registrations</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_interviews') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-message-2"></i></span><span class="nav-link-title">Interviews</span></a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ path('front_profile') }}"><span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-user-circle"></i></span><span class="nav-link-title">Profile</span></a></li>
                             {% endif %}
                         </ul>
                     </div>
                     <div class="navbar-nav flex-row order-md-last">
-                        {% if 'ROLE_ADMIN' in userRoles %}
+                        {% if is_granted('ROLE_ADMIN') %}
                             <div class="nav-item d-none d-md-flex me-2">
                                 {% if isAdminPage %}
                                     <a class="btn btn-sm btn-dark" href="{{ path('front_home') }}">Front Portal</a>
@@ -81,11 +84,13 @@
                                 <a class="btn btn-sm btn-primary" href="{{ path('app_register') }}">Register</a>
                             </div>
                         {% endif %}
-                        <div class="nav-item d-none d-md-flex">
-                            <form method="post" action="{{ path('app_logout') }}">
-                                <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="ti ti-logout me-1"></i>Logout</button>
-                            </form>
-                        </div>
+                        {% if isLoggedIn %}
+                            <div class="nav-item d-none d-md-flex">
+                                <form method="post" action="{{ path('app_logout') }}">
+                                    <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="ti ti-logout me-1"></i>Logout</button>
+                                </form>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </header>
@@ -375,6 +380,7 @@
             });
 
             disableClientValidation(document);
+            })();
         </script>
     </body>
 </html>

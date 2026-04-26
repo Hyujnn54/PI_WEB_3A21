@@ -55,22 +55,37 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const searchInput = document.getElementById('js-search-input');
-        const roleSelect = document.getElementById('js-role-filter');
-        const tableBody = document.getElementById('user-table-body');
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('js-search-input');
+    const roleSelect  = document.getElementById('js-role-filter');
+    const tableBody   = document.getElementById('user-table-body');
 
-        function updateList() {
-            tableBody.style.opacity = '0.5';
-            fetch(`{{ path('app_admin_users') }}?search=${searchInput.value}&role=${roleSelect.value}&ajax=1`)
-                .then(res => res.text())
-                .then(html => {
-                    tableBody.innerHTML = html;
-                    tableBody.style.opacity = '1';
-                });
-        }
-        searchInput.addEventListener('input', updateList);
-        roleSelect.addEventListener('change', updateList);
+    let timeout = null;
+
+    function updateList() {
+        tableBody.style.opacity = '0.6';
+
+        const url = `{{ path('app_admin_users') }}?search=${encodeURIComponent(searchInput.value)}&role=${encodeURIComponent(roleSelect.value)}&ajax=1`;
+
+        fetch(url)
+            .then(response => response.text())
+            .then(html => {
+                tableBody.innerHTML = html;
+                tableBody.style.opacity = '1';
+            })
+            .catch(() => {
+                tableBody.style.opacity = '1';
+            });
+    }
+
+    // Live search with debounce (better performance)
+    searchInput.addEventListener('input', () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(updateList, 300);   // wait 300ms after user stops typing
     });
+
+    // Role filter changes immediately
+    roleSelect.addEventListener('change', updateList);
+});
 </script>
 {% endblock %}

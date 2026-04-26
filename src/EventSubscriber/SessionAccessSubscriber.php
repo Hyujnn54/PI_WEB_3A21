@@ -7,17 +7,21 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 
 class SessionAccessSubscriber implements EventSubscriberInterface
 {
-    public function __construct(private readonly UrlGeneratorInterface $urlGenerator)
+    public function __construct(
+        private readonly UrlGeneratorInterface $urlGenerator,
+        private readonly Security $security
+    )
     {
     }
 
     public static function getSubscribedEvents(): array
     {
         return [
-            KernelEvents::REQUEST => ['onKernelRequest', 20],
+            KernelEvents::REQUEST => ['onKernelRequest', -10],
         ];
     }
 
@@ -36,18 +40,17 @@ class SessionAccessSubscriber implements EventSubscriberInterface
 
         $publicRoutes = [
             'app_login',
+            'app_login_face',
             'app_register',
+            'app_forgot_password',
+            'app_forgot_password_verify',
         ];
 
         if (in_array($route, $publicRoutes, true)) {
             return;
         }
 
-        $session = $request->getSession();
-        $userId = $session->get('user_id');
-        $roles = (array) $session->get('user_roles', []);
-
-        if (!$userId) {
+        if ($this->security->getUser() === null) {
             $event->setResponse(new RedirectResponse($this->urlGenerator->generate('app_login')));
             return;
         }
@@ -56,7 +59,7 @@ class SessionAccessSubscriber implements EventSubscriberInterface
             || str_starts_with($route, 'app_admin')
             || str_starts_with($route, 'management_');
 
-        if ($isAdminRoute && !in_array('ROLE_ADMIN', $roles, true)) {
+        if ($isAdminRoute && !$this->security->isGranted('ROLE_ADMIN')) {
             $event->setResponse(new RedirectResponse($this->urlGenerator->generate('front_home')));
         }
     }

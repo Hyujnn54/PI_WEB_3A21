@@ -1,0 +1,66 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Talent Bridge | Two-Factor Authentication{% endblock %}
+
+{% block body %}
+<div class="page-wrapper">
+    <div class="page-body auth-body">
+        <div class="container container-tight py-4 py-md-5">
+            <div class="tb-auth-shell mx-auto">
+                <div class="text-center mb-4">
+                    <img src="{{ asset('assets/team_upload/logo.png') }}" alt="Talent Bridge" class="tb-auth-logo mb-3" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='{{ asset('assets/team_uploads/logo.png') }}';}else{this.style.display='none';}">
+                    <h1 class="h2 mb-1">Two-Factor Verification</h1>
+                    <div class="text-secondary">Enter the 6-digit code from your authenticator app.</div>
+                </div>
+
+                <div class="card card-md auth-card tb-auth-card">
+                    <div class="card-body p-4 p-md-4">
+                        {% if authenticationError %}
+                            <div class="alert alert-danger tb-auth-alert" role="alert">
+                                <i class="ti ti-alert-circle me-2"></i>{{ authenticationError|trans(authenticationErrorData, 'SchebTwoFactorBundle') }}
+                            </div>
+                        {% endif %}
+
+                        <form method="post" action="{{ checkPathUrl ? checkPathUrl : path(checkPathRoute) }}" novalidate>
+                            <div class="mb-3">
+                                <label class="form-label">Authentication Code</label>
+                                <div class="input-icon">
+                                    <span class="input-icon-addon"><i class="ti ti-shield-lock"></i></span>
+                                    <input
+                                        id="_auth_code"
+                                        type="text"
+                                        name="{{ authCodeParameterName }}"
+                                        class="form-control tb-auth-input"
+                                        placeholder="123456"
+                                        inputmode="numeric"
+                                        pattern="[0-9]*"
+                                        autocomplete="one-time-code"
+                                        maxlength="6"
+                                        autofocus
+                                        required
+                                    >
+                                </div>
+                            </div>
+
+                            {% if displayTrustedOption %}
+                                <div class="mb-3 form-check">
+                                    <input id="_trusted" type="checkbox" class="form-check-input" name="{{ trustedParameterName }}">
+                                    <label for="_trusted" class="form-check-label">{{ 'trusted'|trans({}, 'SchebTwoFactorBundle') }}</label>
+                                </div>
+                            {% endif %}
+
+                            {% if isCsrfProtectionEnabled %}
+                                <input type="hidden" name="{{ csrfParameterName }}" value="{{ csrf_token(csrfTokenId) }}">
+                            {% endif %}
+
+                            <div class="form-footer pt-2">
+                                <button type="submit" class="btn btn-primary w-100 tb-auth-btn">Verify Code</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

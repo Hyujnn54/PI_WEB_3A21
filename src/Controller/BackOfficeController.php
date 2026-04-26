@@ -53,7 +53,7 @@ class BackOfficeController extends AbstractController
 
         $offersActive = 0;
         $offersInactive = 0;
-        $now = new \DateTimeImmutable();
+        $now = date_create();
         foreach ($allOffers as $offer) {
             if (!$offer instanceof Job_offer) {
                 continue;
@@ -61,7 +61,7 @@ class BackOfficeController extends AbstractController
 
             $status = strtolower(trim((string) $offer->getStatus()));
             $deadline = $offer->getDeadline();
-            $isExpired = $deadline instanceof \DateTimeInterface && $deadline < $now;
+            $isExpired = is_object($deadline) && method_exists($deadline, 'getTimestamp') && $deadline < $now;
             $isActive = $status === 'open' && !$isExpired;
 
             if ($isActive) {
@@ -123,8 +123,8 @@ class BackOfficeController extends AbstractController
         }
 
         usort($recentActivity, static function (array $a, array $b): int {
-            $aTime = $a['created_at'] instanceof \DateTimeInterface ? $a['created_at']->getTimestamp() : 0;
-            $bTime = $b['created_at'] instanceof \DateTimeInterface ? $b['created_at']->getTimestamp() : 0;
+            $aTime = is_object($a['created_at'] ?? null) && method_exists($a['created_at'], 'getTimestamp') ? $a['created_at']->getTimestamp() : 0;
+            $bTime = is_object($b['created_at'] ?? null) && method_exists($b['created_at'], 'getTimestamp') ? $b['created_at']->getTimestamp() : 0;
 
             return $bTime <=> $aTime;
         });
@@ -165,7 +165,8 @@ class BackOfficeController extends AbstractController
     #[Route('/admin/profile', name: 'app_admin_profile')]
     public function profile(Request $request, UsersRepository $userRepo): Response
     {
-        $userId = (string) $request->getSession()->get('user_id', '');
+        $user = $this->getUser();
+        $userId = $user instanceof Users ? (string) $user->getId() : '';
         if ($userId === '') {
             return $this->redirectToRoute('app_login');
         }
@@ -334,7 +335,7 @@ class BackOfficeController extends AbstractController
     {
         $offers = [];
         $expiredOffers = [];
-        $now = new \DateTimeImmutable();
+        $now = date_create();
 
         try {
             try {
@@ -362,7 +363,7 @@ class BackOfficeController extends AbstractController
     {
         $offers = [];
         $offerStats = $this->buildOfferStats([]);
-        $now = new \DateTimeImmutable();
+        $now = date_create();
 
         try {
             try {
@@ -386,7 +387,8 @@ class BackOfficeController extends AbstractController
     #[Route('/admin/job-offers/{id}/warning', name: 'app_admin_job_offer_warning', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function sendJobOfferWarning(string $id, Request $request, Connection $connection): Response
     {
-        $currentAdminId = (string) $request->getSession()->get('user_id', '');
+        $user = $this->getUser();
+        $currentAdminId = $user instanceof Users ? (string) $user->getId() : '';
         if ($currentAdminId === '') {
             $this->addFlash('error', 'You must be logged in as admin to send warnings.');
             return $this->redirectToRoute('app_login');
@@ -444,7 +446,7 @@ class BackOfficeController extends AbstractController
                     'status' => 'RESOLVED',
                 ]);
 
-                $now = new \DateTimeImmutable();
+                $now = date_create();
                 $warningId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
 
                 $connection->insert('job_offer_warning', [
@@ -501,7 +503,7 @@ class BackOfficeController extends AbstractController
                 'status' => 'SENT',
                 'reason' => $reason,
                 'message' => $reason,
-                'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'created_at' => date_create()->format('Y-m-d H:i:s'),
             ], [
                 'id' => (string) $warning['id'],
             ]);
@@ -584,7 +586,7 @@ SQL;
         }
     }
 
-    private function closeExpiredOffers(Connection $connection, \DateTimeImmutable $now): void
+    private function closeExpiredOffers(Connection $connection, $now): void
     {
         $connection->executeStatement(
             'UPDATE job_offer SET status = :closed_status WHERE deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
@@ -636,7 +638,7 @@ SQL;
      * @param array<int, array<string, mixed>> $offers
      * @return array<int, array<string, mixed>>
      */
-    private function extractExpiredOffers(array $offers, \DateTimeImmutable $now): array
+    private function extractExpiredOffers(array $offers, $now): array
     {
         $expiredOffers = [];
 
@@ -646,7 +648,7 @@ SQL;
             }
 
             try {
-                $deadlineAt = new \DateTimeImmutable((string) $offer['deadline']);
+                $deadlineAt = date_create((string) $offer['deadline']);
                 if ($deadlineAt < $now) {
                     $expiredOffers[] = $offer;
                 }
@@ -789,8 +791,8 @@ SQL;
                 $errors['event_date'] = 'Event date is required.';
             } else {
                 try {
-                    $date = new \DateTime($eventDate);
-                    $now = new \DateTime();
+                    $date = date_create($eventDate);
+                    $now = date_create();
                     if ($date <= $now) {
                         $errors['event_date'] = 'Event date must be in the future.';
                     }
@@ -821,10 +823,10 @@ SQL;
                 $event->setDescription($description);
                 $event->setEvent_type($eventType);
                 $event->setLocation($location);
-                $event->setEvent_date(new \DateTime($eventDate));
+                $event->setEvent_date(date_create($eventDate));
                 $event->setCapacity((int) $capacity);
                 $event->setMeet_link($meetLink);
-                $event->setCreated_at(new \DateTime());
+                $event->setCreated_at(date_create());
 
                 $entityManager->persist($event);
                 $entityManager->flush();
@@ -952,8 +954,8 @@ SQL;
             $errors['event_date'] = 'Event date is required.';
         } else {
             try {
-                $date = new \DateTime($eventDate);
-                $now = new \DateTime();
+                $date = date_create($eventDate);
+                $now = date_create();
                 if ($date <= $now) {
                     $errors['event_date'] = 'Event date must be in the future.';
                 }
@@ -999,7 +1001,7 @@ SQL;
         $event->setDescription($description);
         $event->setEvent_type($eventType);
         $event->setLocation($location);
-        $event->setEvent_date(new \DateTime($eventDate));
+        $event->setEvent_date(date_create($eventDate));
         $event->setCapacity((int) $capacity);
         $event->setMeet_link($meetLink);
 
@@ -1011,7 +1013,8 @@ SQL;
 
     private function resolveCurrentRecruiter(Request $request, EntityManagerInterface $entityManager): ?Recruiter
     {
-        $userId = (string) $request->getSession()->get('user_id', '');
+        $user = $this->getUser();
+        $userId = $user instanceof Users ? (string) $user->getId() : '';
         if ($userId === '') {
             return null;
         }

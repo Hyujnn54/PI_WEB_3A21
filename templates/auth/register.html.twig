@@ -104,10 +104,28 @@
                                     <label class="form-label">Company Name</label>
                                     <input type="text" name="company_name" class="form-control tb-auth-input" placeholder="Google">
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Company Location</label>
-                                    <input type="text" name="company_location" class="form-control tb-auth-input" placeholder="California, USA">
-                                </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Company Location</label>
+
+                                        <div class="d-flex gap-2">
+                                            <input
+                                                type="text"
+                                                id="company_location"
+                                                name="company_location"
+                                                class="form-control tb-auth-input"
+                                                placeholder="Pick on map..."
+                                                readonly
+                                            >
+
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-primary"
+                                                onclick="openMapPicker()"
+                                            >
+                                                📍 Pick
+                                            </button>
+                                        </div>
+                                    </div>
                             </div>
 
                             <div class="form-footer pt-2">
@@ -124,20 +142,116 @@
         </div>
     </div>
 </div>
+<div id="mapModal" style="
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.65);
+z-index:9999;
+">
+
+    <div style="
+        width:90%;
+        max-width:900px;
+        height:80%;
+        background:white;
+        margin:40px auto;
+        border-radius:14px;
+        padding:15px;
+        position:relative;
+    ">
+
+        <div class="d-flex justify-content-between mb-2">
+            <h4>Select Company Location</h4>
+
+            <button class="btn btn-danger btn-sm" onclick="closeMapPicker()">
+                ✖
+            </button>
+        </div>
+
+        <div id="map" style="height:92%; border-radius:12px;"></div>
+
+    </div>
+</div>
 
 <script>
-    document.getElementById('roleSelector').addEventListener('change', function () {
-        const candidateDiv = document.getElementById('candidateFields');
-        const recruiterDiv = document.getElementById('recruiterFields');
+const roleSelector = document.getElementById('roleSelector');
+const candidateDiv = document.getElementById('candidateFields');
+const recruiterDiv = document.getElementById('recruiterFields');
 
-        if (this.value === 'candidate') {
-            candidateDiv.style.display = 'block';
-            recruiterDiv.style.display = 'none';
+roleSelector.addEventListener('change', function () {
+    if (this.value === 'candidate') {
+        candidateDiv.style.display = 'block';
+        recruiterDiv.style.display = 'none';
+    } else {
+        candidateDiv.style.display = 'none';
+        recruiterDiv.style.display = 'block';
+    }
+});
+
+let map;
+let marker;
+
+function openMapPicker() {
+    document.getElementById('mapModal').style.display = 'block';
+
+    setTimeout(() => {
+        if (!map) {
+            initMap();
         } else {
-            candidateDiv.style.display = 'none';
-            recruiterDiv.style.display = 'block';
+            map.invalidateSize();
         }
-    });
+    }, 200);
+}
+
+function closeMapPicker() {
+    document.getElementById('mapModal').style.display = 'none';
+}
+
+function initMap() {
+
+    map = L.map('map').setView([36.8065, 10.1815], 6); // Tunisia
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+map.on('click', function(e){
+
+    const lat = e.latlng.lat.toFixed(6);
+    const lng = e.latlng.lng.toFixed(6);
+
+    if(marker){
+        map.removeLayer(marker);
+    }
+
+    marker = L.marker([lat, lng]).addTo(map);
+
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+        .then(response => response.json())
+        .then(data => {
+
+            let address = data.display_name
+                ? data.display_name
+                : lat + ', ' + lng;
+
+            document.getElementById('company_location').value = address;
+
+            closeMapPicker();
+        })
+        .catch(error => {
+            document.getElementById('company_location').value = lat + ', ' + lng;
+            closeMapPicker();
+        });
+
+});
+}
 </script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 {% endblock %}
 

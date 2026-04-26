@@ -3,7 +3,6 @@
 namespace App\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -11,28 +10,24 @@ class FrontOfficeController extends AbstractController
 {
     #[Route('/front', name: 'front_home')]
     #[Route('/home', name: 'app_home')]
-    public function index(Request $request): Response
+    public function index(): Response
     {
-        $session = $request->getSession();
-        $userId = $session->get('user_id');
-        $roles = $session->get('user_roles', []);
-
-        if (!$userId) {
+        if ($this->getUser() === null) {
             return $this->redirectToRoute('app_login');
         }
 
         // =============== CANDIDATE ===============
-        if (in_array('ROLE_CANDIDATE', $roles)) {
+        if ($this->isGranted('ROLE_CANDIDATE')) {
             return $this->redirectToRoute('candidate_home');
         }
 
         // =============== RECRUITER ===============
-        if (in_array('ROLE_RECRUITER', $roles)) {
+        if ($this->isGranted('ROLE_RECRUITER')) {
             return $this->redirectToRoute('recruiter_home');
         }
 
         // =============== ADMIN ===============
-        if (in_array('ROLE_ADMIN', $roles)) {
+        if ($this->isGranted('ROLE_ADMIN')) {
             return $this->redirectToRoute('admin_front_home');
         }
 
