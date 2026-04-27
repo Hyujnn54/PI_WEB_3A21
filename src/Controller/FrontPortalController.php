@@ -9,13 +9,20 @@ use App\Entity\Interview;
 use App\Entity\Interview_feedback;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
+use App\Entity\Job_offer_comment;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Entity\Users;
+use App\Form\Filter\JobOfferFilterType;
 use App\Form\ProfileType;
 use App\Repository\Job_applicationRepository;
+use App\Repository\Job_offerRepository;
 use App\Repository\UsersRepository;
 use App\Service\JobApplication\ApplicationAiRankingService;
+use App\Service\CandidateOfferMatchingService;
+use App\Service\CommentAnalyzerService;
+use App\Service\GeolocationService;
+use App\Service\JobOfferLocationGeocoder;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
@@ -23,6 +30,8 @@ use Doctrine\Persistence\ManagerRegistry;
 use Pagerfanta\Adapter\ArrayAdapter;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
+use Knp\Snappy\Pdf;
+use Spiriit\Bundle\FormFilterBundle\Filter\FilterBuilderUpdaterInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +39,7 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Throwable;
 
 #[Route('/offermanagement')]
@@ -43,20 +53,38 @@ class FrontPortalController extends AbstractController
     private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
+    private const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
     public function __construct(
         private readonly ManagerRegistry $doctrine,
-        private readonly ApplicationAiRankingService $applicationAiRankingService
+        private readonly ApplicationAiRankingService $applicationAiRankingService,
+        private readonly CandidateOfferMatchingService $candidateOfferMatchingService,
+        private readonly CommentAnalyzerService $commentAnalyzerService,
+        private readonly JobOfferLocationGeocoder $jobOfferLocationGeocoder,
+        private readonly GeolocationService $geolocationService
     )
     {
     }
 
     #[Route('/front/job-offers', name: 'front_job_offers')]
-    public function jobOffers(Request $request, Connection $connection): Response
+    public function jobOffers(
+        Request $request,
+        Connection $connection,
+        Job_offerRepository $jobOfferRepository,
+        FilterBuilderUpdaterInterface $filterBuilderUpdater
+    ): Response
     {
         $role = $this->resolveSessionRole($request);
-        $currentUserId = $this->resolveCurrentUserId($request);
         $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
+        $candidate = null;
+        $filterForm = $this->createForm(JobOfferFilterType::class, null, [
+            'method' => 'GET',
+            'csrf_protection' => false,
+            'contract_types' => self::CONTRACT_TYPES,
+            'job_statuses' => self::JOB_STATUSES,
+        ]);
+        $filterForm->handleRequest($request);
+
         $warnings = [];
         $warningStatuses = [];
         $expiredOffers = [];
@@ -95,17 +123,19 @@ class FrontPortalController extends AbstractController
                 );
             }
 
-            $rowsSql = 'SELECT id, recruiter_id, title, description, location, contract_type, status, deadline FROM job_offer';
-            $rowsParams = [];
-            if ($role === 'recruiter') {
-                $rowsSql .= ' WHERE recruiter_id = :recruiter_id';
-                $rowsParams['recruiter_id'] = $currentRecruiterId;
+            $filterBuilder = $jobOfferRepository->createPortalOffersFilterQueryBuilder($role, $currentRecruiterId);
+            if ($filterForm->isSubmitted() && $filterForm->isValid()) {
+                $filterBuilderUpdater->addFilterConditions($filterForm, $filterBuilder);
             }
-            $rowsSql .= ' ORDER BY created_at DESC LIMIT 25';
 
-            $rows = $connection->fetchAllAssociative($rowsSql, $rowsParams);
+            $rows = $jobOfferRepository->getPortalOffersFromQueryBuilder($filterBuilder, 25);
 
-            $dbCards = array_map(function (array $row) use ($connection, $now, $appliedOfferIds, $currentRecruiterId): array {
+            $candidateMatchData = [];
+            if ($role === 'candidate' && $candidate instanceof Candidate) {
+                $candidateMatchData = $this->candidateOfferMatchingService->buildCandidateOfferMatchData((string) $candidate->getId(), $rows);
+            }
+
+            $dbCards = array_map(function (array $row) use ($connection, $now, $appliedOfferIds, $currentRecruiterId, $candidateMatchData): array {
                 $formattedDeadline = '';
                 $isExpired = false;
                 try {
@@ -121,6 +151,20 @@ class FrontPortalController extends AbstractController
                     'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
                     ['offer_id' => (string) $row['id']]
                 );
+
+                $matchData = $candidateMatchData[(string) $row['id']] ?? null;
+                $matchScore = is_array($matchData) ? (int) ($matchData['score'] ?? 0) : null;
+                $matchLabel = is_array($matchData) ? (string) ($matchData['label'] ?? '') : '';
+                $matchDetails = is_array($matchData) ? (array) ($matchData['details'] ?? []) : [];
+                $matchSummary = is_array($matchData)
+                    ? sprintf(
+                        '%d requises, %d alignées, %d partielles, %d manquantes',
+                        (int) ($matchDetails['required_skill_count'] ?? 0),
+                        (int) ($matchDetails['matching_skill_count'] ?? 0),
+                        (int) ($matchDetails['partial_match_count'] ?? 0),
+                        (int) ($matchDetails['missing_skill_count'] ?? 0)
+                    )
+                    : '';
 
                 $detailExtra = [
                     'Type: ' . (string) $row['contract_type'],
@@ -141,6 +185,13 @@ class FrontPortalController extends AbstractController
                     $detailExtra[] = 'Skills: Not specified';
                 }
 
+                if (is_array($matchData)) {
+                    $detailExtra[] = 'Match score: ' . $matchScore . '% (' . $matchLabel . ')';
+                    $detailExtra[] = 'Matching skills: ' . (count((array) ($matchData['matching_skills'] ?? [])) > 0 ? implode(', ', (array) $matchData['matching_skills']) : 'None');
+                    $detailExtra[] = 'Missing skills: ' . (count((array) ($matchData['missing_skills'] ?? [])) > 0 ? implode(', ', (array) $matchData['missing_skills']) : 'None');
+                    $detailExtra[] = 'Explanation: ' . (string) ($matchData['explanation'] ?? 'No explanation available.');
+                }
+
                 return [
                     'id' => (string) $row['id'],
                     'meta' => sprintf('%s | %s | %s', (string) $row['location'], (string) $row['contract_type'], ucfirst((string) $row['status'])),
@@ -156,15 +207,55 @@ class FrontPortalController extends AbstractController
                     'status' => (string) $row['status'],
                     'deadline' => $formattedDeadline,
                     'is_expired' => $isExpired,
+                    'match_score' => $matchScore,
+                    'match_label' => $matchLabel,
+                    'match_summary' => $matchSummary,
+                    'match_explanation' => is_array($matchData) ? (string) ($matchData['explanation'] ?? '') : '',
+                    'match_matching_skills' => is_array($matchData) ? implode(', ', (array) ($matchData['matching_skills'] ?? [])) : '',
+                    'match_missing_skills' => is_array($matchData) ? implode(', ', (array) ($matchData['missing_skills'] ?? [])) : '',
+                    'match_details' => is_array($matchData) ? (array) ($matchData['details'] ?? []) : [],
                 ];
             }, $rows);
 
+            // --- Geolocation: geocode the candidate's city in-memory (no DB write) ---
+            $candidateLat = null;
+            $candidateLng = null;
+            if ($role === 'candidate' && $candidate instanceof Candidate) {
+                $candidateCity = $candidate->getLocation();
+                if ($candidateCity !== null && $candidateCity !== '') {
+                    $coords = $this->geolocationService->tryGeocode($candidateCity);
+                    if ($coords !== null) {
+                        $candidateLat = $coords['lat'];
+                        $candidateLng = $coords['lng'];
+                    }
+                }
+            }
+
+            // Add distance to each card.
             foreach ($dbCards as $dbCard) {
+                $dbCard['distance'] = $this->geolocationService->buildOfferWithDistance(
+                    $dbCard,
+                    $candidateLat,
+                    $candidateLng
+                )['distance'];
+
                 if (($dbCard['is_expired'] ?? false) === true) {
                     $expiredOffers[] = $dbCard;
                 }
 
                 $cards[] = $dbCard;
+            }
+
+            // Sort cards nearest → farthest for candidates (nulls go last).
+            if ($role === 'candidate' && $candidateLat !== null) {
+                usort($cards, static function (array $a, array $b): int {
+                    $da = $a['distance'];
+                    $db = $b['distance'];
+                    if ($da === null && $db === null) { return 0; }
+                    if ($da === null) { return 1; }
+                    if ($db === null) { return -1; }
+                    return $da <=> $db;
+                });
             }
         } catch (\Throwable $exception) {
             // Keep UI usable even if table is not ready in current environment.
@@ -204,17 +295,25 @@ class FrontPortalController extends AbstractController
             $card['warning_status'] = $warningStatuses[$card['id']] ?? null;
         }
 
+        $filterData = (array) $filterForm->getData();
+        $hasActiveFilters = trim((string) ($filterData['search'] ?? '')) !== ''
+            || trim((string) ($filterData['contract_type'] ?? '')) !== ''
+            || trim((string) ($filterData['status'] ?? '')) !== ''
+            || trim((string) ($filterData['deadline'] ?? '')) !== '';
+
         return $this->render('front/modules/job_offers.html.twig', [
             'authUser' => ['role' => $role],
             'cards' => $cards,
-            'contractTypes' => self::CONTRACT_TYPES,
+            'filterForm' => $filterForm->createView(),
+            'hasActiveFilters' => $hasActiveFilters,
             'warnings' => $warnings,
             'expiredOffers' => $expiredOffers,
+            'resultCount' => count($cards),
         ]);
     }
 
     #[Route('/front/job-offers/statistics', name: 'front_job_offers_statistics')]
-    public function jobOffersStatistics(Request $request, Connection $connection): Response
+    public function jobOffersStatistics(Request $request, Job_offerRepository $jobOfferRepository): Response
     {
         $role = $this->resolveSessionRole($request);
         $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
@@ -223,15 +322,18 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_job_offers', ['role' => $role]);
         }
 
-        $rows = [];
-        $offerStats = $this->buildOfferStats([]);
+        $offerStats = [
+            'total_published' => 0,
+            'total_closed' => 0,
+            'total_open' => 0,
+            'closed_percentage' => 0,
+            'open_percentage' => 0,
+            'city_stats' => [],
+            'contract_stats' => [],
+        ];
 
         try {
-            $rows = $connection->fetchAllAssociative(
-                'SELECT id, recruiter_id, title, location, contract_type, status, deadline FROM job_offer WHERE recruiter_id = :recruiter_id ORDER BY created_at DESC LIMIT 50',
-                ['recruiter_id' => $currentRecruiterId]
-            );
-            $offerStats = $this->buildOfferStats($rows);
+            $offerStats = $jobOfferRepository->buildRecruiterOfferStats($currentRecruiterId, 50);
         } catch (\Throwable) {
             $this->addFlash('error', 'Unable to load offer statistics right now.');
         }
@@ -239,6 +341,76 @@ class FrontPortalController extends AbstractController
         return $this->render('front/modules/job_offer_statistics.html.twig', [
             'authUser' => ['role' => $role],
             'offerStats' => $offerStats,
+        ]);
+    }
+
+    #[Route('/front/job-offers/statistics/export/pdf', name: 'front_job_offers_statistics_export_pdf', methods: ['GET'])]
+    public function exportJobOffersStatisticsPdf(Request $request, Job_offerRepository $jobOfferRepository, Pdf $pdf): Response
+    {
+        $role = $this->resolveSessionRole($request);
+        $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
+        if ($role !== 'recruiter') {
+            $this->addFlash('warning', 'Only recruiters can export offer statistics.');
+
+            return $this->redirectToRoute('front_job_offers', ['role' => $role]);
+        }
+
+        $offerStats = [
+            'total_published' => 0,
+            'total_closed' => 0,
+            'total_open' => 0,
+            'closed_percentage' => 0,
+            'open_percentage' => 0,
+            'city_stats' => [],
+            'contract_stats' => [],
+        ];
+
+        try {
+            $offerStats = $jobOfferRepository->buildRecruiterOfferStats($currentRecruiterId, 50);
+        } catch (\Throwable) {
+            $this->addFlash('error', 'Unable to export recruiter statistics right now.');
+
+            return $this->redirectToRoute('front_job_offers_statistics', ['role' => 'recruiter']);
+        }
+
+        $logoDataUri = null;
+        $projectDir = (string) $this->getParameter('kernel.project_dir');
+        $logoCandidates = [
+            $projectDir . '/assets/team_upload/logo.png',
+            $projectDir . '/assets/team_uploads/logo.png',
+            $projectDir . '/public/uploads/applications/logo-69d55696892a5.png',
+        ];
+        foreach ($logoCandidates as $logoPath) {
+            if (!is_file($logoPath)) {
+                continue;
+            }
+
+            $logoBinary = @file_get_contents($logoPath);
+            if ($logoBinary !== false) {
+                $logoDataUri = 'data:image/png;base64,' . base64_encode($logoBinary);
+                break;
+            }
+        }
+
+        $html = $this->renderView('pdf/recruiter_job_offer_statistics.pdf.twig', [
+            'offerStats' => $offerStats,
+            'generatedAt' => new \DateTimeImmutable(),
+            'recruiterId' => $currentRecruiterId,
+            'logoDataUri' => $logoDataUri,
+        ]);
+
+        $content = $pdf->getOutputFromHtml($html, [
+            'encoding' => 'utf-8',
+            'enable-local-file-access' => true,
+            'margin-top' => '12mm',
+            'margin-bottom' => '12mm',
+            'margin-left' => '10mm',
+            'margin-right' => '10mm',
+        ]);
+
+        return new Response($content, Response::HTTP_OK, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="recruiter_offer_statistics_' . (new \DateTimeImmutable())->format('Ymd_His') . '.pdf"',
         ]);
     }
 
@@ -283,50 +455,18 @@ class FrontPortalController extends AbstractController
                 $formData['skills'] = [['name' => '', 'level' => '']];
             }
 
-            if ($formData['title'] === '') {
-                $fieldErrors['title'] = 'Title is required.';
-            }
-            if ($formData['contract_type'] === '') {
-                $fieldErrors['contract_type'] = 'Contract type is required.';
-            } elseif (!in_array($formData['contract_type'], self::CONTRACT_TYPES, true)) {
-                $fieldErrors['contract_type'] = 'Please select a valid contract type.';
-            }
-            if ($formData['status'] === '') {
-                $fieldErrors['status'] = 'Status is required.';
-            } elseif (!in_array($formData['status'], self::JOB_STATUSES, true)) {
-                $fieldErrors['status'] = 'Please select a valid status.';
-            }
-            if ($formData['description'] === '') {
-                $fieldErrors['description'] = 'Description is required.';
-            }
-            if ($formData['location'] === '') {
-                $fieldErrors['location'] = 'Location is required.';
-            }
-            if ($formData['deadline'] === '') {
-                $fieldErrors['deadline'] = 'Deadline is required.';
-            } else {
-                $deadline = date_create_from_format('Y-m-d\\TH:i', $formData['deadline']);
-                if (!$deadline) {
-                    $fieldErrors['deadline'] = 'Invalid deadline format.';
-                } elseif ($deadline <= date_create()) {
-                    $fieldErrors['deadline'] = 'Deadline must be greater than today.';
-                }
-            }
-            foreach ($formData['skills'] as $index => $skill) {
-                if ($skill['name'] === '') {
-                    $fieldErrors['skills'][$index]['name'] = 'Skill name is required.';
-                }
-                if ($skill['level'] === '') {
-                    $fieldErrors['skills'][$index]['level'] = 'Skill level is required.';
-                } elseif (!in_array($skill['level'], self::SKILL_LEVELS, true)) {
-                    $fieldErrors['skills'][$index]['level'] = 'Invalid skill level.';
-                }
-            }
+            $fieldErrors = Job_offer::validateCreateFormData(
+                $formData,
+                self::CONTRACT_TYPES,
+                self::JOB_STATUSES,
+                self::SKILL_LEVELS
+            );
 
             if (empty($fieldErrors)) {
                 $deadline = date_create_from_format('Y-m-d\\TH:i', $formData['deadline']);
                 if ($deadline) {
-                    $now = date_create();
+                    $now = new \DateTimeImmutable();
+                    $coords = $this->resolveLocationCoordinates($formData['location']);
                     $newId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
                     try {
                         $connection->beginTransaction();
@@ -337,8 +477,8 @@ class FrontPortalController extends AbstractController
                             'title' => $formData['title'],
                             'description' => $formData['description'],
                             'location' => $formData['location'],
-                            'latitude' => 0,
-                            'longitude' => 0,
+                            'latitude' => $coords['lat'],
+                            'longitude' => $coords['lng'],
                             'contract_type' => $formData['contract_type'],
                             'created_at' => $now->format('Y-m-d H:i:s'),
                             'deadline' => $deadline->format('Y-m-d H:i:s'),
@@ -380,6 +520,111 @@ class FrontPortalController extends AbstractController
             'formData' => $formData,
             'fieldErrors' => $fieldErrors,
         ]);
+    }
+
+    #[Route('/front/job-offers/location-suggestions', name: 'front_job_offer_location_suggestions', methods: ['GET'])]
+    public function suggestOfferLocations(Request $request): JsonResponse
+    {
+        $role = $this->resolveSessionRole($request);
+        if ($role !== 'recruiter') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Only recruiters can access location suggestions.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $term = trim((string) $request->query->get('q', ''));
+        if (mb_strlen($term) < 2) {
+            return $this->json([
+                'ok' => true,
+                'suggestions' => [],
+            ]);
+        }
+
+        $suggestions = $this->jobOfferLocationGeocoder->suggestLocations($term, 6);
+
+        return $this->json([
+            'ok' => true,
+            'suggestions' => $suggestions,
+        ]);
+    }
+
+    #[Route('/front/job-offers/ai-generate', name: 'front_job_offer_ai_generate', methods: ['POST'])]
+    public function generateJobOfferWithAi(Request $request, HttpClientInterface $httpClient): JsonResponse
+    {
+        $role = $this->resolveSessionRole($request);
+        if ($role !== 'recruiter') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Only recruiters can generate AI suggestions.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        $title = trim((string) ($payload['title'] ?? ''));
+        if ($title === '') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Job title is required.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $apiKey = $this->resolveGeminiApiKey();
+        if ($apiKey === '') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'AI service is not configured. Add GEMINI_API_KEY in your environment.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $prompt = "You are an expert HR assistant.\n"
+            . "Based on the following job title, generate a complete and professional job offer.\n\n"
+            . "INPUT:\n"
+            . "Job Title: {$title}\n\n"
+            . "OUTPUT (JSON format only):\n"
+            . "{\n"
+            . "  \"description\": \"Professional and detailed job description (5-8 lines)\",\n"
+            . "  \"required_skills\": [\"skill1\", \"skill2\", \"skill3\", \"skill4\"],\n"
+            . "  \"soft_skills\": [\"skill1\", \"skill2\"],\n"
+            . "  \"experience_level\": \"Junior | Mid | Senior\",\n"
+            . "  \"contract_type\": \"CDI | CDD | Stage | Freelance\",\n"
+            . "  \"suggested_location\": \"City name\",\n"
+            . "  \"keywords\": [\"tag1\", \"tag2\", \"tag3\"]\n"
+            . "}\n\n"
+            . "RULES:\n"
+            . "- Make the description clear and professional\n"
+            . "- Use realistic HR vocabulary\n"
+            . "- Skills must be relevant to the job title\n"
+            . "- Return ONLY valid JSON\n";
+
+        try {
+            $aiResult = $this->requestGeminiGenerateContent($httpClient, $apiKey, $prompt);
+            if (($aiResult['ok'] ?? false) !== true) {
+                return $this->json([
+                    'ok' => false,
+                    'error' => (string) ($aiResult['error'] ?? 'AI service is currently unavailable.'),
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            $rawText = trim((string) ($aiResult['text'] ?? ''));
+            $decoded = $this->decodeAiJsonPayload($rawText);
+            if (!is_array($decoded)) {
+                return $this->json([
+                    'ok' => false,
+                    'error' => 'AI response format is invalid.',
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            return $this->json([
+                'ok' => true,
+                'data' => $this->normalizeAiJobOfferPayload($decoded, $title),
+            ]);
+        } catch (\Throwable) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Failed to generate offer suggestions. Please try again.',
+            ], Response::HTTP_BAD_GATEWAY);
+        }
     }
 
     #[Route('/front/job-offers/{id}/edit', name: 'front_job_offer_edit', requirements: ['id' => '\\d+'], methods: ['GET', 'POST'])]
@@ -452,45 +697,17 @@ class FrontPortalController extends AbstractController
                 $formData['skills'] = [['name' => '', 'level' => '']];
             }
 
-            if ($formData['title'] === '') {
-                $fieldErrors['title'] = 'Title is required.';
-            }
-            if ($formData['contract_type'] === '') {
-                $fieldErrors['contract_type'] = 'Contract type is required.';
-            } elseif (!in_array($formData['contract_type'], self::CONTRACT_TYPES, true)) {
-                $fieldErrors['contract_type'] = 'Please select a valid contract type.';
-            }
-            if ($formData['description'] === '') {
-                $fieldErrors['description'] = 'Description is required.';
-            }
-            if ($formData['location'] === '') {
-                $fieldErrors['location'] = 'Location is required.';
-            }
-            if ($formData['deadline'] === '') {
-                $fieldErrors['deadline'] = 'Deadline is required.';
-            } else {
-                $deadline = date_create_from_format('Y-m-d\\TH:i', $formData['deadline']);
-                if (!$deadline) {
-                    $fieldErrors['deadline'] = 'Invalid deadline format.';
-                } elseif ($deadline <= date_create()) {
-                    $fieldErrors['deadline'] = 'Deadline must be greater than today.';
-                }
-            }
-
-            foreach ($formData['skills'] as $index => $skill) {
-                if ($skill['name'] === '') {
-                    $fieldErrors['skills'][$index]['name'] = 'Skill name is required.';
-                }
-                if ($skill['level'] === '') {
-                    $fieldErrors['skills'][$index]['level'] = 'Skill level is required.';
-                } elseif (!in_array($skill['level'], self::SKILL_LEVELS, true)) {
-                    $fieldErrors['skills'][$index]['level'] = 'Invalid skill level.';
-                }
-            }
+            $fieldErrors = Job_offer::validateEditFormData(
+                $formData,
+                self::CONTRACT_TYPES,
+                self::SKILL_LEVELS
+            );
 
             if (empty($fieldErrors)) {
                 $deadline = date_create_from_format('Y-m-d\\TH:i', $formData['deadline']);
                 if ($deadline) {
+                    $coords = $this->resolveLocationCoordinates($formData['location']);
+
                     try {
                         $connection->beginTransaction();
 
@@ -500,8 +717,8 @@ class FrontPortalController extends AbstractController
                             'location' => $formData['location'],
                             'contract_type' => $formData['contract_type'],
                             'deadline' => $deadline->format('Y-m-d H:i:s'),
-                            'latitude' => 0,
-                            'longitude' => 0,
+                            'latitude' => $coords['lat'],
+                            'longitude' => $coords['lng'],
                         ], [
                             'id' => $id,
                             'recruiter_id' => $currentRecruiterId,
@@ -1915,6 +2132,13 @@ class FrontPortalController extends AbstractController
             }
 
             $user->setPlainPassword(null);
+            if ($user instanceof Candidate) {
+                $coords = $this->geolocationService->tryGeocode((string) $user->getLocation());
+                if ($coords !== null) {
+                    $user->setLatitude($coords['lat']);
+                    $user->setLongitude($coords['lng']);
+                }
+            }
 
             $entityManager->flush();
             $request->getSession()->set('user_name', $user->getFirstName());
@@ -2070,6 +2294,23 @@ class FrontPortalController extends AbstractController
         ];
     }
 
+    /**
+     * @return array{lat: float|null, lng: float|null}
+     */
+    private function resolveLocationCoordinates(string $location): array
+    {
+        $coords = $this->geolocationService->tryGeocode($location);
+
+        if ($coords === null) {
+            return ['lat' => null, 'lng' => null];
+        }
+
+        return [
+            'lat' => $coords['lat'],
+            'lng' => $coords['lng'],
+        ];
+    }
+
     private function validateInterviewPayload(array $data): array
     {
         try {
@@ -2177,6 +2418,191 @@ class FrontPortalController extends AbstractController
         } catch (Throwable) {
             return false;
         }
+    }
+
+    #[Route('/front/job-offers/comments/analyze', name: 'front_job_offer_comment_analyze', methods: ['POST'])]
+    public function analyzeJobOfferComment(Request $request): JsonResponse
+    {
+        $role = $this->resolveSessionRole($request);
+        if ($role !== 'candidate') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Only candidates can analyze comments from this page.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        $comment = trim((string) ($payload['comment'] ?? ''));
+        $validation = Job_offer_comment::validateCommentText($comment);
+        if (($validation['ok'] ?? false) !== true) {
+            return $this->json([
+                'ok' => false,
+                'error' => (string) ($validation['error'] ?? 'Invalid comment.'),
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $analysis = $this->commentAnalyzerService->analyze((string) $validation['value']);
+
+        return $this->json([
+            'ok' => true,
+            'analysis' => $analysis,
+        ]);
+    }
+
+    #[Route('/front/job-offers/{id}/comments', name: 'front_job_offer_comment_create', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function createJobOfferComment(string $id, Request $request, Connection $connection): JsonResponse
+    {
+        $role = $this->resolveSessionRole($request);
+        if ($role !== 'candidate') {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Only candidates can post comments.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $candidate = $this->resolveCurrentCandidate($request);
+        if (!$candidate instanceof Candidate) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Candidate session is required.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $offerExists = $connection->fetchOne('SELECT id FROM job_offer WHERE id = :id LIMIT 1', ['id' => $id]);
+        if ($offerExists === false || $offerExists === null) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Job offer not found.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        $comment = trim((string) ($payload['comment'] ?? ''));
+        $validation = Job_offer_comment::validateCommentText($comment);
+        if (($validation['ok'] ?? false) !== true) {
+            return $this->json([
+                'ok' => false,
+                'error' => (string) ($validation['error'] ?? 'Invalid comment.'),
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $analysis = $this->commentAnalyzerService->analyze((string) $validation['value']);
+        $labelsJson = '[]';
+        try {
+            $labelsJson = (string) json_encode((array) ($analysis['labels'] ?? []), JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            $labelsJson = '[]';
+        }
+
+        $now = new \DateTimeImmutable();
+        $commentId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
+        $moderationStatus = (($analysis['flagged'] ?? false) === true)
+            ? Job_offer_comment::STATUS_FLAGGED
+            : Job_offer_comment::STATUS_APPROVED;
+        $visibilityStatus = (($analysis['autoHidden'] ?? false) === true)
+            ? Job_offer_comment::VISIBILITY_HIDDEN
+            : Job_offer_comment::VISIBILITY_VISIBLE;
+
+        try {
+            $connection->insert('job_offer_comment', [
+                'id' => $commentId,
+                'job_offer_id' => $id,
+                'candidate_id' => (string) $candidate->getId(),
+                'comment_text' => (string) $validation['value'],
+                'toxicity_score' => (float) ($analysis['toxicityScore'] ?? 0),
+                'spam_score' => (float) ($analysis['spamScore'] ?? 0),
+                'sentiment' => (string) ($analysis['sentiment'] ?? 'neutral'),
+                'labels' => $labelsJson,
+                'moderation_status' => $moderationStatus,
+                'visibility_status' => $visibilityStatus,
+                'is_auto_flagged' => (($analysis['flagged'] ?? false) === true) ? 1 : 0,
+                'analyzer_source' => (string) ($analysis['provider'] ?? 'heuristic'),
+                'created_at' => $now->format('Y-m-d H:i:s'),
+                'analyzed_at' => $now->format('Y-m-d H:i:s'),
+                'moderated_at' => null,
+                'moderator_id' => null,
+                'moderator_action_note' => null,
+            ]);
+        } catch (\Throwable) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Unable to save comment right now.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->json([
+            'ok' => true,
+            'comment' => [
+                'id' => $commentId,
+                'text' => (string) $validation['value'],
+                'status' => $moderationStatus,
+                'visibility' => $visibilityStatus,
+                'createdAt' => $now->format(DATE_ATOM),
+            ],
+            'analysis' => $analysis,
+        ]);
+    }
+
+    #[Route('/front/job-offers/{id}/comments', name: 'front_job_offer_comments_list', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function listJobOfferComments(string $id, Request $request, Connection $connection): JsonResponse
+    {
+        $candidate = $this->resolveCurrentCandidate($request);
+        $params = ['offer_id' => $id, 'visible_status' => Job_offer_comment::VISIBILITY_VISIBLE];
+        $sql = <<<'SQL'
+SELECT c.id, c.comment_text, c.sentiment, c.moderation_status, c.visibility_status, c.created_at,
+       u.first_name, u.last_name
+FROM job_offer_comment c
+LEFT JOIN users u ON u.id = c.candidate_id
+WHERE c.job_offer_id = :offer_id
+  AND c.visibility_status = :visible_status
+ORDER BY c.created_at DESC
+LIMIT 25
+SQL;
+
+        if ($candidate instanceof Candidate) {
+            $sql = <<<'SQL'
+SELECT c.id, c.comment_text, c.sentiment, c.moderation_status, c.visibility_status, c.created_at,
+       u.first_name, u.last_name
+FROM job_offer_comment c
+LEFT JOIN users u ON u.id = c.candidate_id
+WHERE c.job_offer_id = :offer_id
+  AND (c.visibility_status = :visible_status OR c.candidate_id = :candidate_id)
+ORDER BY c.created_at DESC
+LIMIT 25
+SQL;
+            $params['candidate_id'] = (string) $candidate->getId();
+        }
+
+        try {
+            $rows = $connection->fetchAllAssociative($sql, $params);
+        } catch (\Throwable) {
+            return $this->json([
+                'ok' => false,
+                'error' => 'Unable to load comments right now.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $comments = array_map(function (array $row): array {
+            $authorName = trim((string) ($row['first_name'] ?? '') . ' ' . (string) ($row['last_name'] ?? ''));
+            if ($authorName === '') {
+                $authorName = 'Candidate';
+            }
+
+            return [
+                'id' => (string) ($row['id'] ?? ''),
+                'text' => (string) ($row['comment_text'] ?? ''),
+                'sentiment' => (string) ($row['sentiment'] ?? 'neutral'),
+                'status' => (string) ($row['moderation_status'] ?? Job_offer_comment::STATUS_APPROVED),
+                'visibility' => (string) ($row['visibility_status'] ?? Job_offer_comment::VISIBILITY_VISIBLE),
+                'createdAt' => (string) ($row['created_at'] ?? ''),
+                'author' => $authorName,
+            ];
+        }, $rows);
+
+        return $this->json([
+            'ok' => true,
+            'comments' => $comments,
+        ]);
     }
 
     private function canSubmitFeedback(Interview $interview): bool
@@ -2324,6 +2750,200 @@ class FrontPortalController extends AbstractController
         }
 
         return $skills;
+    }
+
+    private function resolveGeminiApiKey(): string
+    {
+        $candidates = [
+            $_ENV['GEMINI_API_KEY'] ?? null,
+            $_SERVER['GEMINI_API_KEY'] ?? null,
+            getenv('GEMINI_API_KEY') ?: null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $value = trim((string) $candidate);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function requestGeminiGenerateContent(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
+    {
+        $lastError = 'AI service is currently unavailable.';
+
+        foreach (self::GEMINI_MODELS as $model) {
+            try {
+                $response = $httpClient->request('POST', 'https://generativelanguage.googleapis.com/v1beta/models/' . $model . ':generateContent', [
+                    'query' => ['key' => $apiKey],
+                    'json' => [
+                        'contents' => [
+                            [
+                                'parts' => [
+                                    ['text' => $prompt],
+                                ],
+                            ],
+                        ],
+                        'generationConfig' => [
+                            'temperature' => 0.4,
+                            'responseMimeType' => 'application/json',
+                        ],
+                    ],
+                    'timeout' => 25,
+                ]);
+
+                $statusCode = $response->getStatusCode();
+                $body = $response->toArray(false);
+
+                if ($statusCode >= 400) {
+                    $lastError = $this->extractGeminiErrorMessage($body, $lastError);
+                    if ($statusCode === 404) {
+                        continue;
+                    }
+
+                    return ['ok' => false, 'error' => $lastError];
+                }
+
+                $text = trim((string) ($body['candidates'][0]['content']['parts'][0]['text'] ?? ''));
+                if ($text === '') {
+                    $lastError = 'AI returned an empty response.';
+                    continue;
+                }
+
+                return ['ok' => true, 'text' => $text, 'model' => $model];
+            } catch (\Throwable) {
+                $lastError = 'Failed to contact AI provider.';
+            }
+        }
+
+        return ['ok' => false, 'error' => $lastError];
+    }
+
+    private function extractGeminiErrorMessage(array $body, string $fallback): string
+    {
+        $message = trim((string) ($body['error']['message'] ?? ''));
+        if ($message === '') {
+            return $fallback;
+        }
+
+        if (mb_strlen($message) > 180) {
+            return mb_substr($message, 0, 180) . '...';
+        }
+
+        return $message;
+    }
+
+    private function decodeAiJsonPayload(string $rawPayload): ?array
+    {
+        $payload = trim($rawPayload);
+        if ($payload === '') {
+            return null;
+        }
+
+        $payload = preg_replace('/^```(?:json)?\s*/i', '', $payload) ?? $payload;
+        $payload = preg_replace('/\s*```$/', '', $payload) ?? $payload;
+        $payload = trim($payload);
+
+        $decoded = json_decode($payload, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        $firstBrace = strpos($payload, '{');
+        $lastBrace = strrpos($payload, '}');
+        if ($firstBrace === false || $lastBrace === false || $lastBrace <= $firstBrace) {
+            return null;
+        }
+
+        $jsonChunk = substr($payload, $firstBrace, $lastBrace - $firstBrace + 1);
+        $decodedChunk = json_decode($jsonChunk, true);
+
+        return is_array($decodedChunk) ? $decodedChunk : null;
+    }
+
+    private function normalizeAiJobOfferPayload(array $payload, string $title): array
+    {
+        $description = trim((string) ($payload['description'] ?? ''));
+        if ($description === '') {
+            $description = 'We are hiring a ' . $title . ' to join our team and deliver high-impact work in a collaborative environment.';
+        }
+
+        if (strlen($description) > 1000) {
+            $description = substr($description, 0, 1000);
+        }
+
+        $requiredSkills = $this->normalizeAiTextList($payload['required_skills'] ?? [], 8);
+        if (count($requiredSkills) === 0) {
+            $requiredSkills = [$title . ' fundamentals'];
+        }
+
+        $experienceLevel = strtolower(trim((string) ($payload['experience_level'] ?? 'mid')));
+        $defaultLevel = 'intermediate';
+        if ($experienceLevel === 'junior') {
+            $defaultLevel = 'beginner';
+        } elseif ($experienceLevel === 'senior') {
+            $defaultLevel = 'advanced';
+        }
+
+        $skills = array_map(static function (string $name) use ($defaultLevel): array {
+            return ['name' => $name, 'level' => $defaultLevel];
+        }, $requiredSkills);
+
+        $contractType = $this->mapAiContractType((string) ($payload['contract_type'] ?? ''));
+        $location = trim((string) ($payload['suggested_location'] ?? ''));
+        if ($location === '') {
+            $location = 'Tunis';
+        }
+
+        return [
+            'title' => $title,
+            'description' => $description,
+            'contract_type' => $contractType,
+            'location' => $location,
+            'skills' => $skills,
+        ];
+    }
+
+    private function normalizeAiTextList(mixed $value, int $maxItems = 8): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($value as $rawItem) {
+            $item = trim((string) $rawItem);
+            if ($item === '') {
+                continue;
+            }
+
+            $items[] = $item;
+            if (count($items) >= $maxItems) {
+                break;
+            }
+        }
+
+        return array_values(array_unique($items));
+    }
+
+    private function mapAiContractType(string $rawContractType): string
+    {
+        $contractType = strtoupper(trim($rawContractType));
+        if ($contractType === '') {
+            return 'CDI';
+        }
+
+        return match ($contractType) {
+            'CDI' => 'CDI',
+            'CDD' => 'CDD',
+            'STAGE', 'INTERNSHIP' => 'Internship',
+            'FREELANCE' => 'Freelance',
+            'PART-TIME', 'PART TIME' => 'Part-time',
+            'REMOTE', 'REMOTE CONTRACT' => 'Remote Contract',
+            default => in_array($rawContractType, self::CONTRACT_TYPES, true) ? $rawContractType : 'CDI',
+        };
     }
 
     private function buildOfferStats(array $offers): array

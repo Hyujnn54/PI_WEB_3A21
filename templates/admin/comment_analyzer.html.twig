@@ -1,0 +1,165 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Admin | Comment Analyzer{% endblock %}
+
+{% block admin_content %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="h3 mb-1"><i class="ti ti-message-report me-1"></i>Comment Analyzer</h1>
+            <p class="text-secondary mb-0">Analyze comments with toxicity and spam signals, then moderate with Approve, Reject, or Warn.</p>
+        </div>
+        <div class="badge bg-danger-lt text-danger fs-6">Flagged now: {{ flaggedCount|default(0) }}</div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-xl-7">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" action="{{ path('app_admin_comment_analyzer') }}" class="d-flex flex-wrap gap-2 align-items-center">
+                        <label class="form-label mb-0">Status filter</label>
+                        <select name="status" class="form-select" style="max-width: 240px;">
+                            {% for status in allowedStatuses|default(['ALL']) %}
+                                <option value="{{ status }}" {{ selectedStatus == status ? 'selected' : '' }}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                        <a href="{{ path('app_admin_comment_analyzer') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-5">
+            <div class="card">
+                <div class="card-body">
+                    <div class="small text-uppercase fw-semibold text-secondary mb-2">Manual Analyze API</div>
+                    <textarea id="manualAnalyzeText" class="form-control mb-2" rows="3" placeholder="Paste a comment to analyze..."></textarea>
+                    <button type="button" id="manualAnalyzeBtn" class="btn btn-outline-primary btn-sm mb-2">Analyze Comment</button>
+                    <div id="manualAnalyzeOutput" class="small text-secondary">No analysis yet.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>Offer</th>
+                            <th>Author</th>
+                            <th>Comment</th>
+                            <th>Analyzer Result</th>
+                            <th>Moderation</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for comment in comments|default([]) %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">#{{ comment.offer_id }}</div>
+                                    <div class="small text-secondary">{{ comment.offer_title }}</div>
+                                </td>
+                                <td>{{ comment.author }}</td>
+                                <td>
+                                    <div style="max-width: 360px; white-space: pre-wrap;">{{ comment.comment_text }}</div>
+                                    <div class="small text-secondary mt-1">{{ comment.created_at }}</div>
+                                </td>
+                                <td>
+                                    <div class="small">toxicityScore=<strong>{{ comment.toxicity_score }}</strong></div>
+                                    <div class="small">spamScore=<strong>{{ comment.spam_score }}</strong></div>
+                                    <div class="small">sentiment=<strong>{{ comment.sentiment }}</strong></div>
+                                    <div class="small">labels={{ comment.labels|length > 0 ? comment.labels|join(', ') : '-' }}</div>
+                                </td>
+                                <td>
+                                    {% set statusTone = comment.moderation_status == 'FLAGGED' ? 'danger' : (comment.moderation_status == 'REJECTED' ? 'warning' : (comment.moderation_status == 'WARNED' ? 'warning' : 'success')) %}
+                                    <div class="badge bg-{{ statusTone }}-lt text-{{ statusTone }} mb-1">{{ comment.moderation_status }}</div>
+                                    <div class="small text-secondary">Visibility: {{ comment.visibility_status }}</div>
+                                    {% if comment.moderator_action_note|default('') != '' %}
+                                        <div class="small text-secondary mt-1">Note: {{ comment.moderator_action_note }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="post" action="{{ path('app_admin_comment_analyzer_approve', {id: comment.id}) }}" class="mb-2">
+                                        <input type="hidden" name="note" value="Approved after moderator review.">
+                                        <button type="submit" class="btn btn-sm btn-outline-success w-100">Approve</button>
+                                    </form>
+                                    <form method="post" action="{{ path('app_admin_comment_analyzer_reject', {id: comment.id}) }}" class="mb-2">
+                                        <input type="hidden" name="note" value="Rejected due to policy or quality issues.">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">Reject</button>
+                                    </form>
+                                    <form method="post" action="{{ path('app_admin_comment_analyzer_warn', {id: comment.id}) }}">
+                                        <input type="text" name="warning_note" class="form-control form-control-sm mb-1" maxlength="500" placeholder="Warning message to user">
+                                        <label class="form-check form-check-sm mb-1">
+                                            <input class="form-check-input" type="checkbox" name="hide_comment" value="1">
+                                            <span class="form-check-label small">Hide comment</span>
+                                        </label>
+                                        <button type="submit" class="btn btn-sm btn-outline-warning w-100">Warn User</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-secondary py-4">No comments found for this filter.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const btn = document.getElementById('manualAnalyzeBtn');
+            const text = document.getElementById('manualAnalyzeText');
+            const output = document.getElementById('manualAnalyzeOutput');
+
+            if (!btn || !text || !output) {
+                return;
+            }
+
+            btn.addEventListener('click', async function () {
+                const value = text.value.trim();
+                if (!value) {
+                    output.textContent = 'Please provide a comment first.';
+                    output.className = 'small text-warning';
+                    return;
+                }
+
+                output.textContent = 'Analyzing...';
+                output.className = 'small text-secondary';
+
+                try {
+                    const response = await fetch('{{ path('app_admin_comment_analyzer_analyze') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ comment: value }),
+                    });
+
+                    const payload = await response.json();
+                    if (!response.ok || !payload.ok) {
+                        throw new Error(payload.error || 'Analysis failed');
+                    }
+
+                    const analysis = payload.analysis || {};
+                    const labels = Array.isArray(analysis.labels) ? analysis.labels.join(', ') : '';
+                    output.textContent = 'toxicityScore=' + Number(analysis.toxicityScore || 0).toFixed(3)
+                        + ' | spamScore=' + Number(analysis.spamScore || 0).toFixed(3)
+                        + ' | sentiment=' + String(analysis.sentiment || 'neutral')
+                        + (labels ? ' | labels=' + labels : '')
+                        + (analysis.flagged ? ' | FLAGGED' : ' | OK')
+                        + (analysis.autoHidden ? ' | AUTO-HIDDEN' : '');
+                    output.className = 'small ' + (analysis.flagged ? 'text-danger' : 'text-success');
+                } catch (error) {
+                    output.textContent = String(error && error.message ? error.message : 'Unable to analyze comment.');
+                    output.className = 'small text-danger';
+                }
+            });
+        })();
+    </script>
+{% endblock %}

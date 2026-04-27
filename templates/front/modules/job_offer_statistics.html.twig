@@ -11,7 +11,12 @@
                 <h2 class="page-title"><i class="ti ti-chart-pie me-1"></i>Offer Statistics</h2>
                 <p class="text-secondary mb-0">Recruiter-only analytics for your offers.</p>
             </div>
-            <a href="{{ path('front_job_offers', {role: 'recruiter'}) }}" class="btn btn-outline-primary">Back to Job Offers</a>
+            <div class="d-flex gap-2">
+                <a href="{{ path('front_job_offers_statistics_export_pdf') }}" class="btn btn-primary">
+                    <i class="ti ti-file-type-pdf me-1"></i>Export PDF
+                </a>
+                <a href="{{ path('front_job_offers', {role: 'recruiter'}) }}" class="btn btn-outline-primary">Back to Job Offers</a>
+            </div>
         </div>
     </div>
 

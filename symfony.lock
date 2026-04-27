@@ -38,6 +38,30 @@
             "./migrations/.gitignore"
         ]
     },
+    "knplabs/knp-snappy-bundle": {
+        "version": "1.10",
+        "recipe": {
+            "repo": "github.com/symfony/recipes-contrib",
+            "branch": "main",
+            "version": "1.5",
+            "ref": "c81bdcf4a9d4e7b1959071457f9608631865d381"
+        },
+        "files": [
+            "./config/packages/knp_snappy.yaml"
+        ]
+    },
+    "php-http/discovery": {
+        "version": "1.20",
+        "recipe": {
+            "repo": "github.com/symfony/recipes",
+            "branch": "main",
+            "version": "1.18",
+            "ref": "f45b5dd173a27873ab19f5e3180b2f661c21de02"
+        },
+        "files": [
+            "./config/packages/http_discovery.yaml"
+        ]
+    },
     "knplabs/knp-time-bundle": {
         "version": "2.5.0"
     },
@@ -77,6 +101,9 @@
             "version": "1.2",
             "ref": "e805aba9eff5372e2d149a9ff56566769e22819d"
         }
+    },
+    "spiriitlabs/form-filter-bundle": {
+        "version": "v12.1.0"
     },
     "symfony/asset-mapper": {
         "version": "6.4",
@@ -320,5 +347,14 @@
     },
     "twig/extra-bundle": {
         "version": "v3.24.0"
+    },
+    "willdurand/geocoder-bundle": {
+        "version": "6.0",
+        "recipe": {
+            "repo": "github.com/symfony/recipes-contrib",
+            "branch": "main",
+            "version": "5.0",
+            "ref": "b272ad4fbfcd45a20e7cbfdc4ad1b0e27a62fd3b"
+        }
     }
 }

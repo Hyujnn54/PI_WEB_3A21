@@ -47,9 +47,14 @@
                     <h1 class="h3 mb-1 text-white">Job Offers Statistics</h1>
                     <p class="mb-0 text-white-50">Analytics view for all published offers.</p>
                 </div>
-                <a href="{{ path('app_admin_job_offers') }}" class="btn btn-light btn-sm">
-                    <i class="ti ti-arrow-left me-1"></i>Back to All Job Offers
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="{{ path('app_admin_job_offers_statistics_export_pdf') }}" class="btn btn-light btn-sm">
+                        <i class="ti ti-file-type-pdf me-1"></i>Export PDF
+                    </a>
+                    <a href="{{ path('app_admin_job_offers') }}" class="btn btn-outline-light btn-sm">
+                        <i class="ti ti-arrow-left me-1"></i>Back to All Job Offers
+                    </a>
+                </div>
             </div>
         </div>
     </div>

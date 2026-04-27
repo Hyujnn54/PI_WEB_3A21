@@ -19,7 +19,7 @@
         <div class="container-xl">
             <div class="card tb-admin-card">
                 <div class="card-body">
-                    <form method="post" class="row g-3" novalidate id="jobOfferEditForm">
+                    <form method="post" action="{{ path('front_job_offer_edit', {id: offer.id, role: role}) }}" class="row g-3" novalidate id="jobOfferEditForm" data-turbo="false">
                         <div class="col-md-6">
                             <label class="form-label">Title</label>
                             <input type="text" name="title" class="form-control {{ fieldErrors.title|default(null) ? 'is-invalid' : '' }}" value="{{ formData.title|default(offer.title|default('')) }}">
@@ -126,7 +126,7 @@
 
                         <div class="col-12 d-flex justify-content-end gap-2">
                             <a href="{{ path('front_job_offers', {role: role}) }}" class="btn btn-outline-secondary">Cancel</a>
-                            <button type="submit" class="btn btn-primary">Update Offer</button>
+                            <button type="submit" class="btn btn-primary" formnovalidate onclick="this.form.submit();">Update Offer</button>
                         </div>
                     </form>
                 </div>
@@ -278,12 +278,6 @@
                 if (removeBtn) removeBtn.disabled = rows.length === 1;
             });
         };
-
-        form.addEventListener('submit', function (event) {
-            if (!validateForm()) {
-                event.preventDefault();
-            }
-        });
 
         form.addEventListener('input', function (event) {
             const field = event.target;

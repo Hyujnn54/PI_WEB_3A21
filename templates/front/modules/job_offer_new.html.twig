@@ -21,8 +21,12 @@
                 <div class="card-body">
                     <form method="post" class="row g-3" novalidate id="jobOfferCreateForm">
                         <div class="col-md-6">
-                            <label class="form-label">Title</label>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label mb-0">Title</label>
+                                <button type="button" id="generateAiBtn" class="btn btn-outline-primary btn-sm">Generate with AI</button>
+                            </div>
                             <input type="text" name="title" class="form-control {{ fieldErrors.title|default(null) ? 'is-invalid' : '' }}" value="{{ formData.title|default('') }}">
+                            <small id="aiGenerateStatus" class="text-secondary d-block mt-1"></small>
                             <div class="invalid-feedback d-block" data-error-for="title"></div>
                             {% if fieldErrors.title|default(null) %}
                                 <div class="invalid-feedback d-block fw-semibold">{{ fieldErrors.title }}</div>
@@ -105,7 +109,16 @@
 
                         <div class="col-md-6">
                             <label class="form-label">Location</label>
-                            <input type="text" name="location" class="form-control {{ fieldErrors.location|default(null) ? 'is-invalid' : '' }}" value="{{ formData.location|default('') }}">
+                            <input type="text"
+                                   id="locationInput"
+                                   name="location"
+                                   list="locationSuggestionList"
+                                   autocomplete="off"
+                                   class="form-control {{ fieldErrors.location|default(null) ? 'is-invalid' : '' }}"
+                                   value="{{ formData.location|default('') }}"
+                                   placeholder="Start typing a city or address...">
+                            <datalist id="locationSuggestionList"></datalist>
+                            <small id="locationSuggestionHint" class="text-secondary d-block mt-1">Type at least 2 characters to get location suggestions.</small>
                             <div class="invalid-feedback d-block" data-error-for="location"></div>
                             {% if fieldErrors.location|default(null) %}
                                 <div class="invalid-feedback d-block">{{ fieldErrors.location }}</div>
@@ -137,7 +150,16 @@
         const container = document.getElementById('skillsContainer');
         const addBtn = document.getElementById('addSkillBtn');
         const form = document.getElementById('jobOfferCreateForm');
+        const generateAiBtn = document.getElementById('generateAiBtn');
+        const aiGenerateStatus = document.getElementById('aiGenerateStatus');
+        const locationInput = document.getElementById('locationInput');
+        const locationSuggestionList = document.getElementById('locationSuggestionList');
+        const locationSuggestionHint = document.getElementById('locationSuggestionHint');
+        const locationSuggestionUrl = '{{ path('front_job_offer_location_suggestions') }}';
         if (!container || !addBtn || !form) return;
+
+        let locationDebounceTimer = null;
+        let lastLocationQuery = '';
 
         const levelOptionsHtml = `{% for skillLevel in skillLevels %}<option value="{{ skillLevel }}">{{ skillLevel|capitalize }}</option>{% endfor %}`;
 
@@ -150,6 +172,75 @@
         const setInvalidState = function (field, isInvalid) {
             if (!field) return;
             field.classList.toggle('is-invalid', isInvalid);
+        };
+
+        const setAiStatus = function (message, isError) {
+            if (!aiGenerateStatus) return;
+            aiGenerateStatus.textContent = message || '';
+            aiGenerateStatus.classList.toggle('text-danger', Boolean(isError));
+            aiGenerateStatus.classList.toggle('text-secondary', !isError);
+        };
+
+        const setLocationHint = function (message, isError) {
+            if (!locationSuggestionHint) return;
+            locationSuggestionHint.textContent = message || '';
+            locationSuggestionHint.classList.toggle('text-danger', Boolean(isError));
+            locationSuggestionHint.classList.toggle('text-secondary', !isError);
+        };
+
+        const renderLocationSuggestions = function (suggestions) {
+            if (!locationSuggestionList) return;
+            locationSuggestionList.innerHTML = '';
+            suggestions.forEach(function (entry) {
+                const option = document.createElement('option');
+                option.value = entry;
+                locationSuggestionList.appendChild(option);
+            });
+        };
+
+        const fetchLocationSuggestions = async function (rawQuery) {
+            const query = rawQuery.trim();
+            if (query.length < 2) {
+                renderLocationSuggestions([]);
+                setLocationHint('Type at least 2 characters to get location suggestions.', false);
+                return;
+            }
+
+            lastLocationQuery = query;
+
+            try {
+                const response = await fetch(locationSuggestionUrl + '?q=' + encodeURIComponent(query), {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const payload = await response.json();
+                if (query !== lastLocationQuery) {
+                    return;
+                }
+
+                if (!response.ok || !payload || payload.ok !== true) {
+                    throw new Error((payload && payload.error) ? payload.error : 'Unable to fetch location suggestions.');
+                }
+
+                const suggestions = Array.isArray(payload.suggestions) ? payload.suggestions : [];
+                const values = suggestions
+                    .map(function (item) { return (item && typeof item.label === 'string') ? item.label : ''; })
+                    .filter(function (value) { return value.trim() !== ''; });
+
+                renderLocationSuggestions(values);
+
+                if (values.length > 0) {
+                    setLocationHint('Choose one of the suggested locations.', false);
+                } else {
+                    setLocationHint('No suggestion found. You can still type location manually.', false);
+                }
+            } catch (error) {
+                renderLocationSuggestions([]);
+                setLocationHint((error && error.message) ? error.message : 'Unable to fetch location suggestions.', true);
+            }
         };
 
         const clearSkillRowErrors = function (row) {
@@ -285,6 +376,91 @@
             });
         };
 
+        const createSkillRow = function (skill) {
+            const row = document.createElement('div');
+            row.className = 'row g-2 skill-row';
+            const safeName = typeof skill.name === 'string' ? skill.name.replace(/"/g, '&quot;') : '';
+            const safeLevel = typeof skill.level === 'string' ? skill.level : '';
+
+            row.innerHTML =
+                '<div class="col-md-6"><input type="text" class="form-control" placeholder="e.g. Symfony" value="' + safeName + '"><div class="invalid-feedback d-block" data-skill-error="name"></div></div>' +
+                '<div class="col-md-4"><select class="form-select"><option value="">Choose skill level</option>' + levelOptionsHtml + '</select><div class="invalid-feedback d-block" data-skill-error="level"></div></div>' +
+                '<div class="col-md-2"><button type="button" class="btn btn-outline-danger w-100 remove-skill-btn">Remove</button></div>';
+
+            const levelSelect = row.querySelector('select');
+            if (levelSelect && safeLevel !== '') {
+                levelSelect.value = safeLevel;
+            }
+
+            return row;
+        };
+
+        const populateSkills = function (skills) {
+            if (!Array.isArray(skills) || skills.length === 0) {
+                return;
+            }
+
+            container.innerHTML = '';
+            skills.forEach(function (skill) {
+                container.appendChild(createSkillRow(skill || {}));
+            });
+            refreshIndexes();
+            setError('skills', '');
+        };
+
+        const generateWithAi = async function () {
+            const titleInput = form.querySelector('[name="title"]');
+            const descriptionInput = form.querySelector('[name="description"]');
+            if (!titleInput) return;
+
+            const title = titleInput.value.trim();
+            if (title === '') {
+                setAiStatus('Please enter a job title first.', true);
+                setInvalidState(titleInput, true);
+                return;
+            }
+
+            setAiStatus('Generating suggestion...');
+            if (generateAiBtn) {
+                generateAiBtn.disabled = true;
+            }
+
+            try {
+                const response = await fetch('{{ path('front_job_offer_ai_generate') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ title: title })
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result || result.ok !== true) {
+                    setAiStatus((result && result.error) ? result.error : 'Unable to generate suggestion.', true);
+                    return;
+                }
+
+                const data = result.data || {};
+                if (typeof data.description === 'string' && descriptionInput) {
+                    descriptionInput.value = data.description;
+                    setInvalidState(descriptionInput, false);
+                    setError('description', '');
+                }
+
+                if (Array.isArray(data.skills)) {
+                    populateSkills(data.skills);
+                }
+
+                setAiStatus('Description and skills generated. Please fill location and contract type manually.');
+            } catch (error) {
+                setAiStatus('Network error while generating suggestion.', true);
+            } finally {
+                if (generateAiBtn) {
+                    generateAiBtn.disabled = false;
+                }
+            }
+        };
+
         form.addEventListener('submit', function (event) {
             if (!validateForm()) {
                 event.preventDefault();
@@ -350,15 +526,28 @@
         });
 
         addBtn.addEventListener('click', function () {
-            const row = document.createElement('div');
-            row.className = 'row g-2 skill-row';
-            row.innerHTML =
-                '<div class="col-md-6"><input type="text" class="form-control" placeholder="e.g. Symfony"><div class="invalid-feedback d-block" data-skill-error="name"></div></div>' +
-                '<div class="col-md-4"><select class="form-select"><option value="">Choose skill level</option>' + levelOptionsHtml + '</select><div class="invalid-feedback d-block" data-skill-error="level"></div></div>' +
-                '<div class="col-md-2"><button type="button" class="btn btn-outline-danger w-100 remove-skill-btn">Remove</button></div>';
+            const row = createSkillRow({ name: '', level: '' });
             container.appendChild(row);
             refreshIndexes();
         });
+
+        if (generateAiBtn) {
+            generateAiBtn.addEventListener('click', function () {
+                generateWithAi();
+            });
+        }
+
+        if (locationInput) {
+            locationInput.addEventListener('input', function () {
+                if (locationDebounceTimer) {
+                    clearTimeout(locationDebounceTimer);
+                }
+
+                locationDebounceTimer = setTimeout(function () {
+                    fetchLocationSuggestions(locationInput.value || '');
+                }, 300);
+            });
+        }
 
         container.addEventListener('click', function (event) {
             const target = event.target;

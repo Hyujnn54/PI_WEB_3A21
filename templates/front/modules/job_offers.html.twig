@@ -84,22 +84,52 @@
             <div class="card tb-admin-card mb-3 tb-filter-bar">
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap align-items-center gap-2" id="offerMultiFilter">
-                        <input type="text" class="form-control" style="max-width: 190px;" placeholder="Location" id="filterLocation">
-                        <select class="form-select" style="max-width: 190px;" id="filterContractType">
-                            <option value="">All contract types</option>
-                            {% for contractType in contractTypes|default([]) %}
-                                <option value="{{ contractType }}">{{ contractType }}</option>
-                            {% endfor %}
-                        </select>
-                        <select class="form-select" style="max-width: 170px;" id="filterStatus">
-                            <option value="">All status</option>
-                            <option value="open">Open</option>
-                            <option value="paused">Paused</option>
-                            <option value="closed">Closed</option>
-                        </select>
-                        <input type="date" class="form-control" style="max-width: 180px;" id="filterDeadline">
+                        {% if role != 'admin' %}
+                            {{ form_start(filterForm, {
+                                action: path('front_job_offers'),
+                                method: 'GET',
+                                attr: {
+                                    class: 'd-flex flex-wrap align-items-center gap-2',
+                                    id: 'jobOfferFilterForm'
+                                }
+                            }) }}
+                                {{ form_widget(filterForm.search, {
+                                    attr: {
+                                        class: 'form-control',
+                                        style: 'max-width: 260px;',
+                                        placeholder: 'Search title, description, location...',
+                                        id: 'filterLocation'
+                                    }
+                                }) }}
+                                {{ form_widget(filterForm.contract_type, {
+                                    attr: {
+                                        class: 'form-select',
+                                        style: 'max-width: 190px;',
+                                        id: 'filterContractType'
+                                    }
+                                }) }}
+                                {{ form_widget(filterForm.status, {
+                                    attr: {
+                                        class: 'form-select',
+                                        style: 'max-width: 170px;',
+                                        id: 'filterStatus'
+                                    }
+                                }) }}
+                                {{ form_widget(filterForm.deadline, {
+                                    attr: {
+                                        class: 'form-control',
+                                        style: 'max-width: 180px;',
+                                        id: 'filterDeadline'
+                                    }
+                                }) }}
+                                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                                {% if hasActiveFilters|default(false) %}
+                                    <a href="{{ path('front_job_offers', {role: role}) }}" class="btn btn-outline-secondary btn-sm">Clear Search</a>
+                                {% endif %}
+                            {{ form_end(filterForm) }}
+                        {% endif %}
                         <button type="button" class="btn btn-outline-secondary btn-sm" id="clearOfferFilters">Reset</button>
-                        <div class="small text-secondary ms-auto" id="offerFilterResults"></div>
+                        <div class="small text-secondary ms-auto" id="offerFilterResults">{{ resultCount|default(cards|length) }} result(s)</div>
                     </div>
                 </div>
             </div>
@@ -107,8 +137,17 @@
             <div id="offerCardsGrid" class="row row-cards">
                 {% for card in cards %}
                     {% set isPendingReview = card.warning_status|default(null) == 'RESOLVED' %}
-                    <div class="col-lg-4 col-md-6 tb-filter-item" data-filter-text="{{ (card.meta ~ ' ' ~ card.title ~ ' ' ~ card.text)|lower }}" data-filter-title="{{ card.title|lower }}" data-filter-meta="{{ card.meta|lower }}" data-filter-description="{{ card.text|lower }}" data-filter-location="{{ card.location|default('')|lower }}" data-filter-contract-type="{{ card.contract_type|default('')|lower }}" data-filter-status="{{ card.status|default('')|lower }}" data-filter-deadline="{{ card.deadline|default('') }}" data-sort-title="{{ card.title|lower }}" data-sort-meta="{{ card.meta|lower }}">
-                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta }}" data-detail-title="{{ card.title }}" data-detail-text="{{ card.text }}" data-action-primary="{{ role == 'recruiter' ? 'Modify Offer' : (isAdminReadOnly ? 'Read Only' : (card.already_applied ? 'Already Applied' : (card.can_apply|default(false) ? 'Apply' : 'Offer Unavailable'))) }}" data-action-primary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) : (isAdminReadOnly ? '#' : (card.can_apply|default(false) ? path('app_candidate_apply', {'offerId': card.id}) : '#')) }}" data-action-primary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : (role == 'candidate' and (card.already_applied or not card.can_apply|default(false)) ? '1' : '0')) }}" data-action-secondary="{{ role == 'recruiter' ? 'Delete Offer' : (isAdminReadOnly ? '' : 'Save Offer') }}" data-action-secondary-href="{{ role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) : '#' }}" data-action-secondary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0') }}" data-action-tertiary="{{ role == 'recruiter' ? 'View Applicants' : (isAdminReadOnly ? '' : 'Compare Offer') }}" data-action-tertiary-href="#" data-action-tertiary-disabled="{{ isAdminReadOnly ? '1' : '0' }}" data-detail-extra="{{ card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ card.meta|split(' | ')|last ~ '||Location: ' ~ card.meta|split(' | ')|first) }}">
+                    <div class="col-lg-4 col-md-6">
+                        <div class="tb-module-card h-100 {{ isPendingReview ? 'border-info border-2' : '' }}" style="{{ isPendingReview ? 'background-color: #f0f7ff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);' : '' }}" data-offer-id="{{ card.id }}" data-detail-target="#offerDetailPanel" data-detail-meta="{{ card.meta|e('html_attr') }}" data-detail-title="{{ card.title|e('html_attr') }}" data-detail-text="{{ card.text|e('html_attr') }}" data-match-score="{{ card.match_score|default('')|e('html_attr') }}" data-match-label="{{ card.match_label|default('')|e('html_attr') }}" data-match-summary="{{ card.match_summary|default('')|e('html_attr') }}" data-match-matching-skills="{{ card.match_matching_skills|default('')|e('html_attr') }}" data-match-missing-skills="{{ card.match_missing_skills|default('')|e('html_attr') }}" data-match-explanation="{{ card.match_explanation|default('')|e('html_attr') }}" data-action-primary="{{ (role == 'recruiter' ? 'Modify Offer' : (isAdminReadOnly ? 'Read Only' : (card.already_applied ? 'Already Applied' : (card.can_apply|default(false) ? 'Apply' : 'Offer Unavailable'))))|e('html_attr') }}" data-action-primary-href="{{ (role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_edit', {id: card.id, role: 'recruiter'}) : (isAdminReadOnly ? '#' : (card.can_apply|default(false) ? path('app_candidate_apply', {'offerId': card.id}) : '#')))|e('html_attr') }}" data-action-primary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : (role == 'candidate' and (card.already_applied or not card.can_apply|default(false)) ? '1' : '0')) }}" data-action-secondary="{{ (role == 'recruiter' ? 'Delete Offer' : (isAdminReadOnly ? '' : 'Save Offer'))|e('html_attr') }}" data-action-secondary-href="{{ (role == 'recruiter' and card.can_delete|default(false) ? path('front_job_offer_delete', {id: card.id, role: 'recruiter'}) : '#')|e('html_attr') }}" data-action-secondary-disabled="{{ isAdminReadOnly ? '1' : (role == 'recruiter' and not card.can_delete|default(false) ? '1' : '0') }}" data-action-tertiary="{{ (role == 'recruiter' ? 'View Applicants' : (isAdminReadOnly ? '' : 'Compare Offer'))|e('html_attr') }}" data-action-tertiary-href="#" data-action-tertiary-disabled="{{ isAdminReadOnly ? '1' : '0' }}" data-detail-extra="{{ (card.detail_extra is defined ? card.detail_extra|join('||') : ('Type: ' ~ card.meta|split(' | ')|last ~ '||Location: ' ~ card.meta|split(' | ')|first))|e('html_attr') }}">
+                            {% if role == 'candidate' and card.match_score is defined and card.match_score is not null %}
+                                {% set matchTone = card.match_score >= 85 ? 'success' : (card.match_score >= 70 ? 'warning' : 'danger') %}
+                                <div class="badge bg-{{ matchTone }}-lt text-{{ matchTone }} mb-2">Match {{ card.match_score }}%{{ card.match_label|default('') ? ' - ' ~ card.match_label|capitalize : '' }}</div>
+                            {% endif %}
+                            {% if role == 'candidate' and card.distance is defined and card.distance is not null %}
+                                <div class="badge bg-blue-lt text-blue mb-2">
+                                    <i class="ti ti-map-pin me-1"></i>Distance: {{ card.distance|number_format(1) }} km
+                                </div>
+                            {% endif %}
                             {% if isPendingReview %}
                                 <div class="badge bg-info mb-2" style="position: absolute; top: 8px; right: 8px;">Pending Review</div>
                             {% endif %}
@@ -154,6 +193,36 @@
                     </div>
                     <div class="card-body">
                         <p class="mb-3 tb-detail-text">Select an offer card to display details here.</p>
+                        {% if role == 'candidate' %}
+                            <div class="border rounded-3 p-3 mb-3 bg-azure-lt">
+                                <div class="small text-uppercase text-secondary fw-semibold mb-2">Candidate Match</div>
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="badge bg-success-lt text-success tb-match-score">0%</span>
+                                    <span class="fw-semibold tb-match-label">Select an offer to see the match score.</span>
+                                </div>
+                                <div class="small text-secondary tb-match-summary mb-2"></div>
+                                <div class="small mb-2"><strong>Matching skills:</strong> <span class="tb-match-matching">-</span></div>
+                                <div class="small mb-2"><strong>Missing skills:</strong> <span class="tb-match-missing">-</span></div>
+                                <div class="small text-secondary tb-match-explanation"></div>
+                            </div>
+                            <div id="offerCommentWidget"
+                                 class="border rounded-3 p-3 mb-3"
+                                 data-analyze-url="{{ path('front_job_offer_comment_analyze') }}"
+                                 data-list-url-template="{{ path('front_job_offer_comments_list', {id: 0}) }}"
+                                 data-create-url-template="{{ path('front_job_offer_comment_create', {id: 0}) }}">
+                                <div class="small text-uppercase text-secondary fw-semibold mb-2">Comment Analyzer</div>
+                                <div class="small text-secondary mb-2" id="offerCommentHint">Select an offer card before posting a comment.</div>
+                                <textarea id="offerCommentText" class="form-control mb-2" rows="3" placeholder="Write your comment about this offer..."></textarea>
+                                <div class="d-flex gap-2 mb-2">
+                                    <button type="button" id="offerCommentAnalyzeBtn" class="btn btn-sm btn-outline-primary">Analyze</button>
+                                    <button type="button" id="offerCommentSubmitBtn" class="btn btn-sm btn-primary">Post Comment</button>
+                                </div>
+                                <div id="offerCommentAnalysis" class="small text-secondary"></div>
+                                <hr class="my-2">
+                                <div class="small text-uppercase text-secondary fw-semibold mb-2">Recent Comments</div>
+                                <div id="offerCommentList" class="small text-secondary">No comments loaded.</div>
+                            </div>
+                        {% endif %}
                         <div class="tb-detail-extra small text-secondary mb-0"></div>
                     </div>
                 </div>
@@ -182,49 +251,163 @@
 
 <script>
     (function () {
-        const grid = document.getElementById('offerCardsGrid');
-        if (!grid) return;
+        const cards = Array.from(document.querySelectorAll('#offerCardsGrid .tb-module-card[data-detail-target]'));
+        const detailPanel = document.getElementById('offerDetailPanel');
+        const actionDock = document.getElementById('offerActionDock');
 
+        if (!detailPanel || cards.length === 0) {
+            return;
+        }
+
+        const metaNode = detailPanel.querySelector('.tb-detail-meta');
+        const titleNode = detailPanel.querySelector('.tb-detail-title');
+        const textNode = detailPanel.querySelector('.tb-detail-text');
+        const extraNode = detailPanel.querySelector('.tb-detail-extra');
+
+        const matchScoreNode = detailPanel.querySelector('.tb-match-score');
+        const matchLabelNode = detailPanel.querySelector('.tb-match-label');
+        const matchSummaryNode = detailPanel.querySelector('.tb-match-summary');
+        const matchMatchingNode = detailPanel.querySelector('.tb-match-matching');
+        const matchMissingNode = detailPanel.querySelector('.tb-match-missing');
+        const matchExplanationNode = detailPanel.querySelector('.tb-match-explanation');
+
+        const dockPrimary = actionDock ? actionDock.querySelector('.tb-dock-primary') : null;
+        const dockSecondaryForm = actionDock ? actionDock.querySelector('.tb-dock-secondary-form') : null;
+        const dockSecondaryButton = actionDock ? actionDock.querySelector('.tb-dock-secondary') : null;
+        const dockTertiary = actionDock ? actionDock.querySelector('.tb-dock-tertiary') : null;
+
+        const applyButtonState = function (node, disabled) {
+            if (!node) return;
+            if (disabled) {
+                node.classList.add('disabled');
+                node.setAttribute('aria-disabled', 'true');
+                node.setAttribute('tabindex', '-1');
+            } else {
+                node.classList.remove('disabled');
+                node.removeAttribute('aria-disabled');
+                node.removeAttribute('tabindex');
+            }
+        };
+
+        const updateDock = function (card) {
+            if (!actionDock) {
+                return;
+            }
+
+            const primaryLabel = card.getAttribute('data-action-primary') || 'Primary Action';
+            const primaryHref = card.getAttribute('data-action-primary-href') || '#';
+            const primaryDisabled = card.getAttribute('data-action-primary-disabled') === '1';
+
+            const secondaryLabel = card.getAttribute('data-action-secondary') || '';
+            const secondaryHref = card.getAttribute('data-action-secondary-href') || '#';
+            const secondaryDisabled = card.getAttribute('data-action-secondary-disabled') === '1' || secondaryLabel === '';
+
+            const tertiaryLabel = card.getAttribute('data-action-tertiary') || '';
+            const tertiaryHref = card.getAttribute('data-action-tertiary-href') || '#';
+            const tertiaryDisabled = card.getAttribute('data-action-tertiary-disabled') === '1' || tertiaryLabel === '';
+
+            if (dockPrimary) {
+                dockPrimary.innerHTML = '<i class="ti ti-edit me-1"></i>' + primaryLabel;
+                dockPrimary.setAttribute('href', primaryHref);
+                applyButtonState(dockPrimary, primaryDisabled);
+            }
+
+            if (dockSecondaryForm && dockSecondaryButton) {
+                dockSecondaryForm.setAttribute('action', secondaryHref);
+                dockSecondaryButton.innerHTML = '<i class="ti ti-trash me-1"></i>' + (secondaryLabel || 'Delete');
+                dockSecondaryButton.disabled = secondaryDisabled;
+            }
+
+            if (dockTertiary) {
+                dockTertiary.innerHTML = '<i class="ti ti-link me-1"></i>' + (tertiaryLabel || 'View');
+                dockTertiary.setAttribute('href', tertiaryHref);
+                applyButtonState(dockTertiary, tertiaryDisabled);
+            }
+
+            actionDock.classList.remove('d-none');
+        };
+
+        const updateMatch = function (card) {
+            if (!matchScoreNode || !matchLabelNode) {
+                return;
+            }
+
+            const scoreRaw = card.getAttribute('data-match-score') || '';
+            const label = card.getAttribute('data-match-label') || '';
+            const summary = card.getAttribute('data-match-summary') || '';
+            const matching = card.getAttribute('data-match-matching-skills') || '-';
+            const missing = card.getAttribute('data-match-missing-skills') || '-';
+            const explanation = card.getAttribute('data-match-explanation') || '';
+
+            if (scoreRaw === '') {
+                matchScoreNode.textContent = 'N/A';
+                matchLabelNode.textContent = 'No match data available for this offer.';
+            } else {
+                const score = Number(scoreRaw);
+                matchScoreNode.textContent = Number.isFinite(score) ? score.toFixed(0) + '%' : scoreRaw + '%';
+                matchLabelNode.textContent = label || 'Match computed';
+            }
+
+            if (matchSummaryNode) matchSummaryNode.textContent = summary;
+            if (matchMatchingNode) matchMatchingNode.textContent = matching || '-';
+            if (matchMissingNode) matchMissingNode.textContent = missing || '-';
+            if (matchExplanationNode) matchExplanationNode.textContent = explanation;
+        };
+
+        cards.forEach(function (card) {
+            card.addEventListener('click', function () {
+                cards.forEach(function (item) { item.classList.remove('is-selected'); });
+                card.classList.add('is-selected');
+
+                if (metaNode) metaNode.textContent = card.getAttribute('data-detail-meta') || '';
+                if (titleNode) titleNode.textContent = card.getAttribute('data-detail-title') || 'Offer Details';
+                if (textNode) textNode.textContent = card.getAttribute('data-detail-text') || 'No description available.';
+
+                if (extraNode) {
+                    const extras = (card.getAttribute('data-detail-extra') || '')
+                        .split('||')
+                        .map(function (entry) { return entry.trim(); })
+                        .filter(function (entry) { return entry !== ''; });
+
+                    extraNode.innerHTML = extras
+                        .map(function (line) { return '<div>' + line + '</div>'; })
+                        .join('');
+                }
+
+                updateMatch(card);
+                updateDock(card);
+            });
+        });
+    })();
+
+    (function () {
+        const filterForm = document.getElementById('jobOfferFilterForm');
         const locationInput = document.getElementById('filterLocation');
         const contractTypeInput = document.getElementById('filterContractType');
         const statusSelect = document.getElementById('filterStatus');
         const deadlineInput = document.getElementById('filterDeadline');
         const resetBtn = document.getElementById('clearOfferFilters');
-        const resultLabel = document.getElementById('offerFilterResults');
-        const items = Array.from(grid.querySelectorAll('.tb-filter-item'));
+        if (filterForm && locationInput) {
+            let searchDebounceTimer = null;
 
-        const runFilters = function () {
-            const locationQuery = ((locationInput && locationInput.value) || '').trim().toLowerCase();
-            const contractQuery = ((contractTypeInput && contractTypeInput.value) || '').trim().toLowerCase();
-            const statusQuery = ((statusSelect && statusSelect.value) || '').trim().toLowerCase();
-            const deadlineQuery = ((deadlineInput && deadlineInput.value) || '').trim();
+            locationInput.addEventListener('input', function () {
+                if (searchDebounceTimer) {
+                    clearTimeout(searchDebounceTimer);
+                }
 
-            let visibleCount = 0;
-            items.forEach(function (item) {
-                const itemLocation = (item.dataset.filterLocation || '').toLowerCase();
-                const itemContractType = (item.dataset.filterContractType || '').toLowerCase();
-                const itemStatus = (item.dataset.filterStatus || '').toLowerCase();
-                const itemDeadline = (item.dataset.filterDeadline || '').trim();
-
-                const locationMatch = locationQuery === '' || itemLocation.includes(locationQuery);
-                const contractMatch = contractQuery === '' || itemContractType.includes(contractQuery);
-                const statusMatch = statusQuery === '' || itemStatus === statusQuery;
-                const deadlineMatch = deadlineQuery === '' || itemDeadline === deadlineQuery;
-
-                const isMatch = locationMatch && contractMatch && statusMatch && deadlineMatch;
-                item.classList.toggle('d-none', !isMatch);
-                if (isMatch) visibleCount += 1;
+                searchDebounceTimer = setTimeout(function () {
+                    filterForm.requestSubmit();
+                }, 350);
             });
 
-            if (resultLabel) {
-                resultLabel.textContent = visibleCount + ' result(s)';
-            }
-        };
+            const autoSubmitFilter = function () {
+                filterForm.requestSubmit();
+            };
 
-        if (locationInput) locationInput.addEventListener('input', runFilters);
-        if (contractTypeInput) contractTypeInput.addEventListener('change', runFilters);
-        if (statusSelect) statusSelect.addEventListener('change', runFilters);
-        if (deadlineInput) deadlineInput.addEventListener('change', runFilters);
+            if (contractTypeInput) contractTypeInput.addEventListener('change', autoSubmitFilter);
+            if (statusSelect) statusSelect.addEventListener('change', autoSubmitFilter);
+            if (deadlineInput) deadlineInput.addEventListener('change', autoSubmitFilter);
+        }
 
         if (resetBtn) {
             resetBtn.addEventListener('click', function () {
@@ -232,11 +415,219 @@
                 if (contractTypeInput) contractTypeInput.value = '';
                 if (statusSelect) statusSelect.value = '';
                 if (deadlineInput) deadlineInput.value = '';
-                runFilters();
+
+                if (filterForm) {
+                    filterForm.requestSubmit();
+                    return;
+                }
+            });
+        }
+    })();
+
+    (function () {
+        const widget = document.getElementById('offerCommentWidget');
+        if (!widget) {
+            return;
+        }
+
+        const analyzeUrl = widget.getAttribute('data-analyze-url') || '';
+        const listTemplate = widget.getAttribute('data-list-url-template') || '';
+        const createTemplate = widget.getAttribute('data-create-url-template') || '';
+        const hint = document.getElementById('offerCommentHint');
+        const textarea = document.getElementById('offerCommentText');
+        const analyzeBtn = document.getElementById('offerCommentAnalyzeBtn');
+        const submitBtn = document.getElementById('offerCommentSubmitBtn');
+        const analysisBox = document.getElementById('offerCommentAnalysis');
+        const listBox = document.getElementById('offerCommentList');
+
+        let selectedOfferId = '';
+
+        const buildCommentsUrl = function (template, offerId) {
+            return template.replace(/\/0\/comments$/, '/' + offerId + '/comments');
+        };
+
+        const setHint = function (text) {
+            if (hint) {
+                hint.textContent = text;
+            }
+        };
+
+        const renderAnalysis = function (analysis) {
+            if (!analysisBox) return;
+            if (!analysis) {
+                analysisBox.textContent = '';
+                return;
+            }
+
+            const labels = Array.isArray(analysis.labels) ? analysis.labels.join(', ') : '';
+            const line = 'toxicityScore=' + Number(analysis.toxicityScore || 0).toFixed(3)
+                + ' | spamScore=' + Number(analysis.spamScore || 0).toFixed(3)
+                + ' | sentiment=' + String(analysis.sentiment || 'neutral')
+                + (labels ? ' | labels=' + labels : '')
+                + (analysis.flagged ? ' | FLAGGED' : ' | OK')
+                + (analysis.autoHidden ? ' | AUTO-HIDDEN' : '');
+
+            analysisBox.textContent = line;
+            analysisBox.className = 'small ' + (analysis.flagged ? 'text-danger' : 'text-success');
+        };
+
+        const renderComments = function (comments) {
+            if (!listBox) return;
+            if (!Array.isArray(comments) || comments.length === 0) {
+                listBox.textContent = 'No comments yet for this offer.';
+                return;
+            }
+
+            const escapeHtml = function (value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            };
+
+            listBox.innerHTML = comments.map(function (comment) {
+                const status = String(comment.status || 'APPROVED');
+                const visibility = String(comment.visibility || 'VISIBLE');
+                const sentiment = String(comment.sentiment || 'neutral');
+                const author = String(comment.author || 'Candidate');
+                const createdAt = String(comment.createdAt || '');
+                const text = String(comment.text || '');
+
+                return '<div class="border rounded p-2 mb-2">'
+                    + '<div class="fw-semibold">' + escapeHtml(author) + '</div>'
+                    + '<div class="text-secondary mb-1">' + escapeHtml(createdAt) + '</div>'
+                    + '<div class="mb-1">' + escapeHtml(text) + '</div>'
+                    + '<div class="small text-secondary">sentiment=' + escapeHtml(sentiment) + ' | status=' + escapeHtml(status) + ' | visibility=' + escapeHtml(visibility) + '</div>'
+                    + '</div>';
+            }).join('');
+        };
+
+        const loadComments = async function () {
+            if (!selectedOfferId || !listTemplate) {
+                if (listBox) listBox.textContent = 'Select an offer to load comments.';
+                return;
+            }
+
+            if (listBox) listBox.textContent = 'Loading comments...';
+            try {
+                const response = await fetch(buildCommentsUrl(listTemplate, selectedOfferId), {
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || 'Unable to load comments');
+                }
+
+                renderComments(payload.comments || []);
+            } catch (error) {
+                if (listBox) {
+                    listBox.textContent = String(error && error.message ? error.message : 'Unable to load comments.');
+                }
+            }
+        };
+
+        document.querySelectorAll('#offerCardsGrid .tb-module-card[data-offer-id]').forEach(function (card) {
+            card.addEventListener('click', function () {
+                selectedOfferId = card.getAttribute('data-offer-id') || '';
+                setHint(selectedOfferId ? 'Offer #' + selectedOfferId + ' selected.' : 'Select an offer card before posting a comment.');
+                renderAnalysis(null);
+                loadComments();
+            });
+        });
+
+        if (analyzeBtn) {
+            analyzeBtn.addEventListener('click', async function () {
+                const text = textarea ? textarea.value.trim() : '';
+                if (!text) {
+                    renderAnalysis({
+                        toxicityScore: 0,
+                        spamScore: 0,
+                        sentiment: 'neutral',
+                        labels: [],
+                        flagged: false,
+                        autoHidden: false,
+                    });
+                    if (analysisBox) {
+                        analysisBox.textContent = 'Type a comment before running analysis.';
+                        analysisBox.className = 'small text-warning';
+                    }
+                    return;
+                }
+
+                if (analysisBox) {
+                    analysisBox.textContent = 'Analyzing...';
+                    analysisBox.className = 'small text-secondary';
+                }
+
+                try {
+                    const response = await fetch(analyzeUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ comment: text }),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || !payload.ok) {
+                        throw new Error(payload.error || 'Analysis failed');
+                    }
+
+                    renderAnalysis(payload.analysis || null);
+                } catch (error) {
+                    if (analysisBox) {
+                        analysisBox.textContent = String(error && error.message ? error.message : 'Unable to analyze comment.');
+                        analysisBox.className = 'small text-danger';
+                    }
+                }
             });
         }
 
-        runFilters();
+        if (submitBtn) {
+            submitBtn.addEventListener('click', async function () {
+                const text = textarea ? textarea.value.trim() : '';
+                if (!selectedOfferId) {
+                    setHint('Select an offer card before posting a comment.');
+                    return;
+                }
+
+                if (!text) {
+                    setHint('Comment cannot be empty.');
+                    return;
+                }
+
+                submitBtn.setAttribute('disabled', 'disabled');
+                setHint('Posting comment...');
+
+                try {
+                    const response = await fetch(buildCommentsUrl(createTemplate, selectedOfferId), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ comment: text }),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || !payload.ok) {
+                        throw new Error(payload.error || 'Unable to post comment');
+                    }
+
+                    if (textarea) textarea.value = '';
+                    renderAnalysis(payload.analysis || null);
+                    setHint('Comment posted with moderation status: ' + String((payload.comment && payload.comment.status) || 'APPROVED'));
+                    loadComments();
+                } catch (error) {
+                    setHint(String(error && error.message ? error.message : 'Unable to post comment.'));
+                } finally {
+                    submitBtn.removeAttribute('disabled');
+                }
+            });
+        }
     })();
 </script>
 {% endblock %}

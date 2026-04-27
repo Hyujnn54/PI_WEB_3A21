@@ -6,22 +6,42 @@ use App\Entity\Admin;
 use App\Entity\Interview;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
+use App\Entity\Job_offer_comment;
+use App\Entity\Job_offer_warning;
 use App\Entity\Recruiter;
 use App\Entity\Recruitment_event;
 use App\Entity\Users;
+use App\Form\Filter\JobOfferFilterType;
+use App\Repository\Job_offerRepository;
 use App\Repository\UsersRepository;
+use App\Service\CommentAnalyzerService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Knp\Snappy\Pdf;
+use Spiriit\Bundle\FormFilterBundle\Filter\FilterBuilderUpdaterInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/offermanagement')]
 class BackOfficeController extends AbstractController
 {
+    private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
+    private const JOB_STATUSES = ['open', 'paused', 'closed'];
+    private const WARNING_TYPES = [
+        'Policy violation',
+        'Incorrect information',
+        'Missing required details',
+        'Deadline issue',
+        'Description trompeuse',
+        'Other',
+    ];
+    private const XAI_MODELS = ['grok-3-mini', 'grok-2-latest', 'grok-beta'];
+
     #[Route('/admin', name: 'back_dashboard')]
     #[Route('/admin', name: 'app_admin')]
     public function index(UsersRepository $userRepo, EntityManagerInterface $entityManager): Response
@@ -331,8 +351,21 @@ class BackOfficeController extends AbstractController
     }
 
     #[Route('/admin/job-offers', name: 'app_admin_job_offers')]
-    public function jobOffers(Connection $connection): Response
+    public function jobOffers(
+        Request $request,
+        Connection $connection,
+        Job_offerRepository $jobOfferRepository,
+        FilterBuilderUpdaterInterface $filterBuilderUpdater
+    ): Response
     {
+        $filterForm = $this->createForm(JobOfferFilterType::class, null, [
+            'method' => 'GET',
+            'csrf_protection' => false,
+            'contract_types' => self::CONTRACT_TYPES,
+            'job_statuses' => self::JOB_STATUSES,
+        ]);
+        $filterForm->handleRequest($request);
+
         $offers = [];
         $expiredOffers = [];
         $now = date_create();
@@ -344,26 +377,47 @@ class BackOfficeController extends AbstractController
                 // Keep read-only view available even if auto-close update fails.
             }
 
-            $offers = $this->fetchAdminOffers($connection);
+            $filterBuilder = $jobOfferRepository->createAdminOffersFilterQueryBuilder();
+            if ($filterForm->isSubmitted() && $filterForm->isValid()) {
+                $filterBuilderUpdater->addFilterConditions($filterForm, $filterBuilder);
+            }
+
+            $offers = $jobOfferRepository->getAdminOffersFromQueryBuilder($filterBuilder, 300);
             $expiredOffers = $this->extractExpiredOffers($offers, $now);
         } catch (\Throwable $exception) {
             // Keep admin page available if any read query fails.
             $this->addFlash('error', 'Unable to load complete job offer data right now.');
         }
 
+        $filterData = (array) $filterForm->getData();
+        $hasActiveFilters = trim((string) ($filterData['search'] ?? '')) !== ''
+            || trim((string) ($filterData['contract_type'] ?? '')) !== ''
+            || trim((string) ($filterData['status'] ?? '')) !== ''
+            || trim((string) ($filterData['deadline'] ?? '')) !== '';
+
         return $this->render('admin/job_offers.html.twig', [
             'authUser' => ['role' => 'admin'],
             'offers' => $offers,
             'expiredOffers' => $expiredOffers,
+            'filterForm' => $filterForm->createView(),
+            'hasActiveFilters' => $hasActiveFilters,
+            'resultCount' => count($offers),
         ]);
     }
 
     #[Route('/admin/job-offers/statistics', name: 'app_admin_job_offers_statistics')]
-    public function jobOffersStatistics(Connection $connection): Response
+    public function jobOffersStatistics(Connection $connection, Job_offerRepository $jobOfferRepository): Response
     {
-        $offers = [];
-        $offerStats = $this->buildOfferStats([]);
-        $now = date_create();
+        $offerStats = [
+            'total_published' => 0,
+            'total_closed' => 0,
+            'total_open' => 0,
+            'closed_percentage' => 0,
+            'open_percentage' => 0,
+            'city_stats' => [],
+            'contract_stats' => [],
+        ];
+        $now = new \DateTimeImmutable();
 
         try {
             try {
@@ -372,8 +426,7 @@ class BackOfficeController extends AbstractController
                 // Keep read-only statistics available even if auto-close update fails.
             }
 
-            $offers = $this->fetchAdminOffers($connection);
-            $offerStats = $this->buildOfferStats($offers);
+            $offerStats = $jobOfferRepository->buildAdminOfferStats(1000);
         } catch (\Throwable $exception) {
             $this->addFlash('error', 'Unable to load job offer statistics right now.');
         }
@@ -381,6 +434,74 @@ class BackOfficeController extends AbstractController
         return $this->render('admin/job_offer_statistics.html.twig', [
             'authUser' => ['role' => 'admin'],
             'offerStats' => $offerStats,
+        ]);
+    }
+
+    #[Route('/admin/job-offers/statistics/export/pdf', name: 'app_admin_job_offers_statistics_export_pdf', methods: ['GET'])]
+    public function exportJobOffersStatisticsPdf(Connection $connection, Job_offerRepository $jobOfferRepository, Pdf $pdf): Response
+    {
+        $offerStats = [
+            'total_published' => 0,
+            'total_closed' => 0,
+            'total_open' => 0,
+            'closed_percentage' => 0,
+            'open_percentage' => 0,
+            'city_stats' => [],
+            'contract_stats' => [],
+        ];
+        $now = new \DateTimeImmutable();
+
+        try {
+            try {
+                $this->closeExpiredOffers($connection, $now);
+            } catch (\Throwable) {
+                // Keep export available even if auto-close update fails.
+            }
+
+            $offerStats = $jobOfferRepository->buildAdminOfferStats(1000);
+        } catch (\Throwable) {
+            $this->addFlash('error', 'Unable to export admin statistics right now.');
+
+            return $this->redirectToRoute('app_admin_job_offers_statistics');
+        }
+
+        $logoDataUri = null;
+        $projectDir = (string) $this->getParameter('kernel.project_dir');
+        $logoCandidates = [
+            $projectDir . '/assets/team_upload/logo.png',
+            $projectDir . '/assets/team_uploads/logo.png',
+            $projectDir . '/public/uploads/applications/logo-69d55696892a5.png',
+        ];
+        foreach ($logoCandidates as $logoPath) {
+            if (!is_file($logoPath)) {
+                continue;
+            }
+
+            $logoBinary = @file_get_contents($logoPath);
+            if ($logoBinary !== false) {
+                $logoDataUri = 'data:image/png;base64,' . base64_encode($logoBinary);
+                break;
+            }
+        }
+
+        $html = $this->renderView('pdf/admin_job_offer_statistics.pdf.twig', [
+            'offerStats' => $offerStats,
+            'generatedAt' => new \DateTimeImmutable(),
+            'logoDataUri' => $logoDataUri,
+        ]);
+
+        $content = $pdf->getOutputFromHtml($html, [
+            'encoding' => 'utf-8',
+            'enable-local-file-access' => true,
+            'margin-top' => '12mm',
+            'margin-bottom' => '12mm',
+            'margin-left' => '10mm',
+            'margin-right' => '10mm',
+        ]);
+
+        return new Response($content, Response::HTTP_OK, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="admin_offer_statistics_' . (new \DateTimeImmutable())->format('Ymd_His') . '.pdf"',
         ]);
     }
 
@@ -394,13 +515,20 @@ class BackOfficeController extends AbstractController
             return $this->redirectToRoute('app_login');
         }
 
-        $warningType = trim((string) $request->request->get('warning_type', ''));
-        $warningText = trim((string) $request->request->get('warning_text', ''));
-        if ($warningType === '' || $warningText === '') {
-            $this->addFlash('error', 'Warning reason is required.');
+        $validation = Job_offer_warning::validateWarningInput(
+            (string) $request->request->get('warning_type', ''),
+            (string) $request->request->get('warning_text', '')
+        );
+        if (($validation['ok'] ?? false) !== true) {
+            $this->addFlash('warning_modal_error', (string) ($validation['error'] ?? 'Invalid warning input.'));
+            $this->addFlash('warning_modal_mode', 'warn');
+            $this->addFlash('warning_modal_type', trim((string) $request->request->get('warning_type', '')));
+            $this->addFlash('warning_modal_text', trim((string) $request->request->get('warning_text', '')));
             return $this->redirectToRoute('app_admin_job_offers');
         }
 
+        $warningType = (string) $validation['warningType'];
+        $warningText = (string) $validation['warningText'];
         $reason = sprintf('[%s] %s', $warningType, $warningText);
 
         try {
@@ -476,16 +604,110 @@ class BackOfficeController extends AbstractController
         return $this->redirectToRoute('app_admin_job_offers');
     }
 
+    #[Route('/admin/job-offers/warning/ai-generate', name: 'app_admin_job_offer_warning_ai_generate', methods: ['POST'])]
+    public function generateWarningMessageWithAi(Request $request, Connection $connection, HttpClientInterface $httpClient): JsonResponse
+    {
+        $currentAdminId = (string) $request->getSession()->get('user_id', '');
+        if ($currentAdminId === '') {
+            return new JsonResponse(['ok' => false, 'error' => 'Admin session is required.'], 403);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        $offerId = trim((string) ($payload['offer_id'] ?? ''));
+        $warningType = trim((string) ($payload['warning_type'] ?? ''));
+
+        if ($offerId === '' || $warningType === '') {
+            return new JsonResponse(['ok' => false, 'error' => 'Offer ID and warning type are required.'], 400);
+        }
+
+        if (!in_array($warningType, self::WARNING_TYPES, true)) {
+            return new JsonResponse(['ok' => false, 'error' => 'Please select a valid warning type.'], 400);
+        }
+
+        $offer = $connection->fetchAssociative(
+            'SELECT id, title, description, location, contract_type FROM job_offer WHERE id = :id LIMIT 1',
+            ['id' => $offerId]
+        );
+        if (!$offer) {
+            return new JsonResponse(['ok' => false, 'error' => 'Job offer not found.'], 404);
+        }
+
+        $skills = $connection->fetchAllAssociative(
+            'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
+            ['offer_id' => $offerId]
+        );
+
+        $skillsList = 'None';
+        if (count($skills) > 0) {
+            $parts = [];
+            foreach ($skills as $skill) {
+                $parts[] = sprintf('%s (%s)', (string) ($skill['skill_name'] ?? '-'), (string) ($skill['level_required'] ?? '-'));
+            }
+            $skillsList = implode(', ', $parts);
+        }
+
+        $prompt = "Tu es un assistant RH senior.\n"
+            . "Rédige un message de warning professionnel, clair et actionnable pour un recruteur.\n"
+            . "Le message doit rester respectueux mais ferme, expliquer le problème, demander des corrections précises,"
+            . " et indiquer qu'une mise à jour est attendue rapidement.\n"
+            . "Retourne uniquement le texte du message (sans markdown, sans puces).\n\n"
+            . "Raison sélectionnée: {$warningType}\n"
+            . "Titre offre: " . (string) ($offer['title'] ?? '') . "\n"
+            . "Location: " . (string) ($offer['location'] ?? '') . "\n"
+            . "Contract type: " . (string) ($offer['contract_type'] ?? '') . "\n"
+            . "Description: " . (string) ($offer['description'] ?? '') . "\n"
+            . "Skills: {$skillsList}\n";
+
+        $apiKey = $this->resolveXaiApiKey();
+        $warningMessage = '';
+        $source = 'fallback';
+
+        if ($apiKey !== '') {
+            $aiResult = $this->requestXaiWarningMessage($httpClient, $apiKey, $prompt);
+            if (($aiResult['ok'] ?? false) === true) {
+                $warningMessage = $this->normalizeWarningMessage((string) ($aiResult['message'] ?? ''));
+                $source = 'ai';
+            }
+        }
+
+        if ($warningMessage === '') {
+            $warningMessage = $this->normalizeWarningMessage(sprintf(
+                'Following the review of your job offer "%s", we identified the following issue: %s. Please update the description and related fields so the content is accurate, complete, and aligned with platform standards. Submit the corrected version for admin review as soon as possible.',
+                (string) ($offer['title'] ?? 'this position'),
+                $warningType
+            ));
+            $source = 'fallback';
+        }
+
+        $validation = Job_offer_warning::validateWarningInput($warningType, $warningMessage);
+        if (($validation['ok'] ?? false) !== true) {
+            $warningMessage = $this->normalizeWarningMessage('Please revise this job offer. The content currently does not meet platform quality and compliance standards. Update the listing with clear, accurate, and complete information, then resubmit for review.');
+        }
+
+        return new JsonResponse([
+            'ok' => true,
+            'message' => $warningMessage,
+            'source' => $source,
+        ]);
+    }
+
     #[Route('/admin/job-offers/{id}/reject-changes', name: 'app_admin_reject_job_offer_changes', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function rejectJobOfferWarning(string $id, Request $request, Connection $connection): Response
     {
-        $warningType = trim((string) $request->request->get('warning_type', ''));
-        $warningText = trim((string) $request->request->get('warning_text', ''));
-        if ($warningType === '' || $warningText === '') {
-            $this->addFlash('error', 'Reject reason is required.');
+        $validation = Job_offer_warning::validateWarningInput(
+            (string) $request->request->get('warning_type', ''),
+            (string) $request->request->get('warning_text', '')
+        );
+        if (($validation['ok'] ?? false) !== true) {
+            $this->addFlash('warning_modal_error', (string) ($validation['error'] ?? 'Invalid warning input.'));
+            $this->addFlash('warning_modal_mode', 'reject');
+            $this->addFlash('warning_modal_type', trim((string) $request->request->get('warning_type', '')));
+            $this->addFlash('warning_modal_text', trim((string) $request->request->get('warning_text', '')));
             return $this->redirectToRoute('app_admin_job_offers');
         }
 
+        $warningType = (string) $validation['warningType'];
+        $warningText = (string) $validation['warningText'];
         $reason = sprintf('[%s] %s', $warningType, $warningText);
 
         try {
@@ -586,7 +808,180 @@ SQL;
         }
     }
 
-    private function closeExpiredOffers(Connection $connection, $now): void
+    #[Route('/admin/comment-analyzer', name: 'app_admin_comment_analyzer', methods: ['GET'])]
+    public function commentAnalyzerDashboard(Request $request, Connection $connection): Response
+    {
+        $status = strtoupper(trim((string) $request->query->get('status', 'ALL')));
+        $allowedStatuses = [
+            'ALL',
+            Job_offer_comment::STATUS_FLAGGED,
+            Job_offer_comment::STATUS_APPROVED,
+            Job_offer_comment::STATUS_REJECTED,
+            Job_offer_comment::STATUS_WARNED,
+        ];
+        if (!in_array($status, $allowedStatuses, true)) {
+            $status = 'ALL';
+        }
+
+        $sql = <<<'SQL'
+SELECT c.id, c.comment_text, c.toxicity_score, c.spam_score, c.sentiment, c.labels,
+       c.moderation_status, c.visibility_status, c.created_at, c.moderated_at, c.moderator_action_note,
+       j.id AS offer_id, j.title AS offer_title,
+       u.first_name, u.last_name, u.email
+FROM job_offer_comment c
+LEFT JOIN job_offer j ON j.id = c.job_offer_id
+LEFT JOIN users u ON u.id = c.candidate_id
+SQL;
+
+        $params = [];
+        if ($status !== 'ALL') {
+            $sql .= ' WHERE c.moderation_status = :status';
+            $params['status'] = $status;
+        }
+
+        $sql .= ' ORDER BY c.created_at DESC LIMIT 300';
+
+        $comments = [];
+        $flaggedCount = 0;
+        try {
+            $rows = $connection->fetchAllAssociative($sql, $params);
+            $comments = array_map(function (array $row): array {
+                $labels = [];
+                $decoded = json_decode((string) ($row['labels'] ?? '[]'), true);
+                if (is_array($decoded)) {
+                    foreach ($decoded as $label) {
+                        $value = trim((string) $label);
+                        if ($value !== '') {
+                            $labels[] = $value;
+                        }
+                    }
+                }
+
+                $authorName = trim((string) ($row['first_name'] ?? '') . ' ' . (string) ($row['last_name'] ?? ''));
+                if ($authorName === '') {
+                    $authorName = (string) ($row['email'] ?? 'Candidate');
+                }
+
+                return [
+                    'id' => (string) ($row['id'] ?? ''),
+                    'offer_id' => (string) ($row['offer_id'] ?? ''),
+                    'offer_title' => (string) ($row['offer_title'] ?? 'Unknown offer'),
+                    'author' => $authorName,
+                    'comment_text' => (string) ($row['comment_text'] ?? ''),
+                    'toxicity_score' => round((float) ($row['toxicity_score'] ?? 0), 3),
+                    'spam_score' => round((float) ($row['spam_score'] ?? 0), 3),
+                    'sentiment' => (string) ($row['sentiment'] ?? 'neutral'),
+                    'labels' => $labels,
+                    'moderation_status' => (string) ($row['moderation_status'] ?? Job_offer_comment::STATUS_APPROVED),
+                    'visibility_status' => (string) ($row['visibility_status'] ?? Job_offer_comment::VISIBILITY_VISIBLE),
+                    'created_at' => (string) ($row['created_at'] ?? ''),
+                    'moderated_at' => (string) ($row['moderated_at'] ?? ''),
+                    'moderator_action_note' => (string) ($row['moderator_action_note'] ?? ''),
+                ];
+            }, $rows);
+
+            $flaggedCount = (int) $connection->fetchOne(
+                'SELECT COUNT(*) FROM job_offer_comment WHERE moderation_status = :status',
+                ['status' => Job_offer_comment::STATUS_FLAGGED]
+            );
+        } catch (\Throwable) {
+            $this->addFlash('error', 'Unable to load comment analyzer data right now.');
+        }
+
+        return $this->render('admin/comment_analyzer.html.twig', [
+            'authUser' => ['role' => 'admin'],
+            'comments' => $comments,
+            'selectedStatus' => $status,
+            'allowedStatuses' => $allowedStatuses,
+            'flaggedCount' => $flaggedCount,
+        ]);
+    }
+
+    #[Route('/admin/comment-analyzer/analyze', name: 'app_admin_comment_analyzer_analyze', methods: ['POST'])]
+    public function analyzeCommentPayload(Request $request, CommentAnalyzerService $commentAnalyzerService): JsonResponse
+    {
+        $payload = json_decode((string) $request->getContent(), true);
+        $comment = trim((string) ($payload['comment'] ?? ''));
+        $validation = Job_offer_comment::validateCommentText($comment);
+        if (($validation['ok'] ?? false) !== true) {
+            return new JsonResponse([
+                'ok' => false,
+                'error' => (string) ($validation['error'] ?? 'Invalid comment.'),
+            ], 400);
+        }
+
+        return new JsonResponse([
+            'ok' => true,
+            'analysis' => $commentAnalyzerService->analyze((string) $validation['value']),
+        ]);
+    }
+
+    #[Route('/admin/comment-analyzer/{id}/approve', name: 'app_admin_comment_analyzer_approve', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function approveComment(string $id, Request $request, Connection $connection): Response
+    {
+        $adminId = (string) $request->getSession()->get('user_id', '');
+        $note = trim((string) $request->request->get('note', 'Approved after moderator review.'));
+
+        $ok = $this->applyCommentModeration(
+            $connection,
+            $id,
+            $adminId,
+            Job_offer_comment::STATUS_APPROVED,
+            Job_offer_comment::VISIBILITY_VISIBLE,
+            $note
+        );
+
+        $this->addFlash($ok ? 'success' : 'error', $ok ? 'Comment approved.' : 'Unable to approve comment.');
+
+        return $this->redirectToRoute('app_admin_comment_analyzer');
+    }
+
+    #[Route('/admin/comment-analyzer/{id}/reject', name: 'app_admin_comment_analyzer_reject', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function rejectComment(string $id, Request $request, Connection $connection): Response
+    {
+        $adminId = (string) $request->getSession()->get('user_id', '');
+        $note = trim((string) $request->request->get('note', 'Rejected due to policy or quality issues.'));
+
+        $ok = $this->applyCommentModeration(
+            $connection,
+            $id,
+            $adminId,
+            Job_offer_comment::STATUS_REJECTED,
+            Job_offer_comment::VISIBILITY_HIDDEN,
+            $note
+        );
+
+        $this->addFlash($ok ? 'warning' : 'error', $ok ? 'Comment rejected and hidden.' : 'Unable to reject comment.');
+
+        return $this->redirectToRoute('app_admin_comment_analyzer');
+    }
+
+    #[Route('/admin/comment-analyzer/{id}/warn', name: 'app_admin_comment_analyzer_warn', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function warnCommentAuthor(string $id, Request $request, Connection $connection): Response
+    {
+        $adminId = (string) $request->getSession()->get('user_id', '');
+        $note = trim((string) $request->request->get('warning_note', 'Please keep comments constructive and respectful.'));
+        $hideComment = trim((string) $request->request->get('hide_comment', '0')) === '1';
+
+        if (mb_strlen($note) > 500) {
+            $note = trim(mb_substr($note, 0, 500));
+        }
+
+        $ok = $this->applyCommentModeration(
+            $connection,
+            $id,
+            $adminId,
+            Job_offer_comment::STATUS_WARNED,
+            $hideComment ? Job_offer_comment::VISIBILITY_HIDDEN : Job_offer_comment::VISIBILITY_VISIBLE,
+            $note
+        );
+
+        $this->addFlash($ok ? 'warning' : 'error', $ok ? 'User warning recorded for this comment.' : 'Unable to warn user for this comment.');
+
+        return $this->redirectToRoute('app_admin_comment_analyzer');
+    }
+
+    private function closeExpiredOffers(Connection $connection, \DateTimeInterface $now): void
     {
         $connection->executeStatement(
             'UPDATE job_offer SET status = :closed_status WHERE deadline IS NOT NULL AND deadline < :now AND status <> :closed_status',
@@ -595,6 +990,35 @@ SQL;
                 'now' => $now->format('Y-m-d H:i:s'),
             ]
         );
+    }
+
+    private function applyCommentModeration(
+        Connection $connection,
+        string $commentId,
+        string $adminId,
+        string $status,
+        string $visibility,
+        string $note
+    ): bool {
+        if ($commentId === '' || $adminId === '') {
+            return false;
+        }
+
+        try {
+            $affectedRows = $connection->update('job_offer_comment', [
+                'moderation_status' => $status,
+                'visibility_status' => $visibility,
+                'moderated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'moderator_id' => $adminId,
+                'moderator_action_note' => $note,
+            ], [
+                'id' => $commentId,
+            ]);
+
+            return $affectedRows > 0;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -1040,5 +1464,80 @@ SQL;
         }
 
         return null;
+    }
+
+    private function resolveXaiApiKey(): string
+    {
+        $candidates = [
+            $_ENV['XAI_API_KEY'] ?? null,
+            $_SERVER['XAI_API_KEY'] ?? null,
+            getenv('XAI_API_KEY') ?: null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $value = trim((string) $candidate);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function requestXaiWarningMessage(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
+    {
+        foreach (self::XAI_MODELS as $model) {
+            try {
+                $response = $httpClient->request('POST', 'https://api.x.ai/v1/chat/completions', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $apiKey,
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => [
+                        'model' => $model,
+                        'messages' => [
+                            ['role' => 'system', 'content' => 'You write concise, professional HR compliance messages.'],
+                            ['role' => 'user', 'content' => $prompt],
+                        ],
+                        'temperature' => 0.3,
+                    ],
+                    'timeout' => 25,
+                ]);
+
+                if ($response->getStatusCode() >= 400) {
+                    continue;
+                }
+
+                $body = $response->toArray(false);
+                $text = trim((string) ($body['choices'][0]['message']['content'] ?? ''));
+                if ($text === '') {
+                    continue;
+                }
+
+                return ['ok' => true, 'message' => $text, 'model' => $model];
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return ['ok' => false, 'message' => 'xAI generation unavailable'];
+    }
+
+    private function normalizeWarningMessage(string $raw): string
+    {
+        $message = trim($raw);
+        if ($message === '') {
+            return '';
+        }
+
+        $message = preg_replace('/\s+/u', ' ', $message) ?? $message;
+        $message = preg_replace('/[^\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]/u', ' ', $message) ?? $message;
+        $message = trim($message);
+
+        if (mb_strlen($message) > 500) {
+            $message = trim(mb_substr($message, 0, 500));
+        }
+
+        return $message;
     }
 }

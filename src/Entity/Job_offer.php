@@ -11,6 +11,10 @@ use App\Entity\Job_offer_warning;
 #[ORM\Entity]
 class Job_offer
 {
+    private const TITLE_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,150}$/u';
+    private const LOCATION_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,120}$/u';
+    private const TEXTAREA_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,1000}$/u';
+
 
     #[ORM\Id]
     #[ORM\Column(type: "bigint")]
@@ -26,14 +30,14 @@ class Job_offer
     #[ORM\Column(type: "text")]
     private string $description;
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $location;
+    #[ORM\Column(type: "string", length: 255, nullable: true)]
+    private ?string $location = null;
 
-    #[ORM\Column(type: "float")]
-    private float $latitude;
+    #[ORM\Column(type: "float", nullable: true)]
+    private ?float $latitude = null;
 
-    #[ORM\Column(type: "float")]
-    private float $longitude;
+    #[ORM\Column(type: "float", nullable: true)]
+    private ?float $longitude = null;
 
     #[ORM\Column(type: "string")]
     private string $contract_type;
@@ -99,34 +103,40 @@ class Job_offer
         $this->description = $value;
     }
 
-    public function getLocation()
+    public function getLocation(): ?string
     {
         return $this->location;
     }
 
-    public function setLocation($value)
+    public function setLocation(?string $value): self
     {
         $this->location = $value;
+
+        return $this;
     }
 
-    public function getLatitude()
+    public function getLatitude(): ?float
     {
         return $this->latitude;
     }
 
-    public function setLatitude($value)
+    public function setLatitude(?float $value): self
     {
         $this->latitude = $value;
+
+        return $this;
     }
 
-    public function getLongitude()
+    public function getLongitude(): ?float
     {
         return $this->longitude;
     }
 
-    public function setLongitude($value)
+    public function setLongitude(?float $value): self
     {
         $this->longitude = $value;
+
+        return $this;
     }
 
     public function getContract_type()
@@ -274,4 +284,171 @@ class Job_offer
 
     #[ORM\OneToMany(mappedBy: "job_offer_id", targetEntity: Job_offer_warning::class)]
     private Collection $job_offer_warnings;
+
+    /**
+     * Keep create-form validation rules in the entity so controller stays focused on flow.
+     *
+     * @param array<string, mixed> $formData
+     * @param array<int, string> $allowedContractTypes
+     * @param array<int, string> $allowedStatuses
+     * @param array<int, string> $allowedSkillLevels
+     *
+     * @return array<string, mixed>
+     */
+    public static function validateCreateFormData(
+        array $formData,
+        array $allowedContractTypes,
+        array $allowedStatuses,
+        array $allowedSkillLevels
+    ): array {
+        $errors = [];
+
+        $title = trim((string) ($formData['title'] ?? ''));
+        if ($title === '') {
+            $errors['title'] = 'Title is required.';
+        } elseif (!preg_match(self::TITLE_REGEX, $title)) {
+            $errors['title'] = 'Title must be 3-150 chars and contain valid text.';
+        }
+
+        $contractType = trim((string) ($formData['contract_type'] ?? ''));
+        if ($contractType === '') {
+            $errors['contract_type'] = 'Contract type is required.';
+        } elseif (!in_array($contractType, $allowedContractTypes, true)) {
+            $errors['contract_type'] = 'Please select a valid contract type.';
+        }
+
+        $status = trim((string) ($formData['status'] ?? ''));
+        if ($status === '') {
+            $errors['status'] = 'Status is required.';
+        } elseif (!in_array($status, $allowedStatuses, true)) {
+            $errors['status'] = 'Please select a valid status.';
+        }
+
+        $description = trim((string) ($formData['description'] ?? ''));
+        if ($description === '') {
+            $errors['description'] = 'Description is required.';
+        } elseif (!preg_match(self::TEXTAREA_REGEX, $description)) {
+            $errors['description'] = 'Description must be 10-1000 chars with valid text.';
+        }
+
+        $location = trim((string) ($formData['location'] ?? ''));
+        if ($location === '') {
+            $errors['location'] = 'Location is required.';
+        } elseif (!preg_match(self::LOCATION_REGEX, $location)) {
+            $errors['location'] = 'Location must be 3-120 chars with valid text.';
+        }
+
+        $deadlineRaw = trim((string) ($formData['deadline'] ?? ''));
+        if ($deadlineRaw === '') {
+            $errors['deadline'] = 'Deadline is required.';
+        } else {
+            $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $deadlineRaw);
+            if (!$deadline) {
+                $errors['deadline'] = 'Invalid deadline format.';
+            } elseif ($deadline <= new \DateTimeImmutable()) {
+                $errors['deadline'] = 'Deadline must be greater than today.';
+            }
+        }
+
+        $skills = (array) ($formData['skills'] ?? []);
+        if (count($skills) === 0) {
+            $errors['skills'][0]['name'] = 'Skill name is required.';
+            $errors['skills'][0]['level'] = 'Skill level is required.';
+        }
+
+        foreach ($skills as $index => $skill) {
+            $name = trim((string) ($skill['name'] ?? ''));
+            $level = trim((string) ($skill['level'] ?? ''));
+
+            if ($name === '') {
+                $errors['skills'][$index]['name'] = 'Skill name is required.';
+            }
+
+            if ($level === '') {
+                $errors['skills'][$index]['level'] = 'Skill level is required.';
+            } elseif (!in_array($level, $allowedSkillLevels, true)) {
+                $errors['skills'][$index]['level'] = 'Invalid skill level.';
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $formData
+     * @param array<int, string> $allowedContractTypes
+     * @param array<int, string> $allowedSkillLevels
+     *
+     * @return array<string, mixed>
+     */
+    public static function validateEditFormData(
+        array $formData,
+        array $allowedContractTypes,
+        array $allowedSkillLevels
+    ): array {
+        $errors = [];
+
+        $title = trim((string) ($formData['title'] ?? ''));
+        if ($title === '') {
+            $errors['title'] = 'Title is required.';
+        } elseif (!preg_match(self::TITLE_REGEX, $title)) {
+            $errors['title'] = 'Title must be 3-150 chars and contain valid text.';
+        }
+
+        $contractType = trim((string) ($formData['contract_type'] ?? ''));
+        if ($contractType === '') {
+            $errors['contract_type'] = 'Contract type is required.';
+        } elseif (!in_array($contractType, $allowedContractTypes, true)) {
+            $errors['contract_type'] = 'Please select a valid contract type.';
+        }
+
+        $description = trim((string) ($formData['description'] ?? ''));
+        if ($description === '') {
+            $errors['description'] = 'Description is required.';
+        } elseif (!preg_match(self::TEXTAREA_REGEX, $description)) {
+            $errors['description'] = 'Description must be 10-1000 chars with valid text.';
+        }
+
+        $location = trim((string) ($formData['location'] ?? ''));
+        if ($location === '') {
+            $errors['location'] = 'Location is required.';
+        } elseif (!preg_match(self::LOCATION_REGEX, $location)) {
+            $errors['location'] = 'Location must be 3-120 chars with valid text.';
+        }
+
+        $deadlineRaw = trim((string) ($formData['deadline'] ?? ''));
+        if ($deadlineRaw === '') {
+            $errors['deadline'] = 'Deadline is required.';
+        } else {
+            $deadline = \DateTimeImmutable::createFromFormat('Y-m-d\\TH:i', $deadlineRaw);
+            if (!$deadline) {
+                $errors['deadline'] = 'Invalid deadline format.';
+            } elseif ($deadline <= new \DateTimeImmutable()) {
+                $errors['deadline'] = 'Deadline must be greater than today.';
+            }
+        }
+
+        $skills = (array) ($formData['skills'] ?? []);
+        if (count($skills) === 0) {
+            $errors['skills'][0]['name'] = 'Skill name is required.';
+            $errors['skills'][0]['level'] = 'Skill level is required.';
+        }
+
+        foreach ($skills as $index => $skill) {
+            $name = trim((string) ($skill['name'] ?? ''));
+            $level = trim((string) ($skill['level'] ?? ''));
+
+            if ($name === '') {
+                $errors['skills'][$index]['name'] = 'Skill name is required.';
+            }
+
+            if ($level === '') {
+                $errors['skills'][$index]['level'] = 'Skill level is required.';
+            } elseif (!in_array($level, $allowedSkillLevels, true)) {
+                $errors['skills'][$index]['level'] = 'Invalid skill level.';
+            }
+        }
+
+        return $errors;
+    }
 }

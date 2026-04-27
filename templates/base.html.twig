@@ -240,6 +240,12 @@
                             const meta = panel.querySelector('.tb-detail-meta');
                             const title = panel.querySelector('.tb-detail-title');
                             const text = panel.querySelector('.tb-detail-text');
+                            const matchScore = panel.querySelector('.tb-match-score');
+                            const matchLabel = panel.querySelector('.tb-match-label');
+                            const matchSummary = panel.querySelector('.tb-match-summary');
+                            const matchMatching = panel.querySelector('.tb-match-matching');
+                            const matchMissing = panel.querySelector('.tb-match-missing');
+                            const matchExplanation = panel.querySelector('.tb-match-explanation');
                             const extra = panel.querySelector('.tb-detail-extra');
                             const primary = panel.querySelector('.tb-detail-primary');
                             const secondary = panel.querySelector('.tb-detail-secondary');
@@ -248,6 +254,16 @@
                             if (meta) meta.textContent = card.getAttribute('data-detail-meta') || '';
                             if (title) title.textContent = card.getAttribute('data-detail-title') || 'Details';
                             if (text) text.textContent = card.getAttribute('data-detail-text') || '';
+
+                            if (matchScore) matchScore.textContent = card.getAttribute('data-match-score') || '0%';
+                            if (matchLabel) {
+                                const matchLabelText = card.getAttribute('data-match-label') || 'No match data';
+                                matchLabel.textContent = matchLabelText ? matchLabelText.charAt(0).toUpperCase() + matchLabelText.slice(1) : 'No match data';
+                            }
+                            if (matchSummary) matchSummary.textContent = card.getAttribute('data-match-summary') || '';
+                            if (matchMatching) matchMatching.textContent = card.getAttribute('data-match-matching-skills') || '-';
+                            if (matchMissing) matchMissing.textContent = card.getAttribute('data-match-missing-skills') || '-';
+                            if (matchExplanation) matchExplanation.textContent = card.getAttribute('data-match-explanation') || '';
 
                             if (extra) {
                                 const rawExtra = card.getAttribute('data-detail-extra') || '';

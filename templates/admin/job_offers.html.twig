@@ -3,6 +3,15 @@
 {% block title %}Talent Bridge | Admin Job Offers{% endblock %}
 
 {% block admin_content %}
+    {% set warningModalServerErrors = app.flashes('warning_modal_error') %}
+    {% set warningModalServerModes = app.flashes('warning_modal_mode') %}
+    {% set warningModalServerTypes = app.flashes('warning_modal_type') %}
+    {% set warningModalServerTexts = app.flashes('warning_modal_text') %}
+    {% set warningModalServerError = warningModalServerErrors|first|default('') %}
+    {% set warningModalServerMode = warningModalServerModes|first|default('warn') %}
+    {% set warningModalServerType = warningModalServerTypes|first|default('') %}
+    {% set warningModalServerText = warningModalServerTexts|first|default('') %}
+
     <div class="row mb-4 align-items-center">
         <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
@@ -58,19 +67,47 @@
 
     <div class="card border mb-3">
         <div class="card-body d-flex flex-wrap gap-2 align-items-center" id="adminOfferMultiFilter">
-            <input type="text" class="form-control" style="max-width: 180px;" placeholder="Location" id="adminFilterLocation">
-            <select class="form-select" style="max-width: 190px;" id="adminFilterContractType">
-                <option value="">All contract types</option>
-            </select>
-            <select class="form-select" style="max-width: 170px;" id="adminFilterStatus">
-                <option value="">All status</option>
-                <option value="open">Open</option>
-                <option value="paused">Paused</option>
-                <option value="closed">Closed</option>
-            </select>
-            <input type="date" class="form-control" style="max-width: 170px;" id="adminFilterDeadline">
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="adminClearOfferFilters">Reset</button>
-            <div class="small text-secondary ms-auto" id="adminOfferFilterResults"></div>
+            {{ form_start(filterForm, {
+                action: path('app_admin_job_offers'),
+                method: 'GET',
+                attr: {
+                    class: 'd-flex flex-wrap gap-2 align-items-center',
+                    id: 'adminOfferFilterForm'
+                }
+            }) }}
+                {{ form_widget(filterForm.search, {
+                    attr: {
+                        class: 'form-control',
+                        style: 'max-width: 220px;',
+                        placeholder: 'Search title, location, contract, status...',
+                        id: 'adminSearchInput'
+                    }
+                }) }}
+                {{ form_widget(filterForm.contract_type, {
+                    attr: {
+                        class: 'form-select',
+                        style: 'max-width: 190px;',
+                        id: 'adminFilterContractType'
+                    }
+                }) }}
+                {{ form_widget(filterForm.status, {
+                    attr: {
+                        class: 'form-select',
+                        style: 'max-width: 170px;',
+                        id: 'adminFilterStatus'
+                    }
+                }) }}
+                {{ form_widget(filterForm.deadline, {
+                    attr: {
+                        class: 'form-control',
+                        style: 'max-width: 170px;',
+                        id: 'adminFilterDeadline'
+                    }
+                }) }}
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <a href="{{ path('app_admin_job_offers') }}" class="btn btn-outline-secondary btn-sm" id="adminClearOfferFilters">Reset</a>
+                <div class="small text-secondary ms-auto" id="adminOfferFilterResults">{{ resultCount|default(offers|length) }} result(s)</div>
+            {{ form_end(filterForm) }}
         </div>
     </div>
 
@@ -102,11 +139,7 @@
                         data-warning-state="{{ warningStatusKey }}"
                         data-details-url="{{ path('app_admin_job_offer_details', {id: offer.id}) }}"
                         data-accept-url="{{ path('app_admin_accept_job_offer_changes', {id: offer.id}) }}"
-                        data-reject-url="{{ path('app_admin_reject_job_offer_changes', {id: offer.id}) }}"
-                        data-filter-location="{{ offer.location|default('')|lower }}"
-                        data-filter-contract-type="{{ offer.contract_type|default('')|lower }}"
-                        data-filter-status="{{ offer.status|default('')|lower }}"
-                        data-filter-deadline="{{ offer.deadline ? offer.deadline|date('Y-m-d') : '' }}">
+                        data-reject-url="{{ path('app_admin_reject_job_offer_changes', {id: offer.id}) }}">
                         <td>#{{ offer.id }}</td>
                         <td>{{ offer.title }}</td>
                         <td>{{ offer.recruiter_id }}</td>
@@ -116,6 +149,17 @@
                         <td>{{ offer.created_at ? offer.created_at|date('Y-m-d H:i') : '-' }}</td>
                         <td>{{ offer.deadline ? offer.deadline|date('Y-m-d H:i') : '-' }}</td>
                         <td style="min-width: 320px;">
+                            <div class="d-flex flex-column gap-2 mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary js-open-review"
+                                        data-offer-id="{{ offer.id }}"
+                                        data-details-url="{{ path('app_admin_job_offer_details', {id: offer.id}) }}"
+                                        data-accept-url="{{ path('app_admin_accept_job_offer_changes', {id: offer.id}) }}"
+                                        data-reject-url="{{ path('app_admin_reject_job_offer_changes', {id: offer.id}) }}"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#reviewOfferModal">
+                                    <i class="ti ti-search me-1"></i>Details
+                                </button>
+                            </div>
                             {% if isPendingReview %}
                                 <div class="small fw-semibold text-warning-emphasis mb-2 d-flex align-items-center gap-1">
                                     <i class="ti ti-bell-ringing"></i>
@@ -158,7 +202,7 @@
                                         data-action-url="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}"
                                         data-bs-toggle="modal"
                                         data-bs-target="#warningModal">
-                                    <i class="ti ti-alert-triangle me-1"></i>Warning
+                                    <i class="ti ti-alert-triangle me-1"></i>Signaler
                                 </button>
                             {% endif %}
                         </td>
@@ -221,15 +265,20 @@
                 </div>
                 <div class="modal-footer d-flex justify-content-between">
                     <div class="small text-muted" id="reviewOfferFooterHint">Approve the changes or send another warning from here.</div>
-                    <div class="d-flex gap-2" id="reviewOfferActions">
-                        <form method="post" id="reviewAcceptForm">
-                            <button type="submit" class="btn btn-success" onclick="return confirm('Accept recruiter changes for this offer?');">
-                                <i class="ti ti-check me-1"></i>Accept Changes
-                            </button>
-                        </form>
-                        <button type="button" class="btn btn-danger" id="reviewSendWarningBtn" data-bs-toggle="modal" data-bs-target="#warningModal">
-                            <i class="ti ti-alert-triangle me-1"></i>Send Another Warning
+                    <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-outline-primary" id="reviewAnalyzeBtn">
+                            <i class="ti ti-brain me-1"></i>Analyzer
                         </button>
+                        <div class="d-flex gap-2" id="reviewOfferActions">
+                            <form method="post" id="reviewAcceptForm">
+                                <button type="submit" class="btn btn-success" onclick="return confirm('Accept recruiter changes for this offer?');">
+                                    <i class="ti ti-check me-1"></i>Accept Changes
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-danger" id="reviewSendWarningBtn" data-bs-toggle="modal" data-bs-target="#warningModal">
+                                <i class="ti ti-alert-triangle me-1"></i>Signaler
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -241,30 +290,37 @@
             <div class="modal-content">
                 <form method="post" id="warningModalForm" novalidate>
                     <div class="modal-header">
-                        <h5 class="modal-title" id="warningModalTitle">Send Warning</h5>
+                        <h5 class="modal-title" id="warningModalTitle">Signaler une offre</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Warning Type</label>
+                            <label class="form-label">Raison</label>
                             <select class="form-select" name="warning_type" id="warningType" required>
                                 <option value="">Select type</option>
-                                <option value="Policy violation">Policy violation</option>
-                                <option value="Incorrect information">Incorrect information</option>
-                                <option value="Missing required details">Missing required details</option>
-                                <option value="Deadline issue">Deadline issue</option>
-                                <option value="Other">Other</option>
+                                <option value="Policy violation" {{ warningModalServerType == 'Policy violation' ? 'selected' : '' }}>Policy violation</option>
+                                <option value="Incorrect information" {{ warningModalServerType == 'Incorrect information' ? 'selected' : '' }}>Incorrect information</option>
+                                <option value="Missing required details" {{ warningModalServerType == 'Missing required details' ? 'selected' : '' }}>Missing required details</option>
+                                <option value="Deadline issue" {{ warningModalServerType == 'Deadline issue' ? 'selected' : '' }}>Deadline issue</option>
+                                <option value="Description trompeuse" {{ warningModalServerType == 'Description trompeuse' ? 'selected' : '' }}>Description trompeuse</option>
+                                <option value="Other" {{ warningModalServerType == 'Other' ? 'selected' : '' }}>Other</option>
                             </select>
                         </div>
                         <div>
                             <label class="form-label">Message</label>
-                            <textarea class="form-control" name="warning_text" id="warningText" rows="4" placeholder="Write warning details..." required></textarea>
-                            <div class="invalid-feedback d-block" id="warningModalError" style="display:none;"></div>
+                            <textarea class="form-control" name="warning_text" id="warningText" rows="4" placeholder="Write warning details..." required>{{ warningModalServerText }}</textarea>
+                            <div class="d-flex align-items-center gap-2 mt-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="warningGenerateAiBtn">
+                                    <i class="ti ti-sparkles me-1"></i>Générer avec IA (Grok)
+                                </button>
+                                <span class="small text-secondary" id="warningAiStatus"></span>
+                            </div>
+                            <div class="invalid-feedback d-block" id="warningModalError" style="display:{{ warningModalServerError != '' ? 'block' : 'none' }};">{{ warningModalServerError }}</div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger" id="warningSubmitBtn">Submit</button>
+                        <button type="submit" class="btn btn-danger" id="warningSubmitBtn">Envoyer warning</button>
                     </div>
                 </form>
             </div>
@@ -277,30 +333,12 @@
             if (!table) return;
 
             const rows = Array.from(table.querySelectorAll('tbody .admin-offer-row'));
-            if (rows.length === 0) return;
 
-            const locationInput = document.getElementById('adminFilterLocation');
+            const filterForm = document.getElementById('adminOfferFilterForm');
+            const searchInput = document.getElementById('adminSearchInput');
             const contractTypeSelect = document.getElementById('adminFilterContractType');
             const statusSelect = document.getElementById('adminFilterStatus');
             const deadlineInput = document.getElementById('adminFilterDeadline');
-            const resetBtn = document.getElementById('adminClearOfferFilters');
-            const resultLabel = document.getElementById('adminOfferFilterResults');
-
-            if (contractTypeSelect) {
-                const seen = new Set();
-                rows.forEach(function (row) {
-                    const value = (row.dataset.filterContractType || '').trim();
-                    if (!value) return;
-                    seen.add(value);
-                });
-
-                Array.from(seen).sort().forEach(function (value) {
-                    const option = document.createElement('option');
-                    option.value = value;
-                    option.textContent = value.charAt(0).toUpperCase() + value.slice(1);
-                    contractTypeSelect.appendChild(option);
-                });
-            }
 
             const warningModal = document.getElementById('warningModal');
             const warningModalForm = document.getElementById('warningModalForm');
@@ -308,16 +346,30 @@
             const warningSubmitBtn = document.getElementById('warningSubmitBtn');
             const warningType = document.getElementById('warningType');
             const warningText = document.getElementById('warningText');
+            const warningGenerateAiBtn = document.getElementById('warningGenerateAiBtn');
+            const warningAiStatus = document.getElementById('warningAiStatus');
             const warningModalError = document.getElementById('warningModalError');
+            const serverWarningMode = '{{ warningModalServerMode }}';
+            const hasServerWarningError = {{ warningModalServerError != '' ? 'true' : 'false' }};
             const reviewModal = document.getElementById('reviewOfferModal');
             const reviewLoading = document.getElementById('reviewOfferLoading');
             const reviewContent = document.getElementById('reviewOfferContent');
             const reviewAcceptForm = document.getElementById('reviewAcceptForm');
             const reviewSendWarningBtn = document.getElementById('reviewSendWarningBtn');
+            const reviewAnalyzeBtn = document.getElementById('reviewAnalyzeBtn');
             const reviewModalTitle = document.getElementById('reviewOfferModalTitle');
             const reviewFooterHint = document.getElementById('reviewOfferFooterHint');
             const reviewActions = document.getElementById('reviewOfferActions');
             let reviewRejectUrl = '';
+            let currentReviewOfferId = '';
+            let currentWarningOfferId = '';
+
+            const setWarningAiStatus = function (message, isError) {
+                if (!warningAiStatus) return;
+                warningAiStatus.textContent = message || '';
+                warningAiStatus.classList.toggle('text-danger', Boolean(isError));
+                warningAiStatus.classList.toggle('text-secondary', !isError);
+            };
 
             const setReviewDetails = function (payload) {
                 const offer = payload.offer || {};
@@ -349,7 +401,8 @@
                 });
             };
 
-            const openReviewModal = function (detailsUrl, acceptUrl, rejectUrl, mode) {
+            const openReviewModal = function (offerId, detailsUrl, acceptUrl, rejectUrl, mode) {
+                currentReviewOfferId = (offerId || '').toString();
                 reviewRejectUrl = rejectUrl || '';
                 reviewAcceptForm.setAttribute('action', acceptUrl || '#');
 
@@ -389,10 +442,11 @@
 
             document.querySelectorAll('.js-open-review').forEach(function (btn) {
                 btn.addEventListener('click', function () {
+                    const offerId = btn.getAttribute('data-offer-id') || '';
                     const detailsUrl = btn.getAttribute('data-details-url') || '';
                     const acceptUrl = btn.getAttribute('data-accept-url') || '#';
                     const rejectUrl = btn.getAttribute('data-reject-url') || '#';
-                    openReviewModal(detailsUrl, acceptUrl, rejectUrl, 'pending');
+                    openReviewModal(offerId, detailsUrl, acceptUrl, rejectUrl, 'pending');
                 });
             });
 
@@ -410,6 +464,7 @@
                     const warningState = (row.getAttribute('data-warning-state') || '').toUpperCase();
                     const mode = warningState === 'RESOLVED' ? 'pending' : 'readonly';
                     openReviewModal(
+                        row.getAttribute('data-offer-id') || '',
                         detailsUrl,
                         row.getAttribute('data-accept-url') || '#',
                         row.getAttribute('data-reject-url') || '#',
@@ -421,13 +476,15 @@
             if (reviewSendWarningBtn) {
                 reviewSendWarningBtn.addEventListener('click', function () {
                     if (!reviewRejectUrl) return;
+                    currentWarningOfferId = currentReviewOfferId;
                     warningModalForm.setAttribute('action', reviewRejectUrl);
-                    warningModalTitle.textContent = 'Reject Changes & Send Warning';
-                    warningSubmitBtn.textContent = 'Reject Changes';
+                    warningModalTitle.textContent = 'Rejeter les changements et signaler';
+                    warningSubmitBtn.textContent = 'Rejeter les changements';
                     warningSubmitBtn.classList.remove('btn-danger');
                     warningSubmitBtn.classList.add('btn-warning');
                     if (warningType) warningType.value = '';
                     if (warningText) warningText.value = '';
+                    setWarningAiStatus('', false);
                     if (warningModalError) {
                         warningModalError.textContent = '';
                         warningModalError.style.display = 'none';
@@ -435,26 +492,76 @@
                 });
             }
 
+            if (reviewAnalyzeBtn) {
+                reviewAnalyzeBtn.addEventListener('click', function () {
+                    const descriptionNode = document.getElementById('reviewOfferDescription');
+                    const titleNode = document.getElementById('reviewOfferTitle');
+                    const descriptionText = (descriptionNode && descriptionNode.textContent ? descriptionNode.textContent : '').trim();
+                    const titleText = (titleNode && titleNode.textContent ? titleNode.textContent : '').trim();
+
+                    if (!descriptionText || descriptionText === '-') {
+                        alert('Please open offer details first, then run Analyzer.');
+                        return;
+                    }
+
+                    const payloadText = 'Title: ' + (titleText || 'Untitled') + '\nDescription: ' + descriptionText;
+
+                    fetch('{{ path('app_admin_comment_analyzer_analyze') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({ comment: payloadText })
+                    })
+                    .then(function (response) { return response.json(); })
+                    .then(function (payload) {
+                        if (!payload || payload.ok !== true) {
+                            throw new Error((payload && payload.error) ? payload.error : 'Analysis failed.');
+                        }
+
+                        const analysis = payload.analysis || {};
+                        const labels = Array.isArray(analysis.labels) && analysis.labels.length > 0 ? analysis.labels.join(', ') : 'none';
+                        const message = [
+                            'Analyzer Result (Offer #' + (currentReviewOfferId || '-') + ')',
+                            'Toxicity: ' + Number(analysis.toxicityScore || 0).toFixed(3),
+                            'Spam: ' + Number(analysis.spamScore || 0).toFixed(3),
+                            'Sentiment: ' + String(analysis.sentiment || 'neutral'),
+                            'Labels: ' + labels,
+                            'Flagged: ' + (((analysis.flagged || false) === true) ? 'YES' : 'NO')
+                        ].join('\n');
+
+                        alert(message);
+                    })
+                    .catch(function (error) {
+                        alert(error.message || 'Unable to analyze this offer right now.');
+                    });
+                });
+            }
+
             document.querySelectorAll('.js-warning-open').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     const actionMode = btn.getAttribute('data-action') || 'warn';
                     const actionUrl = btn.getAttribute('data-action-url') || '#';
+                    currentWarningOfferId = (btn.getAttribute('data-offer-id') || '').toString();
                     warningModalForm.setAttribute('action', actionUrl);
 
                     if (actionMode === 'reject') {
-                        warningModalTitle.textContent = 'Reject Changes & Send Warning';
-                        warningSubmitBtn.textContent = 'Reject Changes';
+                        warningModalTitle.textContent = 'Rejeter les changements et signaler';
+                        warningSubmitBtn.textContent = 'Rejeter les changements';
                         warningSubmitBtn.classList.remove('btn-danger');
                         warningSubmitBtn.classList.add('btn-warning');
                     } else {
-                        warningModalTitle.textContent = 'Send Warning';
-                        warningSubmitBtn.textContent = 'Send Warning';
+                        warningModalTitle.textContent = 'Signaler une offre';
+                        warningSubmitBtn.textContent = 'Envoyer warning';
                         warningSubmitBtn.classList.remove('btn-warning');
                         warningSubmitBtn.classList.add('btn-danger');
                     }
 
                     if (warningType) warningType.value = '';
                     if (warningText) warningText.value = '';
+                    setWarningAiStatus('', false);
                     if (warningModalError) {
                         warningModalError.textContent = '';
                         warningModalError.style.display = 'none';
@@ -476,50 +583,100 @@
                 });
             }
 
-            const runFilters = function () {
-                const locationQuery = ((locationInput && locationInput.value) || '').trim().toLowerCase();
-                const contractQuery = ((contractTypeSelect && contractTypeSelect.value) || '').trim().toLowerCase();
-                const statusQuery = ((statusSelect && statusSelect.value) || '').trim().toLowerCase();
-                const deadlineQuery = ((deadlineInput && deadlineInput.value) || '').trim();
+            if (warningGenerateAiBtn) {
+                warningGenerateAiBtn.addEventListener('click', function () {
+                    const typeValue = (warningType && warningType.value ? warningType.value : '').trim();
+                    if (currentWarningOfferId === '') {
+                        setWarningAiStatus('Sélectionnez une offre avant de générer le message.', true);
+                        return;
+                    }
 
-                let visibleCount = 0;
-                rows.forEach(function (row) {
-                    const rowLocation = (row.dataset.filterLocation || '').toLowerCase();
-                    const rowContractType = (row.dataset.filterContractType || '').toLowerCase();
-                    const rowStatus = (row.dataset.filterStatus || '').toLowerCase();
-                    const rowDeadline = (row.dataset.filterDeadline || '').trim();
+                    if (typeValue === '') {
+                        setWarningAiStatus('Choisissez une raison avant de lancer la génération IA.', true);
+                        return;
+                    }
 
-                    const locationMatch = locationQuery === '' || rowLocation.includes(locationQuery);
-                    const contractMatch = contractQuery === '' || rowContractType.includes(contractQuery);
-                    const statusMatch = statusQuery === '' || rowStatus === statusQuery;
-                    const deadlineMatch = deadlineQuery === '' || rowDeadline === deadlineQuery;
+                    warningGenerateAiBtn.disabled = true;
+                    setWarningAiStatus('Génération du message en cours...', false);
 
-                    const isMatch = locationMatch && contractMatch && statusMatch && deadlineMatch;
-                    row.classList.toggle('d-none', !isMatch);
-                    if (isMatch) visibleCount += 1;
-                });
+                    fetch('{{ path('app_admin_job_offer_warning_ai_generate') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            offer_id: currentWarningOfferId,
+                            warning_type: typeValue
+                        })
+                    })
+                    .then(function (response) { return response.json(); })
+                    .then(function (payload) {
+                        if (!payload || payload.ok !== true) {
+                            throw new Error((payload && payload.error) ? payload.error : 'Generation failed.');
+                        }
 
-                if (resultLabel) {
-                    resultLabel.textContent = visibleCount + ' result(s)';
-                }
-            };
+                        if (warningText) {
+                            warningText.value = payload.message || '';
+                        }
 
-            if (locationInput) locationInput.addEventListener('input', runFilters);
-            if (contractTypeSelect) contractTypeSelect.addEventListener('change', runFilters);
-            if (statusSelect) statusSelect.addEventListener('change', runFilters);
-            if (deadlineInput) deadlineInput.addEventListener('change', runFilters);
+                        if (warningModalError) {
+                            warningModalError.textContent = '';
+                            warningModalError.style.display = 'none';
+                        }
 
-            if (resetBtn) {
-                resetBtn.addEventListener('click', function () {
-                    if (locationInput) locationInput.value = '';
-                    if (contractTypeSelect) contractTypeSelect.value = '';
-                    if (statusSelect) statusSelect.value = '';
-                    if (deadlineInput) deadlineInput.value = '';
-                    runFilters();
+                        if ((payload.source || '') === 'ai') {
+                            setWarningAiStatus('Message généré avec IA (Grok). Vous pouvez le modifier avant envoi.', false);
+                        } else {
+                            setWarningAiStatus('IA indisponible, message professionnel proposé automatiquement.', false);
+                        }
+                    })
+                    .catch(function (error) {
+                        setWarningAiStatus(error.message || 'Erreur lors de la génération IA.', true);
+                    })
+                    .finally(function () {
+                        warningGenerateAiBtn.disabled = false;
+                    });
                 });
             }
 
-            runFilters();
+            if (hasServerWarningError && window.bootstrap && warningModal) {
+                if (serverWarningMode === 'reject') {
+                    warningModalTitle.textContent = 'Rejeter les changements et signaler';
+                    warningSubmitBtn.textContent = 'Rejeter les changements';
+                    warningSubmitBtn.classList.remove('btn-danger');
+                    warningSubmitBtn.classList.add('btn-warning');
+                } else {
+                    warningModalTitle.textContent = 'Signaler une offre';
+                    warningSubmitBtn.textContent = 'Envoyer warning';
+                    warningSubmitBtn.classList.remove('btn-warning');
+                    warningSubmitBtn.classList.add('btn-danger');
+                }
+
+                window.bootstrap.Modal.getOrCreateInstance(warningModal).show();
+            }
+
+            if (filterForm) {
+                if (searchInput) {
+                    let searchDebounceTimer = null;
+                    searchInput.addEventListener('input', function () {
+                        if (searchDebounceTimer) {
+                            clearTimeout(searchDebounceTimer);
+                        }
+
+                        searchDebounceTimer = setTimeout(function () {
+                            filterForm.requestSubmit();
+                        }, 350);
+                    });
+                }
+
+                const autoSubmitFilter = function () {
+                    filterForm.requestSubmit();
+                };
+                if (contractTypeSelect) contractTypeSelect.addEventListener('change', autoSubmitFilter);
+                if (statusSelect) statusSelect.addEventListener('change', autoSubmitFilter);
+                if (deadlineInput) deadlineInput.addEventListener('change', autoSubmitFilter);
+            }
         })();
     </script>
 {% endblock %}
