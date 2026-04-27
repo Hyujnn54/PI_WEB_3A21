@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 use App\Entity\Recruiter;
 use Doctrine\Common\Collections\Collection;
@@ -22,24 +23,37 @@ class Recruitment_event
     private Recruiter $recruiter_id;
 
     #[ORM\Column(type: "string", length: 255)]
+    #[Assert\NotBlank(message: 'Event title is required.')]
+    #[Assert\Length(min: 3, max: 255, minMessage: 'Event title must be at least 3 characters.', maxMessage: 'Event title cannot exceed 255 characters.')]
     private string $title;
 
     #[ORM\Column(type: "text")]
+    #[Assert\NotBlank(message: 'Description is required.')]
+    #[Assert\Length(min: 10, minMessage: 'Description must be at least 10 characters.')]
     private string $description;
 
     #[ORM\Column(type: "string", length: 255)]
+    #[Assert\NotBlank(message: 'Event type is required.')]
+    #[Assert\Choice(choices: ['Workshop', 'Hiring Day', 'Webinar'], message: 'Invalid event type selected.')]
     private string $event_type;
 
     #[ORM\Column(type: "string", length: 255)]
+    #[Assert\NotBlank(message: 'Location is required.')]
+    #[Assert\Length(min: 2, minMessage: 'Location must be at least 2 characters.')]
     private string $location;
 
     #[ORM\Column(type: "datetime")]
-    private \DateTimeInterface $event_date;
+    #[Assert\NotNull(message: 'Event date is required.')]
+    #[Assert\GreaterThan('now', message: 'Event date must be in the future.')]
+    private ?\DateTimeInterface $event_date = null;
 
     #[ORM\Column(type: "integer")]
-    private int $capacity;
+    #[Assert\NotNull(message: 'Capacity is required.')]
+    #[Assert\Range(min: 1, max: 1000, notInRangeMessage: 'Capacity must be between {{ min }} and {{ max }}.')]
+    private ?int $capacity = null;
 
     #[ORM\Column(type: "string", length: 255)]
+    #[Assert\Url(message: 'Please enter a valid URL.')]
     private string $meet_link = '';
 
     #[ORM\Column(type: "datetime")]

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ brandName }} | Event Registration Update</title>
+    </head>
+    <body style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f7fb;padding:32px 16px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:680px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 18px 45px rgba(15,23,42,0.12);">
+                        <tr>
+                            <td style="background:linear-gradient(135deg,#163b66 0%,#24599b 50%,#5d8ed6 100%);padding:28px 32px;color:#ffffff;">
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                    <tr>
+                                        <td style="vertical-align:middle;">
+                                            <img src="{{ absolute_url(asset('assets/team_upload/logo.png')) }}" alt="{{ brandName }}" width="48" height="48" style="display:block;border-radius:12px;background:#ffffff;padding:6px;object-fit:contain;">
+                                        </td>
+                                        <td style="vertical-align:middle;padding-left:14px;">
+                                            <div style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">{{ brandName }}</div>
+                                            <div style="font-size:24px;line-height:1.2;font-weight:700;margin-top:4px;">Event registration update</div>
+                                        </td>
+                                        <td align="right" style="vertical-align:middle;">
+                                            {% set bannerColor = status == 'confirmed' ? '#0f7a42' : '#c2410c' %}
+                                            <span style="display:inline-block;padding:10px 14px;border-radius:999px;background:{{ bannerColor }};color:#ffffff;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">
+                                                {{ statusLabel }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding:32px;">
+                                <p style="margin:0 0 14px;font-size:16px;line-height:1.7;">Hello {{ candidateName|default('Candidate') }},</p>
+                                <p style="margin:0 0 20px;font-size:16px;line-height:1.7;color:#374151;">{{ eventTypeMessage }}</p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;background:#f8fbff;border:1px solid #d9e6f5;border-radius:14px;">
+                                    <tr>
+                                        <td style="padding:20px 22px;">
+                                            <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5b6b82;margin-bottom:14px;">Registration details</div>
+                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="font-size:14px;line-height:1.6;color:#243143;">
+                                                <tr>
+                                                    <td style="padding:8px 0;width:140px;color:#6b7280;">Event</td>
+                                                    <td style="padding:8px 0;font-weight:700;">{{ eventTitle }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;color:#6b7280;">Type</td>
+                                                    <td style="padding:8px 0;font-weight:700;">{{ eventType }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;color:#6b7280;">Date</td>
+                                                    <td style="padding:8px 0;font-weight:700;">{{ eventDate }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;color:#6b7280;">Status</td>
+                                                    <td style="padding:8px 0;font-weight:700;">{{ statusLabel }}</td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <div style="margin:0 0 26px;padding:18px 20px;border-left:4px solid {{ bannerColor }};background:#fff7ed;border-radius:10px;color:#4b5563;font-size:15px;line-height:1.7;">
+                                    {{ closingLine }}
+                                </div>
+
+                                {% if status == 'confirmed' and qrCodeUrl is not empty %}
+                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 26px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:14px;">
+                                        <tr>
+                                            <td style="padding:20px 22px;text-align:center;">
+                                                <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#0f4c81;margin-bottom:12px;">Your access QR code</div>
+                                                <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#35506b;">Show this code at check-in for {{ eventType|lower }} access.</p>
+                                                <img src="{{ qrCodeUrl }}" alt="QR code for {{ eventTitle }}" width="220" height="220" style="display:block;margin:0 auto;border-radius:14px;border:8px solid #ffffff;box-shadow:0 10px 30px rgba(37,99,235,0.15);background:#ffffff;">
+                                            </td>
+                                        </tr>
+                                    </table>
+                                {% endif %}
+
+                                {% if status == 'confirmed' and meetingLink is not empty %}
+                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 26px;background:#ecfdf5;border:1px solid #bbf7d0;border-radius:14px;">
+                                        <tr>
+                                            <td style="padding:20px 22px;">
+                                                <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#0f7a42;margin-bottom:12px;">Webinar meeting link</div>
+                                                <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#24503b;">Your webinar is confirmed. Join the session with the link below:</p>
+                                                <p style="margin:0 0 16px;font-size:15px;line-height:1.7;word-break:break-word;"><a href="{{ meetingLink }}" target="_blank" rel="noopener noreferrer" style="color:#0f7a42;font-weight:700;text-decoration:none;">{{ meetingLink }}</a></p>
+                                                <p style="margin:0;font-size:13px;line-height:1.6;color:#4b5563;">We recommend joining a few minutes early to test your audio and video.</p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                {% endif %}
+
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px;">
+                                    <tr>
+                                        <td>
+                                            <a href="{{ eventsUrl }}" style="display:inline-block;background:linear-gradient(135deg,#24599b,#5d8ed6);color:#ffffff;text-decoration:none;font-weight:700;padding:13px 20px;border-radius:10px;">View events on Talent Bridge</a>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <p style="margin:0;font-size:14px;line-height:1.7;color:#6b7280;">
+                                    If you have any questions, reply to this email at <a href="mailto:{{ supportEmail }}" style="color:#24599b;text-decoration:none;">{{ supportEmail }}</a>.
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding:18px 32px 28px;text-align:center;color:#94a3b8;font-size:12px;line-height:1.6;">
+                                <div style="margin-bottom:6px;font-weight:700;color:#64748b;">{{ brandName }}</div>
+                                <div>You are receiving this because you registered for an event on our platform.</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+</html>
