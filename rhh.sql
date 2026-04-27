@@ -18,8 +18,14 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `rh`
+-- Database: `rhh`
 --
+
+USE `rhh`;
+
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS `warning_correction`, `offer_skill`, `job_offer_warning`, `interview_feedback`, `interview`, `application_status_history`, `job_application`, `event_review`, `event_registration`, `recruitment_event`, `candidate_skill`, `candidate`, `job_offer`, `admin`, `recruiter`, `users`;
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- --------------------------------------------------------
 

@@ -11,6 +11,9 @@ use App\Entity\Interview_feedback;
 #[ORM\Entity]
 class Interview
 {
+    private const LOCATION_REGEX = '/^(?=.{3,120}$)[^\p{Cc}\p{Cf}<>]+$/u';
+    private const NOTES_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{0,1000}$/u';
+
 
     #[ORM\Id]
     #[ORM\Column(type: "bigint")]
@@ -188,6 +191,94 @@ class Interview
     public function setReminder_sent($value)
     {
         $this->reminder_sent = $value;
+    }
+
+    public static function validateInput(array $data, int $maxFutureDays = 90): array
+    {
+        try {
+            $scheduledAtImmutable = new \DateTimeImmutable((string) ($data['scheduled_at'] ?? ''));
+        } catch (\Throwable) {
+            return ['ok' => false, 'error' => 'Invalid interview date/time.'];
+        }
+
+        $now = new \DateTimeImmutable();
+        if ($scheduledAtImmutable <= $now) {
+            return ['ok' => false, 'error' => 'Interview date/time must be in the future.'];
+        }
+
+        if ($scheduledAtImmutable > $now->modify('+' . $maxFutureDays . ' days')) {
+            return ['ok' => false, 'error' => 'Interview cannot be scheduled more than ' . $maxFutureDays . ' days ahead.'];
+        }
+
+        // Entity fields are mapped as mutable datetime, so convert before persistence.
+        $scheduledAt = \DateTime::createFromImmutable($scheduledAtImmutable);
+
+        $duration = (int) ($data['duration_minutes'] ?? 0);
+        if ($duration < 15 || $duration > 240) {
+            return ['ok' => false, 'error' => 'Duration must be between 15 and 240 minutes.'];
+        }
+
+        $mode = strtolower(trim((string) ($data['mode'] ?? 'online')));
+        if (!in_array($mode, ['online', 'onsite'], true)) {
+            return ['ok' => false, 'error' => 'Interview mode must be online or onsite.'];
+        }
+
+        $meetingLink = trim((string) ($data['meeting_link'] ?? ''));
+        $location = trim((string) ($data['location'] ?? ''));
+        $notes = trim((string) ($data['notes'] ?? ''));
+
+        if ($mode === 'online' && $meetingLink === '') {
+            return ['ok' => false, 'error' => 'Meeting link is required for online interviews.'];
+        }
+
+        if ($mode === 'online' && !self::isValidMeetingLink($meetingLink)) {
+            return ['ok' => false, 'error' => 'Meeting link must be a valid http(s) URL.'];
+        }
+
+        if ($mode === 'onsite' && $location === '') {
+            return ['ok' => false, 'error' => 'Location is required for onsite interviews.'];
+        }
+
+        if ($mode === 'onsite' && !self::isValidLocation($location)) {
+            return ['ok' => false, 'error' => 'Location must be 3-120 characters and cannot contain angle brackets or hidden control characters.'];
+        }
+
+        if (!self::isValidNotes($notes)) {
+            return ['ok' => false, 'error' => 'Notes contain unsupported characters or exceed 1000 characters.'];
+        }
+
+        return [
+            'ok' => true,
+            'scheduledAt' => $scheduledAt,
+            'duration' => $duration,
+            'mode' => $mode,
+            'meetingLink' => $meetingLink,
+            'location' => $location,
+            'notes' => $notes,
+        ];
+    }
+
+    private static function isValidMeetingLink(string $meetingLink): bool
+    {
+        if (!filter_var($meetingLink, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        return (bool) preg_match('/^https?:\/\/[\S]+$/i', $meetingLink);
+    }
+
+    private static function isValidLocation(string $location): bool
+    {
+        return (bool) preg_match(self::LOCATION_REGEX, $location);
+    }
+
+    private static function isValidNotes(string $value): bool
+    {
+        if (mb_strlen($value) > 1000) {
+            return false;
+        }
+
+        return (bool) preg_match(self::NOTES_REGEX, $value);
     }
 
     #[ORM\OneToMany(mappedBy: "interview_id", targetEntity: Interview_feedback::class)]

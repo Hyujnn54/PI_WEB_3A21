@@ -19,7 +19,7 @@
         <div class="container-xl">
             <div class="card tb-admin-card">
                 <div class="card-body">
-                    <form method="post" class="row g-3">
+                    <form method="post" class="row g-3" data-generate-link-url="{{ path('front_interview_generate_meeting_link', app.request.query.all|merge({role: role})) }}" data-application-id="{{ applicationId|default('') }}" data-interview-id="{{ interviewId|default('') }}">
                         <div class="col-md-6">
                             <label class="form-label">Scheduled At</label>
                             <input type="datetime-local" name="scheduled_at" class="form-control" value="{{ formData.scheduled_at|default('') }}" required>
@@ -37,13 +37,20 @@
                         </div>
                         <div class="col-md-6" data-online-field>
                             <label class="form-label">Meeting Link (required for online)</label>
-                            <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" value="{{ formData.meeting_link|default('') }}" maxlength="500">
+                            <div class="input-group">
+                                <input type="url" name="meeting_link" class="form-control" placeholder="https://meet.example.com/room-123" value="{{ formData.meeting_link|default('') }}" maxlength="500">
+                                <button type="button" class="btn btn-outline-primary" data-generate-meeting-link>Generate Jitsi Link</button>
+                            </div>
                             <div class="form-hint">Use a complete http(s) URL.</div>
+                            <div class="form-hint" data-meeting-link-feedback></div>
                         </div>
                         <div class="col-md-6" data-onsite-field>
-                            <label class="form-label">Room (required for onsite)</label>
-                            <input type="text" name="location" class="form-control" placeholder="Room / Office location" value="{{ formData.location|default('') }}" minlength="3" maxlength="120" pattern="[A-Za-z0-9 ,./#()\-]{3,120}">
-                            <div class="form-hint">3-120 chars. Letters, numbers and , . / # ( ) - only.</div>
+                            <label class="form-label">Location (required for onsite)</label>
+                            <div class="input-group">
+                                <input type="text" name="location" class="form-control" placeholder="Google HQ, Restaurant Bla Bla, 1600 Amphitheatre Pkwy..." value="{{ formData.location|default('') }}" minlength="3" maxlength="120">
+                                <button type="button" class="btn btn-outline-primary" data-map-picker-trigger>Select on Map</button>
+                            </div>
+                            <div class="form-hint">Click Select on Map, choose a place, and we will fill this field with a readable location name for the reminder QR code.</div>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Additional Notes</label>
@@ -61,18 +68,46 @@
     </div>
 </div>
 
+{% include 'front/modules/_interview_map_picker.html.twig' %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    const ensureMapPickerService = async function () {
+        return window.tbInterviewMapPickerService || null;
+    };
+
+    const initInterviewFormPage = async function () {
         const form = document.querySelector('form');
         if (!form) return;
+        if (form.dataset.tbInterviewFormInitialized === '1') return;
+        form.dataset.tbInterviewFormInitialized = '1';
 
         const modeSelect = form.querySelector('select[name="mode"]');
         const meetingInput = form.querySelector('input[name="meeting_link"]');
         const locationInput = form.querySelector('input[name="location"]');
+        const generateButton = form.querySelector('[data-generate-meeting-link]');
+        const generateFeedback = form.querySelector('[data-meeting-link-feedback]');
         const onlineField = form.querySelector('[data-online-field]');
         const onsiteField = form.querySelector('[data-onsite-field]');
+        const mapPickerTrigger = form.querySelector('[data-map-picker-trigger]');
         const notesInput = form.querySelector('textarea[name="notes"]');
         const notesCount = form.querySelector('[data-notes-count]');
+        const mapPickerService = await ensureMapPickerService();
+
+        if (mapPickerService && locationInput && mapPickerTrigger) {
+            mapPickerService.attach(locationInput, mapPickerTrigger);
+        }
+
+        const setGenerateFeedback = function (message, type) {
+            if (!generateFeedback) return;
+            generateFeedback.textContent = message || '';
+            generateFeedback.classList.remove('text-success', 'text-danger', 'text-secondary');
+            if (type === 'success') {
+                generateFeedback.classList.add('text-success');
+            } else if (type === 'error') {
+                generateFeedback.classList.add('text-danger');
+            } else {
+                generateFeedback.classList.add('text-secondary');
+            }
+        };
 
         const applyModeFields = function () {
             const mode = modeSelect ? modeSelect.value : 'online';
@@ -84,6 +119,7 @@
                     meetingInput.required = false;
                     meetingInput.setCustomValidity('');
                 }
+                setGenerateFeedback('', 'info');
                 if (locationInput) locationInput.required = true;
             } else {
                 if (onsiteField) onsiteField.classList.add('d-none');
@@ -103,10 +139,11 @@
 
         if (locationInput) {
             locationInput.addEventListener('input', function () {
-                if (!locationInput.value || locationInput.checkValidity()) {
+                const value = locationInput.value.trim();
+                if (value === '' || (value.length >= 3 && value.length <= 120 && !/[<>]/.test(value))) {
                     locationInput.setCustomValidity('');
                 } else {
-                    locationInput.setCustomValidity('Use 3-120 chars: letters, numbers and , . / # ( ) - only.');
+                    locationInput.setCustomValidity('Use 3-120 visible characters and avoid angle brackets.');
                 }
             });
         }
@@ -119,7 +156,60 @@
             syncNotesCount();
         }
 
+        if (generateButton) {
+            generateButton.addEventListener('click', async function () {
+                if (!meetingInput) return;
+
+                const mode = modeSelect ? modeSelect.value : 'online';
+                if (mode !== 'online') {
+                    setGenerateFeedback('Switch mode to Online to generate a meeting link.', 'error');
+                    return;
+                }
+
+                const endpoint = form.getAttribute('data-generate-link-url') || '';
+                if (endpoint === '') {
+                    setGenerateFeedback('Meeting link endpoint is missing.', 'error');
+                    return;
+                }
+
+                generateButton.disabled = true;
+                setGenerateFeedback('Generating Jitsi link...', 'info');
+
+                const payload = new URLSearchParams();
+                payload.set('mode', mode);
+                payload.set('application_id', form.getAttribute('data-application-id') || '');
+                payload.set('interview_id', form.getAttribute('data-interview-id') || '');
+
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: payload.toString(),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok || !data.ok || !data.meetingLink) {
+                        setGenerateFeedback(data.error || 'Unable to generate a meeting link.', 'error');
+                        return;
+                    }
+
+                    meetingInput.value = data.meetingLink;
+                    setGenerateFeedback('Jitsi meeting link generated.', 'success');
+                } catch (error) {
+                    setGenerateFeedback('Unable to generate a meeting link right now.', 'error');
+                } finally {
+                    generateButton.disabled = false;
+                }
+            });
+        }
+
         applyModeFields();
-    });
+    };
+
+    document.addEventListener('DOMContentLoaded', function () { void initInterviewFormPage(); });
+    document.addEventListener('turbo:load', function () { void initInterviewFormPage(); });
 </script>
 {% endblock %}

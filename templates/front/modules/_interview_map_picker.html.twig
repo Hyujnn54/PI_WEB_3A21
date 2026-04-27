@@ -1,0 +1,472 @@
+<script>
+    (function () {
+        if (window.tbInterviewMapPickerService) {
+            return;
+        }
+
+        const SEARCH_URL = '{{ path('front_interview_map_search') }}';
+        const REVERSE_URL = '{{ path('front_interview_map_reverse') }}';
+        const LEAFLET_JS_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        const LEAFLET_CSS_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        const DEFAULT_CENTER = [36.8065, 10.1815];
+        const DEFAULT_ZOOM = 12;
+        const MAX_LOCATION_LENGTH = 120;
+        let leafletPromise = null;
+        let state = null;
+
+        function ensureLeafletStylesheet() {
+            if (document.querySelector('link[data-tb-leaflet-css="1"]')) {
+                return;
+            }
+
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = LEAFLET_CSS_URL;
+            link.crossOrigin = '';
+            link.dataset.tbLeafletCss = '1';
+            document.head.appendChild(link);
+        }
+
+        function ensureMapPickerStyles() {
+            if (document.getElementById('tbInterviewMapPickerStyles')) {
+                return;
+            }
+
+            const style = document.createElement('style');
+            style.id = 'tbInterviewMapPickerStyles';
+            style.textContent = ''
+                + '#tbInterviewMapPickerMap { min-height: 360px; border-radius: 10px; border: 1px solid #dbe5f5; }\n'
+                + '#tbInterviewMapPickerResults { max-height: 220px; overflow-y: auto; }\n'
+                + '.tb-map-picker-result { text-align: left; white-space: normal; }\n';
+            document.head.appendChild(style);
+        }
+
+        function loadLeafletScript() {
+            if (window.L) {
+                return Promise.resolve(window.L);
+            }
+
+            return new Promise(function (resolve, reject) {
+                const existingScript = document.querySelector('script[data-tb-leaflet-js="1"]');
+                if (existingScript) {
+                    existingScript.addEventListener('load', function () { resolve(window.L); }, { once: true });
+                    existingScript.addEventListener('error', function () { reject(new Error('Unable to load Leaflet.')); }, { once: true });
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = LEAFLET_JS_URL;
+                script.async = true;
+                script.dataset.tbLeafletJs = '1';
+                script.addEventListener('load', function () {
+                    if (window.L) {
+                        resolve(window.L);
+                    } else {
+                        reject(new Error('Leaflet did not initialize correctly.'));
+                    }
+                }, { once: true });
+                script.addEventListener('error', function () {
+                    reject(new Error('Unable to load Leaflet.'));
+                }, { once: true });
+                document.head.appendChild(script);
+            });
+        }
+
+        function sanitizeLabel(value) {
+            return String(value || '')
+                .replace(/[<>\r\n\t]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, MAX_LOCATION_LENGTH);
+        }
+
+        function formatLocationValue(rawLabel) {
+            const label = sanitizeLabel(rawLabel);
+            return label;
+        }
+
+        function resolvePlaceLabel(place) {
+            if (!place || typeof place !== 'object') {
+                return '';
+            }
+
+            return formatLocationValue(place.displayName || place.name || '');
+        }
+
+        function ensureMapPickerModal() {
+            let modal = document.getElementById('tbInterviewMapPickerModal');
+            if (modal) {
+                return modal;
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = ''
+                + '<div class="modal fade" id="tbInterviewMapPickerModal" tabindex="-1" aria-hidden="true">'
+                + '  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">'
+                + '    <div class="modal-content tb-admin-card tb-modal-shell">'
+                + '      <div class="modal-header tb-modal-header">'
+                + '        <h5 class="modal-title"><i class="ti ti-map-pin me-1"></i>Select Interview Location</h5>'
+                + '        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
+                + '      </div>'
+                + '      <div class="modal-body">'
+                + '        <div class="row g-3">'
+                + '          <div class="col-lg-4">'
+                + '            <label class="form-label">Search place</label>'
+                + '            <div class="input-group mb-2">'
+                + '              <input type="text" class="form-control" id="tbInterviewMapPickerSearchInput" placeholder="Google HQ">'
+                + '              <button type="button" class="btn btn-outline-primary" id="tbInterviewMapPickerSearchBtn">Search</button>'
+                + '            </div>'
+                + '            <div class="small text-secondary mb-2">Click a result or click directly on the map.</div>'
+                + '            <div id="tbInterviewMapPickerResults" class="list-group"></div>'
+                + '          </div>'
+                + '          <div class="col-lg-8">'
+                + '            <div id="tbInterviewMapPickerMap"></div>'
+                + '            <div class="small text-secondary mt-2" id="tbInterviewMapPickerSelection">No location selected.</div>'
+                + '          </div>'
+                + '        </div>'
+                + '      </div>'
+                + '      <div class="modal-footer">'
+                + '        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>'
+                + '        <button type="button" class="btn btn-primary" id="tbInterviewMapPickerConfirm" disabled>Use this location</button>'
+                + '      </div>'
+                + '    </div>'
+                + '  </div>'
+                + '</div>';
+
+            document.body.appendChild(wrapper.firstElementChild);
+            return document.getElementById('tbInterviewMapPickerModal');
+        }
+
+        async function searchPlaces(query) {
+            const response = await fetch(SEARCH_URL + '?q=' + encodeURIComponent(query), {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            const payload = await response.json();
+            if (!response.ok || !payload.ok) {
+                throw new Error('Search request failed.');
+            }
+
+            return Array.isArray(payload.results) ? payload.results : [];
+        }
+
+        async function reverseLookup(lat, lng) {
+            const response = await fetch(REVERSE_URL + '?lat=' + encodeURIComponent(String(lat)) + '&lng=' + encodeURIComponent(String(lng)), {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            const payload = await response.json();
+            if (!response.ok || !payload.ok || !payload.place) {
+                throw new Error('Reverse lookup failed.');
+            }
+
+            return payload.place;
+        }
+
+        function ensureLeaflet() {
+            ensureLeafletStylesheet();
+            ensureMapPickerStyles();
+            if (!leafletPromise) {
+                leafletPromise = loadLeafletScript();
+            }
+
+            return leafletPromise;
+        }
+
+        function getState() {
+            if (state) {
+                return state;
+            }
+
+            const modalEl = ensureMapPickerModal();
+            state = {
+                modalEl: modalEl,
+                bootstrapModal: (window.bootstrap && window.bootstrap.Modal) ? new window.bootstrap.Modal(modalEl) : null,
+                map: null,
+                marker: null,
+                mapRoot: document.getElementById('tbInterviewMapPickerMap'),
+                activeInput: null,
+                currentResults: [],
+                selected: null,
+                searchInput: document.getElementById('tbInterviewMapPickerSearchInput'),
+                searchButton: document.getElementById('tbInterviewMapPickerSearchBtn'),
+                resultsRoot: document.getElementById('tbInterviewMapPickerResults'),
+                selectionRoot: document.getElementById('tbInterviewMapPickerSelection'),
+                confirmButton: document.getElementById('tbInterviewMapPickerConfirm'),
+                mapInitAttempted: false,
+            };
+
+            modalEl.addEventListener('shown.bs.modal', function () {
+                if (state && state.map) {
+                    window.setTimeout(function () {
+                        state.map.invalidateSize();
+                    }, 50);
+                }
+            });
+
+            state.searchButton.addEventListener('click', function () {
+                void runSearch();
+            });
+
+            state.searchInput.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    void runSearch();
+                }
+            });
+
+            state.resultsRoot.addEventListener('click', function (event) {
+                const target = event.target instanceof HTMLElement ? event.target.closest('[data-map-result-index]') : null;
+                if (!target) {
+                    return;
+                }
+
+                const index = Number(target.getAttribute('data-map-result-index'));
+                if (!Number.isFinite(index) || index < 0 || index >= state.currentResults.length) {
+                    return;
+                }
+
+                const place = state.currentResults[index];
+                const resolvedLabel = resolvePlaceLabel(place);
+                if (resolvedLabel === '') {
+                    return;
+                }
+
+                selectLocation(resolvedLabel, Number(place.lat), Number(place.lng), true);
+            });
+
+            state.confirmButton.addEventListener('click', function () {
+                applySelectionToInput();
+            });
+
+            return state;
+        }
+
+        function renderResults(places) {
+            const localState = getState();
+            localState.currentResults = places;
+
+            if (places.length === 0) {
+                localState.resultsRoot.innerHTML = '<div class="small text-secondary">No results found.</div>';
+                return;
+            }
+
+            localState.resultsRoot.innerHTML = places.map(function (place, index) {
+                const title = sanitizeLabel(place.name || place.displayName || 'Selected location');
+                const exactLabel = resolvePlaceLabel(place);
+                const preview = Number(place.lat).toFixed(5) + ', ' + Number(place.lng).toFixed(5);
+
+                return ''
+                    + '<button type="button" class="list-group-item list-group-item-action tb-map-picker-result" data-map-result-index="' + String(index) + '">'
+                    + '  <div class="fw-semibold">' + title + '</div>'
+                    + (exactLabel !== '' && exactLabel !== title ? '  <div class="small text-secondary">' + exactLabel + '</div>' : '')
+                    + '  <div class="small text-secondary">' + preview + '</div>'
+                    + '</button>';
+            }).join('');
+        }
+
+        function renderSelection() {
+            const localState = getState();
+            localState.selectionRoot.textContent = localState.selected
+                ? 'Selected: ' + localState.selected.formatted
+                : 'No location selected.';
+            localState.confirmButton.disabled = !localState.selected;
+        }
+
+        function selectLocation(label, lat, lng, centerMap) {
+            const localState = getState();
+            const safeLat = Number(lat);
+            const safeLng = Number(lng);
+            const formattedLabel = formatLocationValue(label);
+            if (!Number.isFinite(safeLat) || !Number.isFinite(safeLng)) {
+                return;
+            }
+            if (formattedLabel === '' || formattedLabel.toLowerCase() === 'pinned location') {
+                return;
+            }
+
+            localState.selected = {
+                label: sanitizeLabel(formattedLabel),
+                lat: safeLat,
+                lng: safeLng,
+                formatted: formattedLabel
+            };
+
+            if (localState.marker) {
+                localState.marker.setLatLng([safeLat, safeLng]);
+            }
+
+            if (localState.map && centerMap) {
+                localState.map.setView([safeLat, safeLng], 15);
+            }
+
+            renderSelection();
+        }
+
+        async function runSearch() {
+            const localState = getState();
+            const query = localState.searchInput.value.trim();
+            if (query === '') {
+                renderResults([]);
+                return;
+            }
+
+            localState.searchButton.disabled = true;
+
+            try {
+                const places = await searchPlaces(query);
+                renderResults(places);
+                if (places.length > 0 && localState.map) {
+                    localState.map.setView([Number(places[0].lat), Number(places[0].lng)], 14);
+                }
+            } catch (error) {
+                localState.resultsRoot.innerHTML = '<div class="small text-danger">Unable to search map locations right now.</div>';
+            } finally {
+                localState.searchButton.disabled = false;
+            }
+        }
+
+        async function ensureMapInstance() {
+            const localState = getState();
+            if (localState.map || localState.mapInitAttempted) {
+                return localState;
+            }
+
+            localState.mapInitAttempted = true;
+
+            try {
+                const L = await ensureLeaflet();
+                localState.map = L.map('tbInterviewMapPickerMap').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(localState.map);
+
+                localState.marker = L.marker(DEFAULT_CENTER).addTo(localState.map);
+                localState.map.on('click', async function (event) {
+                    const lat = event.latlng.lat;
+                    const lng = event.latlng.lng;
+                    localState.selected = null;
+                    renderSelection();
+                    localState.selectionRoot.textContent = 'Looking up exact location...';
+                    if (localState.marker) {
+                        localState.marker.setLatLng([lat, lng]);
+                    }
+
+                    try {
+                        const place = await reverseLookup(lat, lng);
+                        const resolvedLabel = resolvePlaceLabel(place);
+                        if (resolvedLabel !== '') {
+                            selectLocation(resolvedLabel, lat, lng, false);
+                        } else {
+                            localState.selectionRoot.textContent = 'Unable to detect the exact location. Try clicking again or use search.';
+                        }
+                    } catch (error) {
+                        localState.selectionRoot.textContent = 'Unable to detect the exact location. Try clicking again or use search.';
+                    }
+                });
+            } catch (error) {
+                localState.mapRoot.innerHTML = ''
+                    + '<div class="d-flex align-items-center justify-content-center h-100 px-3 py-4 text-center text-secondary" style="min-height:360px;">'
+                    + '<div>'
+                    + '<div class="mb-2"><i class="ti ti-map-off" style="font-size:1.8rem;"></i></div>'
+                    + '<div>Map preview is unavailable right now.</div>'
+                    + '<div class="small mt-1">You can still search places and select one.</div>'
+                    + '</div>'
+                    + '</div>';
+            }
+
+            return localState;
+        }
+
+        function applySelectionToInput() {
+            const localState = getState();
+            if (!localState.activeInput || !localState.selected) {
+                return;
+            }
+
+            localState.activeInput.value = localState.selected.formatted;
+            localState.activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            localState.activeInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+            if (localState.bootstrapModal) {
+                localState.bootstrapModal.hide();
+            } else {
+                localState.modalEl.classList.remove('show');
+                localState.modalEl.style.display = 'none';
+                localState.modalEl.setAttribute('aria-hidden', 'true');
+            }
+        }
+
+        async function open(input) {
+            if (!(input instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const localState = await ensureMapInstance();
+            localState.activeInput = input;
+            localState.currentResults = [];
+            renderResults([]);
+
+            const existingValue = formatLocationValue(input.value);
+            if (existingValue !== '' && existingValue.toLowerCase() !== 'pinned location') {
+                localState.selected = {
+                    label: sanitizeLabel(existingValue),
+                    lat: DEFAULT_CENTER[0],
+                    lng: DEFAULT_CENTER[1],
+                    formatted: existingValue
+                };
+                renderSelection();
+            } else {
+                localState.selected = null;
+                renderSelection();
+            }
+
+            if (localState.map) {
+                localState.map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+            }
+            if (localState.marker) {
+                localState.marker.setLatLng(DEFAULT_CENTER);
+            }
+
+            localState.searchInput.value = '';
+
+            if (localState.bootstrapModal) {
+                localState.bootstrapModal.show();
+            } else {
+                localState.modalEl.classList.add('show');
+                localState.modalEl.style.display = 'block';
+                localState.modalEl.removeAttribute('aria-hidden');
+            }
+
+            window.setTimeout(function () {
+                localState.searchInput.focus();
+            }, 50);
+        }
+
+        window.tbInterviewMapPickerService = {
+            attach: function (input, triggerButton) {
+                if (!(input instanceof HTMLInputElement) || !(triggerButton instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (triggerButton.dataset.tbMapPickerBound === '1') {
+                    return;
+                }
+                triggerButton.dataset.tbMapPickerBound = '1';
+
+                triggerButton.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    void open(input);
+                });
+            },
+            open: open
+        };
+    })();
+</script>
