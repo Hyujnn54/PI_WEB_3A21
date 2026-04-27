@@ -40,7 +40,7 @@ class BackOfficeController extends AbstractController
         'Description trompeuse',
         'Other',
     ];
-    private const XAI_MODELS = ['grok-3-mini', 'grok-2-latest', 'grok-beta'];
+    private const GROQ_WARNING_MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
 
     #[Route('/admin', name: 'back_dashboard')]
     #[Route('/admin', name: 'app_admin')]
@@ -607,9 +607,14 @@ class BackOfficeController extends AbstractController
     #[Route('/admin/job-offers/warning/ai-generate', name: 'app_admin_job_offer_warning_ai_generate', methods: ['POST'])]
     public function generateWarningMessageWithAi(Request $request, Connection $connection, HttpClientInterface $httpClient): JsonResponse
     {
-        $currentAdminId = (string) $request->getSession()->get('user_id', '');
+        $user = $this->getUser();
+        $currentAdminId = $user instanceof Users ? (string) $user->getId() : '';
         if ($currentAdminId === '') {
             return new JsonResponse(['ok' => false, 'error' => 'Admin session is required.'], 403);
+        }
+
+        if (!in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return new JsonResponse(['ok' => false, 'error' => 'Only admins can generate warning messages.'], 403);
         }
 
         $payload = json_decode((string) $request->getContent(), true);
@@ -658,12 +663,12 @@ class BackOfficeController extends AbstractController
             . "Description: " . (string) ($offer['description'] ?? '') . "\n"
             . "Skills: {$skillsList}\n";
 
-        $apiKey = $this->resolveXaiApiKey();
+        $apiKey = $this->resolveGroqApiKey();
         $warningMessage = '';
         $source = 'fallback';
 
         if ($apiKey !== '') {
-            $aiResult = $this->requestXaiWarningMessage($httpClient, $apiKey, $prompt);
+            $aiResult = $this->requestGroqWarningMessage($httpClient, $apiKey, $prompt);
             if (($aiResult['ok'] ?? false) === true) {
                 $warningMessage = $this->normalizeWarningMessage((string) ($aiResult['message'] ?? ''));
                 $source = 'ai';
@@ -1466,12 +1471,12 @@ SQL;
         return null;
     }
 
-    private function resolveXaiApiKey(): string
+    private function resolveGroqApiKey(): string
     {
         $candidates = [
-            $_ENV['XAI_API_KEY'] ?? null,
-            $_SERVER['XAI_API_KEY'] ?? null,
-            getenv('XAI_API_KEY') ?: null,
+            $_ENV['GROQ_API_KEY'] ?? null,
+            $_SERVER['GROQ_API_KEY'] ?? null,
+            getenv('GROQ_API_KEY') ?: null,
         ];
 
         foreach ($candidates as $candidate) {
@@ -1484,11 +1489,11 @@ SQL;
         return '';
     }
 
-    private function requestXaiWarningMessage(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
+    private function requestGroqWarningMessage(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
     {
-        foreach (self::XAI_MODELS as $model) {
+        foreach (self::GROQ_WARNING_MODELS as $model) {
             try {
-                $response = $httpClient->request('POST', 'https://api.x.ai/v1/chat/completions', [
+                $response = $httpClient->request('POST', 'https://api.groq.com/openai/v1/chat/completions', [
                     'headers' => [
                         'Authorization' => 'Bearer ' . $apiKey,
                         'Content-Type' => 'application/json',
@@ -1500,6 +1505,7 @@ SQL;
                             ['role' => 'user', 'content' => $prompt],
                         ],
                         'temperature' => 0.3,
+                        'max_tokens' => 260,
                     ],
                     'timeout' => 25,
                 ]);
@@ -1520,7 +1526,7 @@ SQL;
             }
         }
 
-        return ['ok' => false, 'message' => 'xAI generation unavailable'];
+        return ['ok' => false, 'message' => 'Groq generation unavailable'];
     }
 
     private function normalizeWarningMessage(string $raw): string
