@@ -1124,15 +1124,9 @@ class FrontPortalController extends AbstractController
         $registeredIds = [];
 
         $candidate = $this->resolveCurrentCandidate($request);
-        $candidateName = trim((string) $session->get('candidate_name', ''));
-
-        if ($candidate instanceof Candidate) {
-            $myRegs = $entityManager->getRepository(Event_registration::class)->findBy(['candidate_id' => $candidate]);
-        } elseif ($candidateName !== '') {
-            $myRegs = $entityManager->getRepository(Event_registration::class)->findBy(['candidate_name' => $candidateName]);
-        } else {
-            $myRegs = [];
-        }
+        $myRegs = $candidate instanceof Candidate
+            ? $entityManager->getRepository(Event_registration::class)->findBy(['candidate_id' => $candidate])
+            : [];
 
         if (count($myRegs) > 0) {
             foreach ($myRegs as $registration) {
@@ -1197,18 +1191,8 @@ class FrontPortalController extends AbstractController
         $registeredIds = $session->get('registered_event_ids', []);
 
         $candidate = $this->resolveCurrentCandidate($request);
-        $candidateName = trim((string) $session->get('candidate_name', ''));
-        $candidateEmail = trim((string) $session->get('candidate_email', ''));
 
-        if ($candidate instanceof Candidate) {
-            $fullName = trim(((string) $candidate->getFirstName()) . ' ' . ((string) $candidate->getLastName()));
-            $candidateName = $fullName !== '' ? $fullName : trim((string) $candidate->getFirstName());
-            $candidateEmail = (string) $candidate->getEmail();
-            $session->set('candidate_name', $candidateName);
-            $session->set('candidate_email', $candidateEmail);
-        }
-
-        if ($candidateName === '' && $candidateEmail === '') {
+        if (!$candidate instanceof Candidate) {
             $this->addFlash('warning', 'Please log in with a candidate account to register for events.');
             return $this->redirectToRoute('app_login');
         }
@@ -1220,17 +1204,9 @@ class FrontPortalController extends AbstractController
             $registrationRepository = $entityManager->getRepository(Event_registration::class);
             $queryBuilder = $registrationRepository->createQueryBuilder('er')
                 ->where('IDENTITY(er.event_id) = :eventId')
-                ->setParameter('eventId', $event->getId());
-
-            if ($candidate instanceof Candidate) {
-                $queryBuilder
-                    ->andWhere('IDENTITY(er.candidate_id) = :candidateId')
-                    ->setParameter('candidateId', $candidate->getId());
-            } else {
-                $queryBuilder
-                    ->andWhere('er.candidate_name = :candidateName')
-                    ->setParameter('candidateName', $candidateName);
-            }
+                ->andWhere('IDENTITY(er.candidate_id) = :candidateId')
+                ->setParameter('eventId', $event->getId())
+                ->setParameter('candidateId', $candidate->getId());
 
             $existing = $queryBuilder->getQuery()->getOneOrNullResult();
 
@@ -1238,11 +1214,7 @@ class FrontPortalController extends AbstractController
                 $registration = new Event_registration();
                 $registration->setId($this->nextNumericId(Event_registration::class));
                 $registration->setEvent_id($event);
-                if ($candidate instanceof Candidate) {
-                    $registration->setCandidate_id($candidate);
-                }
-                $registration->setCandidate_name((string) $candidateName);
-                $registration->setCandidate_email((string) $candidateEmail);
+                $registration->setCandidate_id($candidate);
                 $registration->setRegistered_at(date_create());
                 $registration->setAttendance_status('registered');
 
@@ -1286,19 +1258,12 @@ class FrontPortalController extends AbstractController
         $session->set('registered_event_ids', $registeredIds);
 
         $candidate = $this->resolveCurrentCandidate($request);
-        $candidateName = trim((string) $session->get('candidate_name', ''));
-        if ($candidate instanceof Candidate || $candidateName !== '') {
-            if ($candidate instanceof Candidate) {
-                $registration = $entityManager->getRepository(Event_registration::class)->findOneBy([
-                    'event_id' => $event,
-                    'candidate_id' => $candidate,
-                ]);
-            } else {
-                $registration = $entityManager->getRepository(Event_registration::class)->findOneBy([
-                    'event_id' => $event,
-                    'candidate_name' => $candidateName,
-                ]);
-            }
+
+        if ($candidate instanceof Candidate) {
+            $registration = $entityManager->getRepository(Event_registration::class)->findOneBy([
+                'event_id' => $event,
+                'candidate_id' => $candidate,
+            ]);
 
             if ($registration) {
                 $entityManager->remove($registration);
@@ -1322,16 +1287,11 @@ class FrontPortalController extends AbstractController
         $session = $request->getSession();
 
         $candidate = $this->resolveCurrentCandidate($request);
-        $candidateName = trim((string) $session->get('candidate_name', ''));
         $registeredIds = [];
 
-        if ($candidate instanceof Candidate) {
-            $myRegs = $entityManager->getRepository(Event_registration::class)->findBy(['candidate_id' => $candidate]);
-        } elseif ($candidateName !== '') {
-            $myRegs = $entityManager->getRepository(Event_registration::class)->findBy(['candidate_name' => $candidateName]);
-        } else {
-            $myRegs = [];
-        }
+        $myRegs = $candidate instanceof Candidate
+            ? $entityManager->getRepository(Event_registration::class)->findBy(['candidate_id' => $candidate])
+            : [];
 
         if (count($myRegs) > 0) {
             foreach ($myRegs as $registration) {
@@ -1384,18 +1344,9 @@ class FrontPortalController extends AbstractController
         $session->set('registered_event_ids', []);
 
         $candidate = $this->resolveCurrentCandidate($request);
-        $candidateName = trim((string) $session->get('candidate_name', ''));
-        if ($candidate instanceof Candidate) {
-            $registrations = $entityManager->getRepository(Event_registration::class)->findBy([
-                'candidate_id' => $candidate,
-            ]);
-        } elseif ($candidateName !== '') {
-            $registrations = $entityManager->getRepository(Event_registration::class)->findBy([
-                'candidate_name' => $candidateName,
-            ]);
-        } else {
-            $registrations = [];
-        }
+        $registrations = $candidate instanceof Candidate
+            ? $entityManager->getRepository(Event_registration::class)->findBy(['candidate_id' => $candidate])
+            : [];
 
         if (count($registrations) > 0) {
 
@@ -1427,6 +1378,8 @@ class FrontPortalController extends AbstractController
             ], ['id' => 'DESC']);
         }
 
+        $now = new \DateTimeImmutable();
+        $urgentNotifications = [];
         $eventsData = [];
         foreach ($events as $event) {
             $registrations = $event->getEvent_registrations();
@@ -1446,10 +1399,10 @@ class FrontPortalController extends AbstractController
                 }
 
                 if ($candidateFullName === '') {
-                    $candidateFullName = (string) ($registration->getCandidate_name() ?? 'Unknown');
+                    $candidateFullName = 'Unknown';
                 }
                 if ($candidateEmail === '') {
-                    $candidateEmail = (string) ($registration->getCandidate_email() ?? 'N/A');
+                    $candidateEmail = 'N/A';
                 }
 
                 $candidatesList[] = [
@@ -1458,6 +1411,25 @@ class FrontPortalController extends AbstractController
                     'email' => $candidateEmail,
                     'registered_at' => $registration->getRegistered_at(),
                     'status' => $registration->getAttendance_status() ?? 'registered',
+                ];
+            }
+
+            $pendingActionsCount = 0;
+            foreach ($candidatesList as $candidateRow) {
+                $status = strtolower(trim((string) ($candidateRow['status'] ?? '')));
+                if (!in_array($status, ['confirmed', 'rejected'], true)) {
+                    $pendingActionsCount += 1;
+                }
+            }
+
+            $secondsUntilEvent = $event->getEvent_date()->getTimestamp() - $now->getTimestamp();
+            $isUrgent = $pendingActionsCount > 0 && $secondsUntilEvent >= 0 && $secondsUntilEvent <= (72 * 3600);
+
+            if ($isUrgent) {
+                $urgentNotifications[] = [
+                    'title' => (string) $event->getTitle(),
+                    'pending_count' => $pendingActionsCount,
+                    'event_date' => $event->getEvent_date(),
                 ];
             }
 
@@ -1471,12 +1443,15 @@ class FrontPortalController extends AbstractController
                 'event_type' => $event->getEvent_type(),
                 'registrations' => $candidatesList,
                 'registration_count' => count($candidatesList),
+                'pending_actions_count' => $pendingActionsCount,
+                'is_urgent' => $isUrgent,
             ];
         }
 
         return $this->render('front/modules/recruiter_event_registrations.html.twig', [
             'authUser' => ['role' => $role],
             'events' => $eventsData,
+            'urgentNotifications' => $urgentNotifications,
         ]);
     }
 
@@ -1510,10 +1485,10 @@ class FrontPortalController extends AbstractController
                 }
 
                 if ($candidateFullName === '') {
-                    $candidateFullName = (string) ($registration->getCandidate_name() ?? 'Unknown');
+                    $candidateFullName = 'Unknown';
                 }
                 if ($candidateEmail === '') {
-                    $candidateEmail = (string) ($registration->getCandidate_email() ?? 'N/A');
+                    $candidateEmail = 'N/A';
                 }
 
                 $candidatesList[] = [
@@ -1523,6 +1498,14 @@ class FrontPortalController extends AbstractController
                     'registered_at' => $registration->getRegistered_at(),
                     'status' => $registration->getAttendance_status() ?? 'registered',
                 ];
+            }
+
+            $pendingActionsCount = 0;
+            foreach ($candidatesList as $candidateRow) {
+                $status = strtolower(trim((string) ($candidateRow['status'] ?? '')));
+                if (!in_array($status, ['confirmed', 'rejected'], true)) {
+                    $pendingActionsCount += 1;
+                }
             }
 
             $eventsData[] = [
@@ -1535,6 +1518,8 @@ class FrontPortalController extends AbstractController
                 'event_type' => $event->getEvent_type(),
                 'registrations' => $candidatesList,
                 'registration_count' => count($candidatesList),
+                'pending_actions_count' => $pendingActionsCount,
+                'is_urgent' => false,
             ];
         }
 

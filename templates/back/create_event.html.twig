@@ -2,6 +2,49 @@
 
 {% block title %}Talent Bridge | {{ isEdit|default(false) ? 'Edit Event' : 'Create Event' }}{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        #eventLocationMap {
+            height: 280px;
+            border-radius: 12px;
+            border: 1px solid rgba(98, 105, 118, 0.25);
+        }
+
+        .tb-map-results {
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid rgba(98, 105, 118, 0.18);
+            border-radius: 8px;
+        }
+
+        .tb-map-result-btn {
+            width: 100%;
+            border: 0;
+            border-bottom: 1px solid rgba(98, 105, 118, 0.12);
+            background: #fff;
+            text-align: left;
+            padding: 0.55rem 0.75rem;
+            font-size: 0.9rem;
+            color: #1f2937;
+        }
+
+        .tb-map-result-btn:last-child {
+            border-bottom: 0;
+        }
+
+        .tb-map-result-btn:hover {
+            background: #f3f6fb;
+        }
+    </style>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
 {% block body %}
 <div class="page-wrapper">
     <div class="page-header d-print-none">
@@ -41,8 +84,14 @@
                                 <small class="text-danger d-none" id="titleError"></small>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Description <span class="text-danger">*</span></label>
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1 flex-wrap">
+                                    <label class="form-label mb-0">Description <span class="text-danger">*</span></label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="generateDescriptionBtn">
+                                        <i class="ti ti-sparkles me-1"></i>Generate with AI
+                                    </button>
+                                </div>
                                 <textarea name="description" id="description" class="form-control" rows="3" minlength="10">{{ formData.description|default('') }}</textarea>
+                                <small class="text-secondary d-block mt-1" id="generateDescriptionHint">Fill title, type, location, and date, then generate.</small>
                                 <small class="text-danger d-none" id="descriptionError"></small>
                             </div>
                             <div class="mb-3">
@@ -58,7 +107,21 @@
                             <div class="mb-3">
                                 <label class="form-label">Location <span class="text-danger">*</span></label>
                                 <input type="text" name="location" id="location" class="form-control" minlength="2" value="{{ formData.location|default('') }}">
+                                <input type="hidden" name="location_lat" id="location_lat" value="{{ formData.location_lat|default('') }}">
+                                <input type="hidden" name="location_lng" id="location_lng" value="{{ formData.location_lng|default('') }}">
                                 <small class="text-danger d-none" id="locationError"></small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Choose Destination on Map</label>
+                                <div class="input-group mb-2">
+                                    <input type="text" id="mapSearchQuery" class="form-control" placeholder="Search an address, city, or place">
+                                    <button type="button" class="btn btn-outline-primary" id="mapSearchBtn">
+                                        <i class="ti ti-search me-1"></i>Search
+                                    </button>
+                                </div>
+                                <div id="mapSearchResults" class="tb-map-results d-none mb-2"></div>
+                                <div id="eventLocationMap"></div>
+                                <small class="text-secondary d-block mt-2">Click on the map or search for a place. The selected destination will fill the location field automatically.</small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Event Date <span class="text-danger">*</span></label>
@@ -86,9 +149,25 @@
     </div>
 
     <script>
+        const mapSearchUrl = '{{ path('front_interview_map_search') }}';
+        const mapReverseUrl = '{{ path('front_interview_map_reverse') }}';
+        const generateDescriptionUrl = '{{ path('recruiter_generate_event_description') }}';
+
         const createEventForm = document.getElementById('createEventForm');
         const eventTypeSelect = document.getElementById('event_type');
         const meetLinkContainer = document.getElementById('meetLinkContainer');
+        const meetLinkInput = document.getElementById('meet_link');
+        const locationInput = document.getElementById('location');
+        const locationLatInput = document.getElementById('location_lat');
+        const locationLngInput = document.getElementById('location_lng');
+        const mapSearchInput = document.getElementById('mapSearchQuery');
+        const mapSearchBtn = document.getElementById('mapSearchBtn');
+        const mapSearchResults = document.getElementById('mapSearchResults');
+        const generateDescriptionBtn = document.getElementById('generateDescriptionBtn');
+        const generateDescriptionHint = document.getElementById('generateDescriptionHint');
+
+        let eventMap = null;
+        let eventLocationMarker = null;
 
         function toggleMeetLinkVisibility() {
             if (!eventTypeSelect || !meetLinkContainer) {
@@ -97,6 +176,10 @@
 
             const isWebinar = eventTypeSelect.value === 'Webinar';
             meetLinkContainer.classList.toggle('d-none', !isWebinar);
+
+            if (!isWebinar && meetLinkInput) {
+                meetLinkInput.value = '';
+            }
         }
 
         function validateForm() {
@@ -155,7 +238,7 @@
             if (!capacity) {
                 errors.capacity = 'Capacity is required.';
             } else {
-                const cap = parseInt(capacity);
+                const cap = parseInt(capacity, 10);
                 if (cap < 1) {
                     errors.capacity = 'Capacity must be at least 1.';
                 } else if (cap > 1000) {
@@ -191,17 +274,266 @@
             }
         }
 
-        createEventForm.addEventListener('submit', function(e) {
-            if (!validateForm()) {
-                e.preventDefault();
+        function renderMapSearchResults(results) {
+            if (!mapSearchResults) {
+                return;
             }
-        });
+
+            if (!Array.isArray(results) || results.length === 0) {
+                mapSearchResults.innerHTML = '';
+                mapSearchResults.classList.add('d-none');
+                return;
+            }
+
+            mapSearchResults.innerHTML = '';
+            mapSearchResults.classList.remove('d-none');
+
+            results.forEach(function (result) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'tb-map-result-btn';
+
+                const label = String(result.displayName || result.name || 'Selected location');
+                const lat = Number(result.lat);
+                const lng = Number(result.lng);
+
+                button.textContent = label;
+                button.addEventListener('click', function () {
+                    if (Number.isNaN(lat) || Number.isNaN(lng) || !eventMap) {
+                        return;
+                    }
+
+                    setPickedLocation(lat, lng, label, true);
+                    mapSearchResults.innerHTML = '';
+                    mapSearchResults.classList.add('d-none');
+                });
+
+                mapSearchResults.appendChild(button);
+            });
+        }
+
+        function setPickedLocation(lat, lng, label, focusMap) {
+            if (!eventMap || Number.isNaN(lat) || Number.isNaN(lng)) {
+                return;
+            }
+
+            if (!eventLocationMarker) {
+                eventLocationMarker = L.marker([lat, lng]).addTo(eventMap);
+            } else {
+                eventLocationMarker.setLatLng([lat, lng]);
+            }
+
+            eventLocationMarker.bindPopup(label || 'Selected destination').openPopup();
+
+            if (locationInput && label) {
+                locationInput.value = label;
+            }
+            if (locationLatInput) {
+                locationLatInput.value = String(lat);
+            }
+            if (locationLngInput) {
+                locationLngInput.value = String(lng);
+            }
+
+            if (focusMap) {
+                eventMap.setView([lat, lng], 14);
+            }
+        }
+
+        async function reverseGeocode(lat, lng) {
+            const url = mapReverseUrl + '?lat=' + encodeURIComponent(String(lat)) + '&lng=' + encodeURIComponent(String(lng));
+
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Reverse geocoding request failed');
+                }
+
+                const data = await response.json();
+                const place = data && typeof data === 'object' ? data.place : null;
+                if (place && typeof place === 'object') {
+                    const label = String(place.displayName || place.name || '').trim();
+                    if (label !== '') {
+                        return label;
+                    }
+                }
+            } catch (_) {
+                // Keep coordinate fallback.
+            }
+
+            return lat.toFixed(6) + ', ' + lng.toFixed(6);
+        }
+
+        async function searchDestination() {
+            if (!mapSearchInput) {
+                return;
+            }
+
+            const query = mapSearchInput.value.trim();
+            if (!query) {
+                renderMapSearchResults([]);
+                return;
+            }
+
+            try {
+                const response = await fetch(mapSearchUrl + '?q=' + encodeURIComponent(query), {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Search request failed');
+                }
+
+                const data = await response.json();
+                const results = data && Array.isArray(data.results) ? data.results : [];
+                renderMapSearchResults(results);
+            } catch (_) {
+                renderMapSearchResults([]);
+            }
+        }
+
+        function initializeLocationMap() {
+            const mapContainer = document.getElementById('eventLocationMap');
+            if (!mapContainer || typeof L === 'undefined') {
+                return;
+            }
+
+            eventMap = L.map(mapContainer).setView([36.8065, 10.1815], 6);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(eventMap);
+
+            eventMap.on('click', async function (ev) {
+                const lat = ev.latlng.lat;
+                const lng = ev.latlng.lng;
+                const label = await reverseGeocode(lat, lng);
+                setPickedLocation(lat, lng, label, false);
+            });
+
+            if (mapSearchBtn) {
+                mapSearchBtn.addEventListener('click', searchDestination);
+            }
+
+            if (mapSearchInput) {
+                mapSearchInput.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        searchDestination();
+                    }
+                });
+            }
+
+            const rawLat = locationLatInput ? parseFloat(locationLatInput.value) : NaN;
+            const rawLng = locationLngInput ? parseFloat(locationLngInput.value) : NaN;
+            if (!Number.isNaN(rawLat) && !Number.isNaN(rawLng)) {
+                setPickedLocation(rawLat, rawLng, locationInput && locationInput.value ? locationInput.value : 'Selected destination', true);
+            } else if (locationInput && locationInput.value.trim() !== '' && mapSearchInput) {
+                mapSearchInput.value = locationInput.value.trim();
+                searchDestination();
+            }
+
+            setTimeout(function () {
+                if (eventMap) {
+                    eventMap.invalidateSize();
+                }
+            }, 150);
+        }
+
+        async function generateDescriptionWithAI() {
+            const title = document.getElementById('title').value.trim();
+            const eventType = document.getElementById('event_type').value.trim();
+            const location = document.getElementById('location').value.trim();
+            const eventDate = document.getElementById('event_date').value;
+            const capacity = document.getElementById('capacity').value.trim();
+            const descriptionField = document.getElementById('description');
+
+            if (!title || !eventType || !location || !eventDate) {
+                if (generateDescriptionHint) {
+                    generateDescriptionHint.textContent = 'Please fill title, event type, location, and event date first.';
+                    generateDescriptionHint.classList.remove('text-secondary');
+                    generateDescriptionHint.classList.add('text-danger');
+                }
+                return;
+            }
+
+            if (generateDescriptionBtn) {
+                generateDescriptionBtn.disabled = true;
+                generateDescriptionBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Generating...';
+            }
+
+            try {
+                const response = await fetch(generateDescriptionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        event_type: eventType,
+                        location: location,
+                        event_date: eventDate,
+                        capacity: capacity
+                    })
+                });
+
+                const data = await response.json().catch(function () { return {}; });
+                if (!response.ok || !data.ok) {
+                    throw new Error(data.error || 'Unable to generate description.');
+                }
+
+                if (descriptionField && typeof data.description === 'string' && data.description.trim() !== '') {
+                    descriptionField.value = data.description;
+                }
+
+                if (generateDescriptionHint) {
+                    generateDescriptionHint.textContent = 'Description generated. You can edit it before saving.';
+                    generateDescriptionHint.classList.remove('text-danger');
+                    generateDescriptionHint.classList.add('text-secondary');
+                }
+            } catch (error) {
+                if (generateDescriptionHint) {
+                    generateDescriptionHint.textContent = error && error.message ? error.message : 'Unable to generate description right now.';
+                    generateDescriptionHint.classList.remove('text-secondary');
+                    generateDescriptionHint.classList.add('text-danger');
+                }
+            } finally {
+                if (generateDescriptionBtn) {
+                    generateDescriptionBtn.disabled = false;
+                    generateDescriptionBtn.innerHTML = '<i class="ti ti-sparkles me-1"></i>Generate with AI';
+                }
+            }
+        }
+
+        if (createEventForm) {
+            createEventForm.addEventListener('submit', function (event) {
+                if (!validateForm()) {
+                    event.preventDefault();
+                }
+            });
+        }
 
         if (eventTypeSelect) {
             eventTypeSelect.addEventListener('change', toggleMeetLinkVisibility);
         }
 
+        if (generateDescriptionBtn) {
+            generateDescriptionBtn.addEventListener('click', generateDescriptionWithAI);
+        }
+
         toggleMeetLinkVisibility();
+        initializeLocationMap();
     </script>
 </div>
 {% endblock %}

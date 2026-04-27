@@ -28,10 +28,8 @@ class Event_registration
     #[ORM\Column(type: "string", length: 255)]
     private string $attendance_status;
 
-    #[ORM\Column(type: "string", length: 255, nullable: true)]
     private ?string $candidate_name = null;
 
-    #[ORM\Column(type: "string", length: 255, nullable: true)]
     private ?string $candidate_email = null;
 
     public function getId()

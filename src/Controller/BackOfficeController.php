@@ -1180,15 +1180,40 @@ SQL;
         }
 
         $errors = [];
+        $formData = [
+            'title' => '',
+            'description' => '',
+            'event_type' => '',
+            'location' => '',
+            'location_lat' => '',
+            'location_lng' => '',
+            'event_date' => '',
+            'capacity' => '50',
+            'meet_link' => '',
+        ];
 
         if ($request->isMethod('POST')) {
             $title = trim((string) $request->request->get('title', ''));
             $description = trim((string) $request->request->get('description', ''));
             $eventType = trim((string) $request->request->get('event_type', ''));
             $location = trim((string) $request->request->get('location', ''));
+            $locationLat = trim((string) $request->request->get('location_lat', ''));
+            $locationLng = trim((string) $request->request->get('location_lng', ''));
             $eventDate = (string) $request->request->get('event_date', '');
             $capacity = (string) $request->request->get('capacity', '');
             $meetLink = trim((string) $request->request->get('meet_link', ''));
+
+            $formData = [
+                'title' => $title,
+                'description' => $description,
+                'event_type' => $eventType,
+                'location' => $location,
+                'location_lat' => $locationLat,
+                'location_lng' => $locationLng,
+                'event_date' => $eventDate,
+                'capacity' => $capacity === '' ? '50' : $capacity,
+                'meet_link' => $meetLink,
+            ];
 
             if ($title === '') {
                 $errors['title'] = 'Event title is required.';
@@ -1269,16 +1294,106 @@ SQL;
             'authUser' => ['role' => 'recruiter'],
             'errors' => $errors,
             'isEdit' => false,
-            'formData' => [
-                'title' => '',
-                'description' => '',
-                'event_type' => '',
-                'location' => '',
-                'event_date' => '',
-                'capacity' => '50',
-                'meet_link' => '',
-            ],
+            'formData' => $formData,
         ]);
+    }
+
+    #[Route('/recruiter/events/ai-description', name: 'recruiter_generate_event_description', methods: ['POST'])]
+    public function generateEventDescription(Request $request, EntityManagerInterface $entityManager, HttpClientInterface $httpClient): JsonResponse
+    {
+        $currentRecruiter = $this->resolveCurrentRecruiter($request, $entityManager);
+        if (!$currentRecruiter instanceof Recruiter) {
+            return new JsonResponse(['ok' => false, 'error' => 'Recruiter session is required.'], 403);
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        $title = trim((string) ($payload['title'] ?? ''));
+        $eventType = trim((string) ($payload['event_type'] ?? ''));
+        $location = trim((string) ($payload['location'] ?? ''));
+        $eventDate = trim((string) ($payload['event_date'] ?? ''));
+        $capacity = trim((string) ($payload['capacity'] ?? ''));
+
+        if ($title === '' || $eventType === '' || $location === '' || $eventDate === '') {
+            return new JsonResponse(['ok' => false, 'error' => 'Title, event type, location, and event date are required.'], 400);
+        }
+
+        $apiUrl = trim((string) ($_ENV['AI_CHAT_COMPLETIONS_URL'] ?? $_SERVER['AI_CHAT_COMPLETIONS_URL'] ?? getenv('AI_CHAT_COMPLETIONS_URL') ?: ''));
+        if ($apiUrl === '') {
+            $apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+        }
+
+        $model = trim((string) ($_ENV['AI_MODEL'] ?? $_SERVER['AI_MODEL'] ?? getenv('AI_MODEL') ?: ''));
+        if ($model === '') {
+            $model = 'openrouter/auto';
+        }
+
+        $apiKey = $this->resolveEventDescriptionApiKey();
+        $fallbackDescription = $this->buildEventDescriptionFallback($title, $eventType, $location, $eventDate, $capacity);
+
+        if ($apiKey === '') {
+            return new JsonResponse([
+                'ok' => true,
+                'description' => $fallbackDescription,
+                'source' => 'fallback',
+            ]);
+        }
+
+        $prompt = "Write one concise, attractive recruitment event description (2-4 sentences) for candidates.\n"
+            . "Keep it professional, human, and action-oriented.\n"
+            . "Do not use markdown.\n\n"
+            . "Event title: {$title}\n"
+            . "Event type: {$eventType}\n"
+            . "Location: {$location}\n"
+            . "Event date: {$eventDate}\n"
+            . "Capacity: " . ($capacity !== '' ? $capacity : 'N/A') . "\n";
+
+        try {
+            $response = $httpClient->request('POST', $apiUrl, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type' => 'application/json',
+                    'HTTP-Referer' => $request->getSchemeAndHttpHost(),
+                    'X-Title' => 'Talent Bridge Event Description',
+                ],
+                'json' => [
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'system', 'content' => 'You are a senior recruitment marketing copywriter.'],
+                        ['role' => 'user', 'content' => $prompt],
+                    ],
+                    'temperature' => 0.5,
+                    'max_tokens' => 260,
+                ],
+                'timeout' => 25,
+            ]);
+
+            if ($response->getStatusCode() >= 400) {
+                throw new \RuntimeException('AI provider returned an error status.');
+            }
+
+            $body = $response->toArray(false);
+            $rawText = trim((string) ($body['choices'][0]['message']['content'] ?? ''));
+            $description = $this->normalizeEventDescription($rawText);
+            if ($description === '') {
+                throw new \RuntimeException('AI provider returned an empty message.');
+            }
+
+            return new JsonResponse([
+                'ok' => true,
+                'description' => $description,
+                'source' => 'ai',
+            ]);
+        } catch (\Throwable) {
+            return new JsonResponse([
+                'ok' => true,
+                'description' => $fallbackDescription,
+                'source' => 'fallback',
+            ]);
+        }
     }
 
     #[Route('/recruiter/delete-event/{id}', name: 'recruiter_delete_event', methods: ['POST'])]
@@ -1337,6 +1452,8 @@ SQL;
                     'description' => (string) $event->getDescription(),
                     'event_type' => (string) $event->getEvent_type(),
                     'location' => (string) $event->getLocation(),
+                    'location_lat' => '',
+                    'location_lng' => '',
                     'event_date' => $event->getEvent_date()->format('Y-m-d\TH:i'),
                     'capacity' => (string) $event->getCapacity(),
                     'meet_link' => (string) $event->getMeet_link(),
@@ -1349,6 +1466,8 @@ SQL;
         $description = trim((string) $request->request->get('description', ''));
         $eventType = trim((string) $request->request->get('event_type', ''));
         $location = trim((string) $request->request->get('location', ''));
+        $locationLat = trim((string) $request->request->get('location_lat', ''));
+        $locationLng = trim((string) $request->request->get('location_lng', ''));
         $eventDate = (string) $request->request->get('event_date', '');
         $capacity = (string) $request->request->get('capacity', '');
         $meetLink = trim((string) $request->request->get('meet_link', ''));
@@ -1419,6 +1538,8 @@ SQL;
                     'description' => $description,
                     'event_type' => $eventType,
                     'location' => $location,
+                    'location_lat' => $locationLat,
+                    'location_lng' => $locationLng,
                     'event_date' => $eventDate,
                     'capacity' => $capacity,
                     'meet_link' => $meetLink,
@@ -1438,6 +1559,76 @@ SQL;
 
         $this->addFlash('success', 'Event updated successfully!');
         return $this->redirectToRoute('front_events');
+    }
+
+    private function resolveEventDescriptionApiKey(): string
+    {
+        $candidates = [
+            $_ENV['AI_API_KEY'] ?? null,
+            $_SERVER['AI_API_KEY'] ?? null,
+            getenv('AI_API_KEY') ?: null,
+            $_ENV['OPENROUTER_API_KEY'] ?? null,
+            $_SERVER['OPENROUTER_API_KEY'] ?? null,
+            getenv('OPENROUTER_API_KEY') ?: null,
+            $_ENV['GROQ_API_KEY'] ?? null,
+            $_SERVER['GROQ_API_KEY'] ?? null,
+            getenv('GROQ_API_KEY') ?: null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $value = trim((string) $candidate);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function buildEventDescriptionFallback(string $title, string $eventType, string $location, string $eventDate, string $capacity): string
+    {
+        $safeTitle = $title !== '' ? $title : 'Recruitment Event';
+        $safeType = $eventType !== '' ? $eventType : 'recruitment event';
+        $safeLocation = $location !== '' ? $location : 'our venue';
+        $safeCapacity = trim($capacity) !== '' ? trim($capacity) : 'limited';
+
+        $dateLabel = '';
+        try {
+            $parsedDate = new \DateTimeImmutable($eventDate);
+            $dateLabel = $parsedDate->format('F j, Y \\a\\t H:i');
+        } catch (\Throwable) {
+            $dateLabel = $eventDate;
+        }
+
+        $capacityPhrase = $safeCapacity === 'limited'
+            ? 'Seats are limited, so early registration is recommended.'
+            : 'Capacity is limited to ' . $safeCapacity . ' participants, so early registration is recommended.';
+
+        return $this->normalizeEventDescription(
+            $safeTitle . ' is an upcoming ' . $safeType . ' in ' . $safeLocation
+            . ($dateLabel !== '' ? ' on ' . $dateLabel : '')
+            . '. This event is designed to connect candidates with recruiters through practical insights and direct networking opportunities. '
+            . $capacityPhrase
+        );
+    }
+
+    private function normalizeEventDescription(string $raw): string
+    {
+        $text = trim($raw);
+        if ($text === '') {
+            return '';
+        }
+
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\n{3,}/u', "\n\n", $text) ?? $text;
+        $text = trim($text);
+
+        if (mb_strlen($text) > 1200) {
+            $text = trim(mb_substr($text, 0, 1200));
+        }
+
+        return $text;
     }
 
     private function resolveCurrentRecruiter(Request $request, EntityManagerInterface $entityManager): ?Recruiter
