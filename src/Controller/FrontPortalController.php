@@ -35,14 +35,22 @@ use Pagerfanta\Adapter\ArrayAdapter;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
 use Knp\Snappy\Pdf;
+use Psr\Log\LoggerInterface;
 use Spiriit\Bundle\FormFilterBundle\Filter\FilterBuilderUpdaterInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
+use Symfony\Component\Notifier\NotifierInterface;
+use Symfony\Component\Notifier\Notification\Notification;
+use Symfony\Component\Notifier\Recipient\Recipient;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Throwable;
 
@@ -1158,22 +1166,32 @@ class FrontPortalController extends AbstractController
             $events = $entityManager->getRepository(Recruitment_event::class)->findBy([], ['id' => 'DESC']);
         }
 
-        $cards = array_map(static function (Recruitment_event $event) use ($registeredIds): array {
+        $cards = [];
+        foreach ($events as $event) {
             $description = trim((string) $event->getDescription());
+            $capacity = (int) $event->getCapacity();
+            $registrationCount = $this->countActiveEventRegistrations($event);
+            $isFull = $capacity > 0 && $registrationCount >= $capacity;
+            $fillRatio = $capacity > 0 ? $registrationCount / $capacity : 0.0;
 
-            return [
+            $cards[] = [
                 'id' => $event->getId(),
                 'meta' => sprintf('%s | %s', $event->getEvent_date()->format('d M Y'), (string) $event->getLocation()),
                 'title' => (string) $event->getTitle(),
                 'text' => $description === '' ? 'No event description available yet.' : substr($description, 0, 190),
                 'event_type' => (string) $event->getEvent_type(),
                 'location' => (string) $event->getLocation(),
-                'capacity' => (int) $event->getCapacity(),
+                'capacity' => $capacity,
+                'registration_count' => $registrationCount,
+                'remaining_spots' => $capacity > 0 ? max(0, $capacity - $registrationCount) : null,
+                'is_full' => $isFull,
+                'is_popular' => $registrationCount >= 3 || ($registrationCount > 0 && $fillRatio >= 0.5),
+                'popularity_score' => $registrationCount,
                 'meet_link' => (string) $event->getMeet_link(),
                 'event_date_value' => $event->getEvent_date()->format('Y-m-d\TH:i'),
                 'registered' => in_array($event->getId(), $registeredIds, true),
             ];
-        }, $events);
+        }
 
         return $this->render('front/modules/events.html.twig', [
             'authUser' => ['role' => $role],
@@ -1182,7 +1200,13 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/events/register/{id}', name: 'front_event_register', methods: ['POST'])]
-    public function registerEvent(Request $request, int $id, EntityManagerInterface $entityManager): Response
+    public function registerEvent(
+        Request $request,
+        int $id,
+        EntityManagerInterface $entityManager,
+        NotifierInterface $notifier,
+        LoggerInterface $logger
+    ): Response
     {
         $role = $this->resolveSessionRole($request);
         if ($role !== 'candidate') {
@@ -1205,29 +1229,43 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('app_login');
         }
 
-        if (!in_array($id, $registeredIds, true)) {
-            $registeredIds[] = $id;
-            $session->set('registered_event_ids', $registeredIds);
+        $registrationRepository = $entityManager->getRepository(Event_registration::class);
+        $queryBuilder = $registrationRepository->createQueryBuilder('er')
+            ->where('IDENTITY(er.event_id) = :eventId')
+            ->andWhere('IDENTITY(er.candidate_id) = :candidateId')
+            ->setParameter('eventId', $event->getId())
+            ->setParameter('candidateId', $candidate->getId());
 
-            $registrationRepository = $entityManager->getRepository(Event_registration::class);
-            $queryBuilder = $registrationRepository->createQueryBuilder('er')
-                ->where('IDENTITY(er.event_id) = :eventId')
-                ->andWhere('IDENTITY(er.candidate_id) = :candidateId')
-                ->setParameter('eventId', $event->getId())
-                ->setParameter('candidateId', $candidate->getId());
+        $existing = $queryBuilder->getQuery()->getOneOrNullResult();
 
-            $existing = $queryBuilder->getQuery()->getOneOrNullResult();
+        if (!$existing) {
+            $capacity = (int) $event->getCapacity();
+            $registrationCount = $this->countActiveEventRegistrations($event);
+            if ($capacity > 0 && $registrationCount >= $capacity) {
+                $message = sprintf('"%s" is full. Registration is closed for this event.', $event->getTitle());
+                if ($request->isXmlHttpRequest()) {
+                    return $this->json(['success' => false, 'warning' => true, 'message' => $message], Response::HTTP_CONFLICT);
+                }
 
-            if (!$existing) {
-                $registration = new Event_registration();
-                $registration->setId($this->nextNumericId(Event_registration::class));
-                $registration->setEvent_id($event);
-                $registration->setCandidate_id($candidate);
-                $registration->setRegistered_at(date_create());
-                $registration->setAttendance_status('registered');
+                $this->addFlash('warning', $message);
+                return $this->redirectToRoute('front_events', ['role' => 'candidate']);
+            }
 
-                $entityManager->persist($registration);
-                $entityManager->flush();
+            $registration = new Event_registration();
+            $registration->setId($this->nextNumericId(Event_registration::class));
+            $registration->setEvent_id($event);
+            $registration->setCandidate_id($candidate);
+            $registration->setRegistered_at(date_create());
+            $registration->setAttendance_status('registered');
+
+            $entityManager->persist($registration);
+            $entityManager->flush();
+
+            $this->sendEventRegistrationBundleNotification($notifier, $logger, $registration, 'registered');
+
+            if (!in_array($id, $registeredIds, true)) {
+                $registeredIds[] = $id;
+                $session->set('registered_event_ids', $registeredIds);
             }
 
             $message = sprintf('You have successfully registered for "%s".', $event->getTitle());
@@ -1236,6 +1274,11 @@ class FrontPortalController extends AbstractController
             }
             $this->addFlash('success', $message);
         } else {
+            if (!in_array($id, $registeredIds, true)) {
+                $registeredIds[] = $id;
+                $session->set('registered_event_ids', $registeredIds);
+            }
+
             $message = sprintf('You are already registered for "%s".', $event->getTitle());
             if ($request->isXmlHttpRequest()) {
                 return $this->json(['warning' => true, 'message' => $message]);
@@ -1247,7 +1290,13 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/events/unregister/{id}', name: 'front_event_unregister', methods: ['POST'])]
-    public function unregisterEvent(Request $request, int $id, EntityManagerInterface $entityManager): Response
+    public function unregisterEvent(
+        Request $request,
+        int $id,
+        EntityManagerInterface $entityManager,
+        NotifierInterface $notifier,
+        LoggerInterface $logger
+    ): Response
     {
         $role = $this->resolveSessionRole($request);
         if ($role !== 'candidate') {
@@ -1274,6 +1323,7 @@ class FrontPortalController extends AbstractController
             ]);
 
             if ($registration) {
+                $this->sendEventRegistrationBundleNotification($notifier, $logger, $registration, 'unregistered');
                 $entityManager->remove($registration);
                 $entityManager->flush();
             }
@@ -1281,6 +1331,93 @@ class FrontPortalController extends AbstractController
 
         $this->addFlash('success', sprintf('You have cancelled registration for "%s".', $event->getTitle()));
         return $this->redirectToRoute('front_event_registrations', ['role' => 'candidate']);
+    }
+
+    private function countActiveEventRegistrations(Recruitment_event $event): int
+    {
+        $count = 0;
+        foreach ($event->getEvent_registrations() as $registration) {
+            if ($registration instanceof Event_registration && $this->isActiveEventRegistrationStatus($registration->getAttendance_status())) {
+                $count += 1;
+            }
+        }
+
+        return $count;
+    }
+
+    private function isActiveEventRegistrationStatus(?string $status): bool
+    {
+        $normalized = strtolower(trim((string) $status));
+
+        return !in_array($normalized, ['rejected', 'cancelled', 'canceled', 'no_show'], true);
+    }
+
+    private function sendEventRegistrationBundleNotification(
+        NotifierInterface $notifier,
+        LoggerInterface $logger,
+        Event_registration $registration,
+        string $action
+    ): void {
+        $event = $registration->getEvent_id();
+        $candidate = $registration->getCandidate_id();
+        if (!$event instanceof Recruitment_event || !$candidate instanceof Candidate) {
+            return;
+        }
+
+        $recruiter = $event->getRecruiter_id();
+        if (!$recruiter instanceof Recruiter) {
+            return;
+        }
+
+        $recruiterEmail = trim((string) $recruiter->getEmail());
+        if (!filter_var($recruiterEmail, FILTER_VALIDATE_EMAIL)) {
+            $logger->warning('Event registration notification skipped: recruiter email is invalid.', [
+                'registration_id' => $registration->getId(),
+                'event_id' => $event->getId(),
+                'recruiter_id' => $recruiter->getId(),
+                'recruiter_email' => $recruiterEmail,
+            ]);
+
+            return;
+        }
+
+        $candidateName = $this->formatCandidateName($candidate);
+        $candidateEmail = trim((string) $candidate->getEmail());
+        $eventTitle = trim((string) $event->getTitle());
+        $eventDate = $event->getEvent_date() instanceof \DateTimeInterface
+            ? $event->getEvent_date()->format('F j, Y \\a\\t H:i')
+            : 'date not set';
+        $isUnregister = $action === 'unregistered';
+        $subject = $isUnregister
+            ? sprintf('Event registration cancelled: %s', $eventTitle !== '' ? $eventTitle : 'Recruitment event')
+            : sprintf('New event registration: %s', $eventTitle !== '' ? $eventTitle : 'Recruitment event');
+        $content = sprintf(
+            "%s %s for \"%s\".\n\nCandidate: %s\nEmail: %s\nEvent date: %s\nRegistration ID: %s",
+            $candidateName,
+            $isUnregister ? 'cancelled their registration' : 'registered',
+            $eventTitle !== '' ? $eventTitle : 'Recruitment event',
+            $candidateName,
+            $candidateEmail !== '' ? $candidateEmail : 'N/A',
+            $eventDate,
+            (string) $registration->getId()
+        );
+
+        try {
+            $notification = (new Notification($subject, ['email']))
+                ->content($content)
+                ->importance($isUnregister ? Notification::IMPORTANCE_MEDIUM : Notification::IMPORTANCE_HIGH);
+
+            $notifier->send($notification, new Recipient($recruiterEmail));
+        } catch (\Throwable $exception) {
+            $logger->error('Event registration notification failed.', [
+                'registration_id' => $registration->getId(),
+                'event_id' => $event->getId(),
+                'candidate_id' => $candidate->getId(),
+                'recruiter_id' => $recruiter->getId(),
+                'action' => $action,
+                'error_message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     #[Route('/front/events/registrations', name: 'front_event_registrations')]
@@ -1340,7 +1477,12 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/events/unregister-all', name: 'front_event_unregister_all', methods: ['POST'])]
-    public function unregisterAllEvents(Request $request, EntityManagerInterface $entityManager): Response
+    public function unregisterAllEvents(
+        Request $request,
+        EntityManagerInterface $entityManager,
+        NotifierInterface $notifier,
+        LoggerInterface $logger
+    ): Response
     {
         $role = $this->resolveSessionRole($request);
         if ($role !== 'candidate') {
@@ -1359,6 +1501,9 @@ class FrontPortalController extends AbstractController
         if (count($registrations) > 0) {
 
             foreach ($registrations as $registration) {
+                if ($registration instanceof Event_registration) {
+                    $this->sendEventRegistrationBundleNotification($notifier, $logger, $registration, 'unregistered');
+                }
                 $entityManager->remove($registration);
             }
             $entityManager->flush();
@@ -1538,7 +1683,13 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/recruiter/event-registrations/{id}/status', name: 'recruiter_update_registration_status', methods: ['POST'])]
-    public function updateRegistrationStatus(Request $request, string $id, EntityManagerInterface $entityManager): Response
+    public function updateRegistrationStatus(
+        Request $request,
+        string $id,
+        EntityManagerInterface $entityManager,
+        MailerInterface $mailer,
+        LoggerInterface $logger
+    ): Response
     {
         $role = $this->resolveSessionRole($request);
         if ($role !== 'recruiter') {
@@ -1562,12 +1713,131 @@ class FrontPortalController extends AbstractController
         if (in_array($status, ['confirmed', 'rejected'], true)) {
             $registration->setAttendance_status($status);
             $entityManager->flush();
-            $this->addFlash('success', 'Registration status updated to ' . ucfirst($status) . '.');
+
+            $emailSent = $this->sendEventRegistrationStatusEmail($mailer, $logger, $registration, $status);
+            $this->addFlash(
+                $emailSent ? 'success' : 'warning',
+                'Registration status updated to ' . ucfirst($status) . ($emailSent ? ' and the candidate was emailed.' : ', but the candidate email could not be sent.')
+            );
         } else {
             $this->addFlash('warning', 'Invalid status provided.');
         }
 
         return $this->redirectToRoute('recruiter_event_registrations', ['role' => 'recruiter']);
+    }
+
+    private function sendEventRegistrationStatusEmail(
+        MailerInterface $mailer,
+        LoggerInterface $logger,
+        Event_registration $registration,
+        string $status
+    ): bool {
+        $candidate = $registration->getCandidate_id();
+        $event = $registration->getEvent_id();
+        if (!$candidate instanceof Candidate || !$event instanceof Recruitment_event) {
+            return false;
+        }
+
+        $recipient = trim((string) $candidate->getEmail());
+        if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+            $logger->warning('Event registration status email skipped: invalid candidate email.', [
+                'registration_id' => $registration->getId(),
+                'candidate_id' => $candidate->getId(),
+                'candidate_email' => $recipient,
+            ]);
+
+            return false;
+        }
+
+        $fromAddress = trim((string) ($_ENV['MAILER_FROM_ADDRESS'] ?? $_SERVER['MAILER_FROM_ADDRESS'] ?? $_ENV['MAILER_FROM'] ?? $_SERVER['MAILER_FROM'] ?? 'no-reply@talent-bridge.local'));
+        $fromName = trim((string) ($_ENV['MAILER_FROM_NAME'] ?? $_SERVER['MAILER_FROM_NAME'] ?? 'Talent Bridge Recrutement'));
+        $supportEmail = filter_var($fromAddress, FILTER_VALIDATE_EMAIL) ? $fromAddress : 'no-reply@talent-bridge.local';
+        $statusLabel = $status === 'confirmed' ? 'Confirmed' : 'Rejected';
+        $candidateName = $this->formatCandidateName($candidate);
+        $eventTitle = trim((string) $event->getTitle());
+        $eventType = trim((string) $event->getEvent_type());
+        $eventDate = $event->getEvent_date() instanceof \DateTimeInterface
+            ? $event->getEvent_date()->format('F j, Y \\a\\t H:i')
+            : 'To be announced';
+        $meetingLink = $status === 'confirmed' ? trim((string) $event->getMeet_link()) : '';
+        $eventsUrl = $this->generateUrl('front_event_registrations', ['role' => 'candidate'], UrlGeneratorInterface::ABSOLUTE_URL);
+
+        $eventTypeMessage = $status === 'confirmed'
+            ? sprintf('Good news: your registration for "%s" has been accepted by the recruiter.', $eventTitle !== '' ? $eventTitle : 'this event')
+            : sprintf('Your registration for "%s" was reviewed and was not accepted this time.', $eventTitle !== '' ? $eventTitle : 'this event');
+        $closingLine = $status === 'confirmed'
+            ? 'Your spot is confirmed. Please keep this email handy and check the event details before the scheduled date.'
+            : 'You can keep exploring other hiring events on Talent Bridge and register for the ones that match your goals.';
+
+        $qrCodeUrl = '';
+        if ($status === 'confirmed') {
+            $qrPayload = sprintf(
+                'Talent Bridge Event Registration | Event: %s | Candidate: %s | Registration: %s',
+                $eventTitle !== '' ? $eventTitle : (string) $event->getId(),
+                $candidateName,
+                (string) $registration->getId()
+            );
+            $qrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&format=png&data=' . rawurlencode($qrPayload);
+        }
+
+        $htmlBody = $this->renderView('emails/recruitment_event_status.html.twig', [
+            'brandName' => 'Talent Bridge',
+            'candidateName' => $candidateName,
+            'eventTypeMessage' => $eventTypeMessage,
+            'eventTitle' => $eventTitle !== '' ? $eventTitle : 'Recruitment event',
+            'eventType' => $eventType !== '' ? $eventType : 'Event',
+            'eventDate' => $eventDate,
+            'status' => $status,
+            'statusLabel' => $statusLabel,
+            'closingLine' => $closingLine,
+            'qrCodeUrl' => $qrCodeUrl,
+            'meetingLink' => $meetingLink,
+            'eventsUrl' => $eventsUrl,
+            'supportEmail' => $supportEmail,
+        ]);
+
+        $textBody = sprintf(
+            "Hello %s,\n\n%s\n\nEvent: %s\nType: %s\nDate: %s\nStatus: %s\n\n%s\n\nView your registrations: %s",
+            $candidateName,
+            $eventTypeMessage,
+            $eventTitle !== '' ? $eventTitle : 'Recruitment event',
+            $eventType !== '' ? $eventType : 'Event',
+            $eventDate,
+            $statusLabel,
+            $closingLine,
+            $eventsUrl
+        );
+
+        try {
+            $email = (new Email())
+                ->from(new Address($fromAddress, $fromName !== '' ? $fromName : 'Talent Bridge'))
+                ->to(new Address($recipient, $candidateName))
+                ->subject(sprintf('Your event registration was %s', strtolower($statusLabel)))
+                ->text($textBody)
+                ->html($htmlBody);
+
+            $mailer->send($email);
+
+            return true;
+        } catch (\Throwable $exception) {
+            $logger->error('Event registration status email failed to send.', [
+                'registration_id' => $registration->getId(),
+                'candidate_id' => $candidate->getId(),
+                'candidate_email' => $recipient,
+                'event_id' => $event->getId(),
+                'status' => $status,
+                'error_message' => $exception->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    private function formatCandidateName(Candidate $candidate): string
+    {
+        $fullName = trim((string) $candidate->getFirstName() . ' ' . (string) $candidate->getLastName());
+
+        return $fullName !== '' ? $fullName : 'Candidate';
     }
 
     #[Route('/front/interviews', name: 'front_interviews')]

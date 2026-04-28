@@ -167,6 +167,9 @@
                         if (sortMode === 'meta_desc') {
                             return (b.dataset.sortMeta || '').localeCompare((a.dataset.sortMeta || ''));
                         }
+                        if (sortMode === 'popular_desc') {
+                            return Number(b.dataset.sortPopular || 0) - Number(a.dataset.sortPopular || 0);
+                        }
                         if (sortMode === 'date_asc') {
                             return Number(a.dataset.sortDate || 0) - Number(b.dataset.sortDate || 0);
                         }
