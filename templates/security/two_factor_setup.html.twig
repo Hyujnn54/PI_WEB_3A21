@@ -46,7 +46,8 @@
 
                         <hr class="my-4">
 
-                        <form method="post" action="{{ path('app_2fa_setup') }}" novalidate>
+                        <form method="post" action="{{ path('app_2fa_setup', returnTo|default('') == 'profile' ? {return_to: 'profile'} : {}) }}" novalidate>
+                            <input type="hidden" name="return_to" value="{{ returnTo|default('') }}">
                             <div class="mb-3">
                                 <label class="form-label">Verification Code</label>
                                 <input type="text" name="verification_code" class="form-control tb-auth-input" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" required>

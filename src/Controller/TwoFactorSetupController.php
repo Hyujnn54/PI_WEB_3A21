@@ -8,6 +8,7 @@ use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\SvgWriter;
 use OTPHP\TOTP;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -22,8 +23,11 @@ class TwoFactorSetupController extends AbstractController
             return $this->redirectToRoute('app_login');
         }
 
+        $returnTo = trim((string) $request->request->get('return_to', $request->query->get('return_to', '')));
+        $successRoute = $returnTo === 'profile' ? 'front_profile' : 'app_entry';
+
         if ($user->isGoogleAuthenticatorEnabled()) {
-            return $this->redirectToRoute('app_entry');
+            return $this->redirectToRoute($successRoute);
         }
 
         if (!$user->getGoogleAuthenticatorSecret()) {
@@ -56,7 +60,7 @@ class TwoFactorSetupController extends AbstractController
                 $entityManager->flush();
 
                 $this->addFlash('success', 'Two-factor authentication is now enabled.');
-                return $this->redirectToRoute('app_entry');
+                return $this->redirectToRoute($successRoute);
             }
         }
 
@@ -64,6 +68,30 @@ class TwoFactorSetupController extends AbstractController
             'email' => $user->getEmail(),
             'secret' => $secret,
             'qrCodeDataUri' => $qrCodeDataUri,
+            'returnTo' => $returnTo,
         ]);
+    }
+
+    #[Route('/profile/2fa/disable', name: 'app_2fa_disable', methods: ['POST'])]
+    public function disable(Request $request, EntityManagerInterface $entityManager): RedirectResponse
+    {
+        $user = $this->getUser();
+        if (!$user instanceof Users) {
+            return $this->redirectToRoute('app_login');
+        }
+
+        if (!$this->isCsrfTokenValid('2fa_disable', (string) $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid security token. Please try again.');
+
+            return $this->redirectToRoute('front_profile');
+        }
+
+        $user->setGoogleAuthenticatorEnabled(false);
+        $user->setGoogleAuthenticatorSecret(null);
+        $entityManager->flush();
+
+        $this->addFlash('success', 'Two-factor authentication is now disabled.');
+
+        return $this->redirectToRoute('front_profile');
     }
 }

@@ -30,7 +30,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 #[Route('/offermanagement')]
 class BackOfficeController extends AbstractController
 {
-    private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
+    private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Full-time', 'Part-time', 'Remote Contract'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
     private const WARNING_TYPES = [
         'Policy violation',
@@ -811,6 +811,86 @@ SQL;
         } catch (\Throwable) {
             return new JsonResponse(['ok' => false, 'error' => 'Unable to load offer details.'], 500);
         }
+    }
+
+    #[Route('/admin/job-offers/{id}/analyze', name: 'app_admin_job_offer_analyze', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function analyzeJobOffer(
+        string $id,
+        Connection $connection,
+        CommentAnalyzerService $commentAnalyzerService,
+        HttpClientInterface $httpClient
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof Users || !in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return new JsonResponse(['ok' => false, 'error' => 'Only admins can analyze job offers.'], 403);
+        }
+
+        $offer = $connection->fetchAssociative(
+            'SELECT id, recruiter_id, title, description, location, contract_type, status, deadline
+             FROM job_offer
+             WHERE id = :id
+             LIMIT 1',
+            ['id' => $id]
+        );
+
+        if (!$offer) {
+            return new JsonResponse(['ok' => false, 'error' => 'Offer not found.'], 404);
+        }
+
+        $skills = $connection->fetchAllAssociative(
+            'SELECT skill_name, level_required FROM offer_skill WHERE offer_id = :offer_id ORDER BY id ASC',
+            ['offer_id' => $id]
+        );
+
+        $skillsText = $this->formatOfferSkillsForPrompt($skills);
+        $offerText = sprintf(
+            "Title: %s\nContract: %s\nLocation: %s\nStatus: %s\nDeadline: %s\nDescription: %s\nSkills: %s",
+            (string) ($offer['title'] ?? ''),
+            (string) ($offer['contract_type'] ?? ''),
+            (string) ($offer['location'] ?? ''),
+            (string) ($offer['status'] ?? ''),
+            (string) ($offer['deadline'] ?? ''),
+            (string) ($offer['description'] ?? ''),
+            $skillsText
+        );
+
+        $commentAnalysis = $commentAnalyzerService->analyze($offerText);
+        $groqAnalysis = $this->analyzeOfferWithGroq($httpClient, $offer, $skillsText);
+        $flagDecision = $this->decideOfferFlagState($commentAnalysis, $groqAnalysis);
+        $analysisSummary = [
+            'flagged' => $flagDecision['flagged'],
+            'reason' => $flagDecision['reason'],
+            'commentAnalyzer' => [
+                'toxicityScore' => (float) ($commentAnalysis['toxicityScore'] ?? 0),
+                'spamScore' => (float) ($commentAnalysis['spamScore'] ?? 0),
+                'sentiment' => (string) ($commentAnalysis['sentiment'] ?? 'neutral'),
+                'labels' => (array) ($commentAnalysis['labels'] ?? []),
+            ],
+            'groq' => [
+                'source' => (string) ($groqAnalysis['source'] ?? 'unknown'),
+                'riskLevel' => (string) ($groqAnalysis['riskLevel'] ?? 'unknown'),
+                'summary' => (string) ($groqAnalysis['summary'] ?? ''),
+                'issues' => (array) ($groqAnalysis['issues'] ?? []),
+                'recommendations' => (array) ($groqAnalysis['recommendations'] ?? []),
+            ],
+        ];
+
+        $encodedSummary = (string) json_encode($analysisSummary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $connection->update('job_offer', [
+            'is_flagged' => $flagDecision['flagged'] ? 1 : 0,
+            'flagged_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            'quality_score' => $flagDecision['qualityScore'],
+            'ai_suggestions' => mb_substr($encodedSummary, 0, 5000),
+        ], [
+            'id' => $id,
+        ]);
+
+        return new JsonResponse([
+            'ok' => true,
+            'commentAnalysis' => $commentAnalysis,
+            'groqAnalysis' => $groqAnalysis,
+            'flagDecision' => $flagDecision,
+        ]);
     }
 
     #[Route('/admin/comment-analyzer', name: 'app_admin_comment_analyzer', methods: ['GET'])]
@@ -1718,6 +1798,197 @@ SQL;
         }
 
         return ['ok' => false, 'message' => 'Groq generation unavailable'];
+    }
+
+    /**
+     * @param array<string, mixed> $offer
+     *
+     * @return array<string, mixed>
+     */
+    private function analyzeOfferWithGroq(HttpClientInterface $httpClient, array $offer, string $skillsText): array
+    {
+        $apiKey = $this->resolveGroqApiKey();
+        if ($apiKey === '') {
+            return [
+                'ok' => false,
+                'source' => 'unconfigured',
+                'summary' => 'Groq is not configured. Add GROQ_API_KEY to enable AI offer analysis.',
+                'riskLevel' => 'unknown',
+                'issues' => [],
+                'recommendations' => [],
+            ];
+        }
+
+        $prompt = "You are an HR compliance reviewer for a recruitment platform.\n"
+            . "Analyze this job offer for quality, missing information, policy risks, misleading language, discrimination risk, and recruiter action items.\n"
+            . "Return JSON only with keys: riskLevel (low|medium|high), summary, issues (array), recommendations (array).\n\n"
+            . "Title: " . (string) ($offer['title'] ?? '') . "\n"
+            . "Contract: " . (string) ($offer['contract_type'] ?? '') . "\n"
+            . "Location: " . (string) ($offer['location'] ?? '') . "\n"
+            . "Status: " . (string) ($offer['status'] ?? '') . "\n"
+            . "Deadline: " . (string) ($offer['deadline'] ?? '') . "\n"
+            . "Description: " . (string) ($offer['description'] ?? '') . "\n"
+            . "Skills: {$skillsText}\n";
+
+        foreach (self::GROQ_WARNING_MODELS as $model) {
+            try {
+                $response = $httpClient->request('POST', 'https://api.groq.com/openai/v1/chat/completions', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $apiKey,
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => [
+                        'model' => $model,
+                        'messages' => [
+                            ['role' => 'system', 'content' => 'You return compact valid JSON for HR compliance analysis.'],
+                            ['role' => 'user', 'content' => $prompt],
+                        ],
+                        'temperature' => 0.2,
+                        'max_tokens' => 500,
+                        'response_format' => ['type' => 'json_object'],
+                    ],
+                    'timeout' => 25,
+                ]);
+
+                if ($response->getStatusCode() >= 400) {
+                    continue;
+                }
+
+                $body = $response->toArray(false);
+                $text = trim((string) ($body['choices'][0]['message']['content'] ?? ''));
+                $decoded = json_decode($text, true);
+                if (!is_array($decoded)) {
+                    continue;
+                }
+
+                return [
+                    'ok' => true,
+                    'source' => 'groq',
+                    'model' => $model,
+                    'riskLevel' => $this->normalizeGroqRiskLevel((string) ($decoded['riskLevel'] ?? 'medium')),
+                    'summary' => $this->normalizeGroqText((string) ($decoded['summary'] ?? 'Analysis completed.')),
+                    'issues' => $this->normalizeGroqList($decoded['issues'] ?? []),
+                    'recommendations' => $this->normalizeGroqList($decoded['recommendations'] ?? []),
+                ];
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return [
+            'ok' => false,
+            'source' => 'fallback',
+            'summary' => 'Groq analysis is unavailable right now. Use the analyzer scores below and review the offer manually.',
+            'riskLevel' => 'unknown',
+            'issues' => [],
+            'recommendations' => [],
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $skills
+     */
+    private function formatOfferSkillsForPrompt(array $skills): string
+    {
+        if ($skills === []) {
+            return 'None listed';
+        }
+
+        $parts = [];
+        foreach ($skills as $skill) {
+            $name = trim((string) ($skill['skill_name'] ?? ''));
+            $level = trim((string) ($skill['level_required'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $parts[] = $level !== '' ? sprintf('%s (%s)', $name, $level) : $name;
+        }
+
+        return $parts === [] ? 'None listed' : implode(', ', $parts);
+    }
+
+    private function normalizeGroqRiskLevel(string $riskLevel): string
+    {
+        $value = strtolower(trim($riskLevel));
+
+        return in_array($value, ['low', 'medium', 'high'], true) ? $value : 'medium';
+    }
+
+    private function normalizeGroqText(string $text): string
+    {
+        $value = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+
+        return mb_substr($value, 0, 500);
+    }
+
+    /**
+     * @return string[]
+     */
+    private function normalizeGroqList(mixed $items): array
+    {
+        if (!is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            $value = $this->normalizeGroqText((string) $item);
+            if ($value !== '') {
+                $normalized[] = mb_substr($value, 0, 220);
+            }
+
+            if (count($normalized) >= 5) {
+                break;
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $commentAnalysis
+     * @param array<string, mixed> $groqAnalysis
+     *
+     * @return array{flagged: bool, reason: string, qualityScore: int}
+     */
+    private function decideOfferFlagState(array $commentAnalysis, array $groqAnalysis): array
+    {
+        $toxicityScore = (float) ($commentAnalysis['toxicityScore'] ?? 0);
+        $spamScore = (float) ($commentAnalysis['spamScore'] ?? 0);
+        $commentFlagged = ($commentAnalysis['flagged'] ?? false) === true;
+        $groqRisk = strtolower(trim((string) ($groqAnalysis['riskLevel'] ?? 'unknown')));
+
+        $flagged = $commentFlagged
+            || $toxicityScore >= 0.75
+            || $spamScore >= 0.72
+            || $groqRisk === 'high'
+            || ($groqRisk === 'medium' && ($toxicityScore >= 0.55 || $spamScore >= 0.55));
+
+        if ($flagged) {
+            $reasonParts = [];
+            if ($commentFlagged || $toxicityScore >= 0.75 || $spamScore >= 0.72) {
+                $reasonParts[] = 'Comment Analyzer detected elevated toxicity/spam risk';
+            }
+
+            if ($groqRisk === 'high') {
+                $reasonParts[] = 'Groq classified the offer as high risk';
+            } elseif ($groqRisk === 'medium') {
+                $reasonParts[] = 'Groq classified the offer as medium risk with elevated analyzer scores';
+            }
+
+            return [
+                'flagged' => true,
+                'reason' => implode('; ', $reasonParts),
+                'qualityScore' => $groqRisk === 'high' ? 35 : 55,
+            ];
+        }
+
+        return [
+            'flagged' => false,
+            'reason' => 'Comment Analyzer and Groq did not detect enough risk to flag this offer.',
+            'qualityScore' => $groqRisk === 'medium' ? 75 : 95,
+        ];
     }
 
     private function normalizeWarningMessage(string $raw): string

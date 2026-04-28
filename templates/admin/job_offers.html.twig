@@ -138,7 +138,9 @@
                         data-offer-id="{{ offer.id }}"
                         data-warning-state="{{ warningStatusKey }}"
                         data-details-url="{{ path('app_admin_job_offer_details', {id: offer.id}) }}"
+                        data-analyze-url="{{ path('app_admin_job_offer_analyze', {id: offer.id}) }}"
                         data-accept-url="{{ path('app_admin_accept_job_offer_changes', {id: offer.id}) }}"
+                        data-warning-url="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}"
                         data-reject-url="{{ path('app_admin_reject_job_offer_changes', {id: offer.id}) }}">
                         <td>#{{ offer.id }}</td>
                         <td>{{ offer.title }}</td>
@@ -153,8 +155,11 @@
                                 <button type="button" class="btn btn-sm btn-outline-primary js-open-review"
                                         data-offer-id="{{ offer.id }}"
                                         data-details-url="{{ path('app_admin_job_offer_details', {id: offer.id}) }}"
+                                        data-analyze-url="{{ path('app_admin_job_offer_analyze', {id: offer.id}) }}"
                                         data-accept-url="{{ path('app_admin_accept_job_offer_changes', {id: offer.id}) }}"
+                                        data-warning-url="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}"
                                         data-reject-url="{{ path('app_admin_reject_job_offer_changes', {id: offer.id}) }}"
+                                        data-review-mode="details"
                                         data-bs-toggle="modal"
                                         data-bs-target="#reviewOfferModal">
                                     <i class="ti ti-search me-1"></i>Details
@@ -171,8 +176,11 @@
                                     <button type="button" class="btn btn-sm btn-primary js-open-review"
                                             data-offer-id="{{ offer.id }}"
                                             data-details-url="{{ path('app_admin_job_offer_details', {id: offer.id}) }}"
+                                            data-analyze-url="{{ path('app_admin_job_offer_analyze', {id: offer.id}) }}"
                                             data-accept-url="{{ path('app_admin_accept_job_offer_changes', {id: offer.id}) }}"
+                                            data-warning-url="{{ path('app_admin_job_offer_warning', {id: offer.id}) }}"
                                             data-reject-url="{{ path('app_admin_reject_job_offer_changes', {id: offer.id}) }}"
+                                            data-review-mode="pending"
                                             data-bs-toggle="modal"
                                             data-bs-target="#reviewOfferModal">
                                         <i class="ti ti-search me-1"></i>Review Resolved Offer
@@ -266,6 +274,7 @@
                 <div class="modal-footer d-flex justify-content-between">
                     <div class="small text-muted" id="reviewOfferFooterHint">Approve the changes or send another warning from here.</div>
                     <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="button" class="btn btn-outline-primary" id="reviewAnalyzeBtn">
                             <i class="ti ti-brain me-1"></i>Analyzer
                         </button>
@@ -275,7 +284,7 @@
                                     <i class="ti ti-check me-1"></i>Accept Changes
                                 </button>
                             </form>
-                            <button type="button" class="btn btn-danger" id="reviewSendWarningBtn" data-bs-toggle="modal" data-bs-target="#warningModal">
+                            <button type="button" class="btn btn-danger" id="reviewSendWarningBtn">
                                 <i class="ti ti-alert-triangle me-1"></i>Signaler
                             </button>
                         </div>
@@ -311,7 +320,7 @@
                             <textarea class="form-control" name="warning_text" id="warningText" rows="4" placeholder="Write warning details..." required>{{ warningModalServerText }}</textarea>
                             <div class="d-flex align-items-center gap-2 mt-2">
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="warningGenerateAiBtn">
-                                    <i class="ti ti-sparkles me-1"></i>Générer avec IA (Grok)
+                                    <i class="ti ti-sparkles me-1"></i>Générer avec IA (Groq)
                                 </button>
                                 <span class="small text-secondary" id="warningAiStatus"></span>
                             </div>
@@ -361,6 +370,8 @@
             const reviewFooterHint = document.getElementById('reviewOfferFooterHint');
             const reviewActions = document.getElementById('reviewOfferActions');
             let reviewRejectUrl = '';
+            let reviewWarningUrl = '';
+            let reviewAnalyzeUrl = '';
             let currentReviewOfferId = '';
             let currentWarningOfferId = '';
 
@@ -370,6 +381,27 @@
                 warningAiStatus.classList.toggle('text-danger', Boolean(isError));
                 warningAiStatus.classList.toggle('text-secondary', !isError);
             };
+
+            const cleanModalState = function () {
+                if (document.querySelector('.modal.show')) {
+                    return;
+                }
+
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+                document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) {
+                    backdrop.remove();
+                });
+            };
+
+            if (warningModal) {
+                warningModal.addEventListener('hidden.bs.modal', cleanModalState);
+            }
+
+            if (reviewModal) {
+                reviewModal.addEventListener('hidden.bs.modal', cleanModalState);
+            }
 
             const setReviewDetails = function (payload) {
                 const offer = payload.offer || {};
@@ -401,19 +433,23 @@
                 });
             };
 
-            const openReviewModal = function (offerId, detailsUrl, acceptUrl, rejectUrl, mode) {
+            const openReviewModal = function (offerId, detailsUrl, analyzeUrl, acceptUrl, warningUrl, rejectUrl, mode) {
                 currentReviewOfferId = (offerId || '').toString();
                 reviewRejectUrl = rejectUrl || '';
+                reviewWarningUrl = warningUrl || '';
+                reviewAnalyzeUrl = analyzeUrl || '';
                 reviewAcceptForm.setAttribute('action', acceptUrl || '#');
 
                 if (mode === 'pending') {
                     reviewModalTitle.textContent = 'Review Recruiter Changes';
                     reviewFooterHint.textContent = 'Approve the changes or send another warning from here.';
                     reviewActions.classList.remove('d-none');
+                    reviewAcceptForm.classList.remove('d-none');
                 } else {
                     reviewModalTitle.textContent = 'Job Offer Details';
-                    reviewFooterHint.textContent = 'Read-only preview for the selected offer.';
-                    reviewActions.classList.add('d-none');
+                    reviewFooterHint.textContent = 'Analyze this offer or send a warning to the recruiter.';
+                    reviewActions.classList.remove('d-none');
+                    reviewAcceptForm.classList.add('d-none');
                 }
 
                 reviewLoading.textContent = 'Loading offer details...';
@@ -444,9 +480,12 @@
                 btn.addEventListener('click', function () {
                     const offerId = btn.getAttribute('data-offer-id') || '';
                     const detailsUrl = btn.getAttribute('data-details-url') || '';
+                    const analyzeUrl = btn.getAttribute('data-analyze-url') || '';
                     const acceptUrl = btn.getAttribute('data-accept-url') || '#';
+                    const warningUrl = btn.getAttribute('data-warning-url') || '#';
                     const rejectUrl = btn.getAttribute('data-reject-url') || '#';
-                    openReviewModal(offerId, detailsUrl, acceptUrl, rejectUrl, 'pending');
+                    const mode = btn.getAttribute('data-review-mode') || 'details';
+                    openReviewModal(offerId, detailsUrl, analyzeUrl, acceptUrl, warningUrl, rejectUrl, mode);
                 });
             });
 
@@ -466,7 +505,9 @@
                     openReviewModal(
                         row.getAttribute('data-offer-id') || '',
                         detailsUrl,
+                        row.getAttribute('data-analyze-url') || '',
                         row.getAttribute('data-accept-url') || '#',
+                        row.getAttribute('data-warning-url') || '#',
                         row.getAttribute('data-reject-url') || '#',
                         mode
                     );
@@ -474,14 +515,15 @@
             });
 
             if (reviewSendWarningBtn) {
-                reviewSendWarningBtn.addEventListener('click', function () {
-                    if (!reviewRejectUrl) return;
+                reviewSendWarningBtn.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    if (!reviewWarningUrl) return;
                     currentWarningOfferId = currentReviewOfferId;
-                    warningModalForm.setAttribute('action', reviewRejectUrl);
-                    warningModalTitle.textContent = 'Rejeter les changements et signaler';
-                    warningSubmitBtn.textContent = 'Rejeter les changements';
-                    warningSubmitBtn.classList.remove('btn-danger');
-                    warningSubmitBtn.classList.add('btn-warning');
+                    warningModalForm.setAttribute('action', reviewWarningUrl);
+                    warningModalTitle.textContent = 'Signaler une offre';
+                    warningSubmitBtn.textContent = 'Signaler';
+                    warningSubmitBtn.classList.remove('btn-warning');
+                    warningSubmitBtn.classList.add('btn-danger');
                     if (warningType) warningType.value = '';
                     if (warningText) warningText.value = '';
                     setWarningAiStatus('', false);
@@ -489,31 +531,41 @@
                         warningModalError.textContent = '';
                         warningModalError.style.display = 'none';
                     }
+
+                    if (!window.bootstrap || !warningModal) {
+                        return;
+                    }
+
+                    const showWarningModal = function () {
+                        window.bootstrap.Modal.getOrCreateInstance(warningModal).show();
+                    };
+
+                    if (reviewModal && reviewModal.classList.contains('show')) {
+                        reviewModal.addEventListener('hidden.bs.modal', showWarningModal, { once: true });
+                        window.bootstrap.Modal.getOrCreateInstance(reviewModal).hide();
+                    } else {
+                        showWarningModal();
+                    }
                 });
             }
 
             if (reviewAnalyzeBtn) {
                 reviewAnalyzeBtn.addEventListener('click', function () {
-                    const descriptionNode = document.getElementById('reviewOfferDescription');
-                    const titleNode = document.getElementById('reviewOfferTitle');
-                    const descriptionText = (descriptionNode && descriptionNode.textContent ? descriptionNode.textContent : '').trim();
-                    const titleText = (titleNode && titleNode.textContent ? titleNode.textContent : '').trim();
-
-                    if (!descriptionText || descriptionText === '-') {
+                    if (!reviewAnalyzeUrl || !currentReviewOfferId) {
                         alert('Please open offer details first, then run Analyzer.');
                         return;
                     }
 
-                    const payloadText = 'Title: ' + (titleText || 'Untitled') + '\nDescription: ' + descriptionText;
+                    reviewAnalyzeBtn.disabled = true;
+                    reviewAnalyzeBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Analyzing...';
 
-                    fetch('{{ path('app_admin_comment_analyzer_analyze') }}', {
+                    fetch(reviewAnalyzeUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest'
-                        },
-                        body: JSON.stringify({ comment: payloadText })
+                        }
                     })
                     .then(function (response) { return response.json(); })
                     .then(function (payload) {
@@ -521,21 +573,43 @@
                             throw new Error((payload && payload.error) ? payload.error : 'Analysis failed.');
                         }
 
-                        const analysis = payload.analysis || {};
-                        const labels = Array.isArray(analysis.labels) && analysis.labels.length > 0 ? analysis.labels.join(', ') : 'none';
+                        const commentAnalysis = payload.commentAnalysis || {};
+                        const groqAnalysis = payload.groqAnalysis || {};
+                        const flagDecision = payload.flagDecision || {};
+                        const labels = Array.isArray(commentAnalysis.labels) && commentAnalysis.labels.length > 0 ? commentAnalysis.labels.join(', ') : 'none';
+                        const groqIssues = Array.isArray(groqAnalysis.issues) && groqAnalysis.issues.length > 0 ? groqAnalysis.issues.join('; ') : 'none';
+                        const groqRecommendations = Array.isArray(groqAnalysis.recommendations) && groqAnalysis.recommendations.length > 0 ? groqAnalysis.recommendations.join('; ') : 'none';
                         const message = [
                             'Analyzer Result (Offer #' + (currentReviewOfferId || '-') + ')',
-                            'Toxicity: ' + Number(analysis.toxicityScore || 0).toFixed(3),
-                            'Spam: ' + Number(analysis.spamScore || 0).toFixed(3),
-                            'Sentiment: ' + String(analysis.sentiment || 'neutral'),
+                            '',
+                            'Comment Analyzer',
+                            'Toxicity: ' + Number(commentAnalysis.toxicityScore || 0).toFixed(3),
+                            'Spam: ' + Number(commentAnalysis.spamScore || 0).toFixed(3),
+                            'Sentiment: ' + String(commentAnalysis.sentiment || 'neutral'),
                             'Labels: ' + labels,
-                            'Flagged: ' + (((analysis.flagged || false) === true) ? 'YES' : 'NO')
+                            'Flagged: ' + (((commentAnalysis.flagged || false) === true) ? 'YES' : 'NO'),
+                            '',
+                            'Groq Offer Review',
+                            'Source: ' + String(groqAnalysis.source || 'unknown') + (groqAnalysis.model ? ' (' + groqAnalysis.model + ')' : ''),
+                            'Risk: ' + String(groqAnalysis.riskLevel || 'unknown'),
+                            'Summary: ' + String(groqAnalysis.summary || '-'),
+                            'Issues: ' + groqIssues,
+                            'Recommendations: ' + groqRecommendations,
+                            '',
+                            'Offer Flag Decision',
+                            'Flagged: ' + (((flagDecision.flagged || false) === true) ? 'YES' : 'NO'),
+                            'Quality score: ' + String(flagDecision.qualityScore || '-'),
+                            'Reason: ' + String(flagDecision.reason || '-')
                         ].join('\n');
 
                         alert(message);
                     })
                     .catch(function (error) {
                         alert(error.message || 'Unable to analyze this offer right now.');
+                    })
+                    .finally(function () {
+                        reviewAnalyzeBtn.disabled = false;
+                        reviewAnalyzeBtn.innerHTML = '<i class="ti ti-brain me-1"></i>Analyzer';
                     });
                 });
             }
@@ -626,7 +700,7 @@
                         }
 
                         if ((payload.source || '') === 'ai') {
-                            setWarningAiStatus('Message généré avec IA (Grok). Vous pouvez le modifier avant envoi.', false);
+                            setWarningAiStatus('Message généré avec IA (Groq). Vous pouvez le modifier avant envoi.', false);
                         } else {
                             setWarningAiStatus('IA indisponible, message professionnel proposé automatiquement.', false);
                         }

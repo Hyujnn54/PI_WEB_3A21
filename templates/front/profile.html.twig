@@ -136,6 +136,43 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="col-12 mt-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                                            <div>
+                                                <h4 class="h5 mb-2">Two-Factor Authentication</h4>
+                                                <p class="text-secondary mb-0">Protect your account with a 6-digit code from an authenticator app.</p>
+                                            </div>
+                                            {% if profileUser.googleAuthenticatorEnabled %}
+                                                <span class="badge bg-green-lt text-green">Enabled</span>
+                                            {% else %}
+                                                <span class="badge bg-orange-lt text-orange">Disabled</span>
+                                            {% endif %}
+                                        </div>
+
+                                        {% if profileUser.googleAuthenticatorEnabled %}
+                                            <div class="alert alert-success py-2 my-3">
+                                                Two-factor authentication is active for your account.
+                                            </div>
+                                            <form method="post" action="{{ path('app_2fa_disable') }}" onsubmit="return confirm('Disable two-factor authentication for your account?');">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('2fa_disable') }}">
+                                                <button type="submit" class="btn btn-outline-danger">
+                                                    <i class="ti ti-shield-off me-1"></i>Disable 2FA
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <div class="alert alert-warning py-2 my-3">
+                                                Two-factor authentication is currently disabled.
+                                            </div>
+                                            <a href="{{ path('app_2fa_setup', {return_to: 'profile'}) }}" class="btn btn-outline-primary">
+                                                <i class="ti ti-shield-lock me-1"></i>Enable 2FA
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
                     {% endif %}
                 </div>
             </div>

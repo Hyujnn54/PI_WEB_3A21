@@ -54,10 +54,6 @@ class LoginFormAuthenticator extends AbstractLoginFormAuthenticator
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
         $user = $token->getUser();
-        if ($user instanceof Users && !$user->isGoogleAuthenticatorEnabled()) {
-            return new RedirectResponse($this->urlGenerator->generate('app_2fa_setup'));
-        }
-
         if ($user instanceof Users && $user->isGoogleAuthenticatorEnabled()) {
             return null;
         }

@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Candidate;
 use App\Entity\Candidate_skill;
+use App\Entity\Application_status_history;
 use App\Entity\Event_registration;
 use App\Entity\Interview;
 use App\Entity\Interview_feedback;
@@ -51,10 +52,11 @@ class FrontPortalController extends AbstractController
     private const MAX_FUTURE_DAYS = 90;
     private const EDIT_LOCK_HOURS = 2;
     private const REVIEW_COMMENT_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,1000}$/u';
-    private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Part-time', 'Remote Contract'];
+    private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Full-time', 'Part-time', 'Remote Contract'];
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
     private const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+    private const GROQ_JOB_OFFER_MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
 
     public function __construct(
         private readonly ManagerRegistry $doctrine,
@@ -564,6 +566,9 @@ class FrontPortalController extends AbstractController
 
         $payload = json_decode((string) $request->getContent(), true);
         $title = trim((string) ($payload['title'] ?? ''));
+        $contractType = $this->normalizeStoredContractType((string) ($payload['contract_type'] ?? ''));
+        $location = trim((string) ($payload['location'] ?? ''));
+        $skills = $this->normalizeSkills((array) ($payload['skills'] ?? []));
         if ($title === '') {
             return $this->json([
                 'ok' => false,
@@ -571,25 +576,28 @@ class FrontPortalController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        $apiKey = $this->resolveGeminiApiKey();
+        $apiKey = $this->resolveGroqApiKey();
         if ($apiKey === '') {
             return $this->json([
                 'ok' => false,
-                'error' => 'AI service is not configured. Add GEMINI_API_KEY in your environment.',
+                'error' => 'AI service is not configured. Add GROQ_API_KEY in your environment.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         $prompt = "You are an expert HR assistant.\n"
-            . "Based on the following job title, generate a complete and professional job offer.\n\n"
+            . "Based on the following job offer context, generate a complete and professional job offer.\n\n"
             . "INPUT:\n"
-            . "Job Title: {$title}\n\n"
+            . "Job Title: {$title}\n"
+            . "Contract Type: " . ($contractType !== '' ? $contractType : 'Not specified') . "\n"
+            . "Location: " . ($location !== '' ? $location : 'Not specified') . "\n"
+            . "Required Skills: " . $this->formatSkillsForPrompt($skills) . "\n\n"
             . "OUTPUT (JSON format only):\n"
             . "{\n"
             . "  \"description\": \"Professional and detailed job description (5-8 lines)\",\n"
             . "  \"required_skills\": [\"skill1\", \"skill2\", \"skill3\", \"skill4\"],\n"
             . "  \"soft_skills\": [\"skill1\", \"skill2\"],\n"
             . "  \"experience_level\": \"Junior | Mid | Senior\",\n"
-            . "  \"contract_type\": \"CDI | CDD | Stage | Freelance\",\n"
+            . "  \"contract_type\": \"CDI | CDD | Internship | Freelance | Full-time | Part-time | Remote Contract\",\n"
             . "  \"suggested_location\": \"City name\",\n"
             . "  \"keywords\": [\"tag1\", \"tag2\", \"tag3\"]\n"
             . "}\n\n"
@@ -600,7 +608,7 @@ class FrontPortalController extends AbstractController
             . "- Return ONLY valid JSON\n";
 
         try {
-            $aiResult = $this->requestGeminiGenerateContent($httpClient, $apiKey, $prompt);
+            $aiResult = $this->requestGroqGenerateJobOffer($httpClient, $apiKey, $prompt);
             if (($aiResult['ok'] ?? false) !== true) {
                 return $this->json([
                     'ok' => false,
@@ -663,14 +671,14 @@ class FrontPortalController extends AbstractController
 
         $formData = [
             'title' => (string) ($offer['title'] ?? ''),
-            'contract_type' => (string) ($offer['contract_type'] ?? ''),
+            'contract_type' => $this->normalizeStoredContractType((string) ($offer['contract_type'] ?? '')),
             'description' => (string) ($offer['description'] ?? ''),
             'location' => (string) ($offer['location'] ?? ''),
             'deadline' => $deadlineValue,
             'skills' => array_map(static function (array $skill): array {
                 return [
                     'name' => (string) ($skill['skill_name'] ?? ''),
-                    'level' => (string) ($skill['level_required'] ?? ''),
+                    'level' => self::normalizeStoredSkillLevel((string) ($skill['level_required'] ?? '')),
                 ];
             }, $skills),
         ];
@@ -1794,6 +1802,14 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_job_applications', $request->query->all());
         }
 
+        $currentRecruiter = $this->resolveCurrentRecruiter($request);
+        $offer = $application->getOffer_id();
+        $recruiter = $offer ? $offer->getRecruiter_id() : null;
+        if (!$currentRecruiter instanceof Recruiter || !$recruiter instanceof Recruiter || (string) $currentRecruiter->getId() !== (string) $recruiter->getId()) {
+            $this->addFlash('warning', 'You can only schedule interviews for your own job offers.');
+            return $this->redirectToRoute('front_job_applications', $request->query->all());
+        }
+
         $formData = [
             'scheduled_at' => '',
             'duration_minutes' => '60',
@@ -1820,9 +1836,6 @@ class FrontPortalController extends AbstractController
 
             $validation = Interview::validateInput($formData, self::MAX_FUTURE_DAYS);
             if ($validation['ok']) {
-                $offer = $application->getOffer_id();
-                $recruiter = $offer->getRecruiter_id();
-
                 $interview = new Interview();
                 $interview->setId($this->nextNumericId(Interview::class));
                 $interview->setApplication_id($application);
@@ -1840,7 +1853,21 @@ class FrontPortalController extends AbstractController
                 try {
                     $entityManager = $this->doctrine->getManager();
                     $entityManager->persist($interview);
-                    $application->setCurrent_status('interview_scheduled');
+
+                    $oldStatus = strtoupper(trim((string) $application->getCurrent_status()));
+                    $application->setCurrent_status('IN_REVIEW');
+
+                    $history = new Application_status_history();
+                    $history->setApplication_id($application);
+                    $history->setStatus('IN_REVIEW');
+                    $history->setChanged_at(new \DateTime());
+                    $history->setChanged_by($recruiter);
+                    $history->setNote($oldStatus === 'IN_REVIEW'
+                        ? 'Interview scheduled while the application remains in review.'
+                        : 'Interview scheduled; application moved to In Review.'
+                    );
+                    $entityManager->persist($history);
+
                     $entityManager->flush();
 
                     $this->addFlash('success', 'Interview created successfully.');
@@ -1959,8 +1986,8 @@ class FrontPortalController extends AbstractController
         $entityManager->remove($interview);
         $entityManager->flush();
 
-        if (!$this->hasActiveInterviewForApplication($application) && (string) $application->getCurrent_status() === 'interview_scheduled') {
-            $application->setCurrent_status('under_review');
+        if (!$this->hasActiveInterviewForApplication($application) && strtoupper((string) $application->getCurrent_status()) === 'INTERVIEW_SCHEDULED') {
+            $application->setCurrent_status('IN_REVIEW');
             $entityManager->flush();
         }
 
@@ -2382,10 +2409,10 @@ class FrontPortalController extends AbstractController
     public function analyzeJobOfferComment(Request $request): JsonResponse
     {
         $role = $this->resolveSessionRole($request);
-        if ($role !== 'candidate') {
+        if ($role !== 'admin') {
             return $this->json([
                 'ok' => false,
-                'error' => 'Only candidates can analyze comments from this page.',
+                'error' => 'Only admins can analyze comments from this page.',
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -2504,6 +2531,7 @@ class FrontPortalController extends AbstractController
     #[Route('/front/job-offers/{id}/comments', name: 'front_job_offer_comments_list', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function listJobOfferComments(string $id, Request $request, Connection $connection): JsonResponse
     {
+        $role = $this->resolveSessionRole($request);
         $candidate = $this->resolveCurrentCandidate($request);
         $params = ['offer_id' => $id, 'visible_status' => Job_offer_comment::VISIBILITY_VISIBLE];
         $sql = <<<'SQL'
@@ -2517,7 +2545,18 @@ ORDER BY c.created_at DESC
 LIMIT 25
 SQL;
 
-        if ($candidate instanceof Candidate) {
+        if ($role === 'admin') {
+            $params = ['offer_id' => $id];
+            $sql = <<<'SQL'
+SELECT c.id, c.comment_text, c.sentiment, c.moderation_status, c.visibility_status, c.created_at,
+       u.first_name, u.last_name
+FROM job_offer_comment c
+LEFT JOIN users u ON u.id = c.candidate_id
+WHERE c.job_offer_id = :offer_id
+ORDER BY c.created_at DESC
+LIMIT 25
+SQL;
+        } elseif ($candidate instanceof Candidate) {
             $sql = <<<'SQL'
 SELECT c.id, c.comment_text, c.sentiment, c.moderation_status, c.visibility_status, c.created_at,
        u.first_name, u.last_name
@@ -2732,6 +2771,141 @@ SQL;
         return $skills;
     }
 
+    private function normalizeStoredContractType(string $rawContractType): string
+    {
+        $value = trim($rawContractType);
+        if ($value === '') {
+            return '';
+        }
+
+        if (in_array($value, self::CONTRACT_TYPES, true)) {
+            return $value;
+        }
+
+        $normalized = strtoupper(str_replace(['-', ' '], '_', $value));
+
+        return match ($normalized) {
+            'CDI' => 'CDI',
+            'CDD' => 'CDD',
+            'STAGE', 'INTERNSHIP' => 'Internship',
+            'FREELANCE' => 'Freelance',
+            'FULL_TIME', 'FULLTIME' => 'Full-time',
+            'PART_TIME', 'PARTTIME' => 'Part-time',
+            'REMOTE', 'REMOTE_CONTRACT' => 'Remote Contract',
+            default => '',
+        };
+    }
+
+    private static function normalizeStoredSkillLevel(string $rawLevel): string
+    {
+        $normalized = strtolower(str_replace(['-', ' '], '_', trim($rawLevel)));
+
+        return match ($normalized) {
+            'beginner', 'junior', 'entry', 'entry_level' => 'beginner',
+            'intermediate', 'mid', 'middle', 'mid_level' => 'intermediate',
+            'advanced', 'senior', 'expert' => 'advanced',
+            default => in_array($normalized, self::SKILL_LEVELS, true) ? $normalized : '',
+        };
+    }
+
+    /**
+     * @param array<int, array{name: string, level: string}> $skills
+     */
+    private function formatSkillsForPrompt(array $skills): string
+    {
+        if ($skills === []) {
+            return 'Not specified';
+        }
+
+        $parts = [];
+        foreach ($skills as $skill) {
+            $name = trim((string) ($skill['name'] ?? ''));
+            $level = trim((string) ($skill['level'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $parts[] = $level !== '' ? sprintf('%s (%s)', $name, $level) : $name;
+        }
+
+        return $parts === [] ? 'Not specified' : implode(', ', $parts);
+    }
+
+    private function resolveGroqApiKey(): string
+    {
+        $candidates = [
+            $_ENV['GROQ_API_KEY'] ?? null,
+            $_SERVER['GROQ_API_KEY'] ?? null,
+            getenv('GROQ_API_KEY') ?: null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $value = trim((string) $candidate);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function requestGroqGenerateJobOffer(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
+    {
+        $lastError = 'Groq service is currently unavailable.';
+
+        foreach (self::GROQ_JOB_OFFER_MODELS as $model) {
+            try {
+                $response = $httpClient->request('POST', 'https://api.groq.com/openai/v1/chat/completions', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $apiKey,
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => [
+                        'model' => $model,
+                        'messages' => [
+                            ['role' => 'system', 'content' => 'You are an expert HR assistant. Return only valid JSON.'],
+                            ['role' => 'user', 'content' => $prompt],
+                        ],
+                        'temperature' => 0.35,
+                        'max_tokens' => 900,
+                        'response_format' => ['type' => 'json_object'],
+                    ],
+                    'timeout' => 25,
+                ]);
+
+                $statusCode = $response->getStatusCode();
+                $body = $response->toArray(false);
+
+                if ($statusCode >= 400) {
+                    $lastError = $this->extractGroqErrorMessage($body, $lastError);
+                    continue;
+                }
+
+                $text = trim((string) ($body['choices'][0]['message']['content'] ?? ''));
+                if ($text === '') {
+                    $lastError = 'Groq returned an empty response.';
+                    continue;
+                }
+
+                return ['ok' => true, 'text' => $text, 'model' => $model];
+            } catch (\Throwable) {
+                $lastError = 'Failed to contact Groq.';
+            }
+        }
+
+        return ['ok' => false, 'error' => $lastError];
+    }
+
+    private function extractGroqErrorMessage(array $body, string $fallback): string
+    {
+        $message = trim((string) ($body['error']['message'] ?? ''));
+        if ($message === '') {
+            return $fallback;
+        }
+
+        return mb_strlen($message) > 180 ? mb_substr($message, 0, 180) . '...' : $message;
+    }
+
     private function resolveGeminiApiKey(): string
     {
         $candidates = [
@@ -2920,6 +3094,7 @@ SQL;
             'CDD' => 'CDD',
             'STAGE', 'INTERNSHIP' => 'Internship',
             'FREELANCE' => 'Freelance',
+            'FULL-TIME', 'FULL TIME', 'FULL_TIME' => 'Full-time',
             'PART-TIME', 'PART TIME' => 'Part-time',
             'REMOTE', 'REMOTE CONTRACT' => 'Remote Contract',
             default => in_array($rawContractType, self::CONTRACT_TYPES, true) ? $rawContractType : 'CDI',

@@ -205,17 +205,17 @@
                                 <div class="small mb-2"><strong>Missing skills:</strong> <span class="tb-match-missing">-</span></div>
                                 <div class="small text-secondary tb-match-explanation"></div>
                             </div>
+                        {% endif %}
+                        {% if role == 'admin' %}
                             <div id="offerCommentWidget"
                                  class="border rounded-3 p-3 mb-3"
                                  data-analyze-url="{{ path('front_job_offer_comment_analyze') }}"
-                                 data-list-url-template="{{ path('front_job_offer_comments_list', {id: 0}) }}"
-                                 data-create-url-template="{{ path('front_job_offer_comment_create', {id: 0}) }}">
+                                 data-list-url-template="{{ path('front_job_offer_comments_list', {id: 0}) }}">
                                 <div class="small text-uppercase text-secondary fw-semibold mb-2">Comment Analyzer</div>
-                                <div class="small text-secondary mb-2" id="offerCommentHint">Select an offer card before posting a comment.</div>
-                                <textarea id="offerCommentText" class="form-control mb-2" rows="3" placeholder="Write your comment about this offer..."></textarea>
+                                <div class="small text-secondary mb-2" id="offerCommentHint">Select an offer card to review comments or analyze text.</div>
+                                <textarea id="offerCommentText" class="form-control mb-2" rows="3" placeholder="Paste a comment to analyze..."></textarea>
                                 <div class="d-flex gap-2 mb-2">
                                     <button type="button" id="offerCommentAnalyzeBtn" class="btn btn-sm btn-outline-primary">Analyze</button>
-                                    <button type="button" id="offerCommentSubmitBtn" class="btn btn-sm btn-primary">Post Comment</button>
                                 </div>
                                 <div id="offerCommentAnalysis" class="small text-secondary"></div>
                                 <hr class="my-2">
@@ -432,11 +432,9 @@
 
         const analyzeUrl = widget.getAttribute('data-analyze-url') || '';
         const listTemplate = widget.getAttribute('data-list-url-template') || '';
-        const createTemplate = widget.getAttribute('data-create-url-template') || '';
         const hint = document.getElementById('offerCommentHint');
         const textarea = document.getElementById('offerCommentText');
         const analyzeBtn = document.getElementById('offerCommentAnalyzeBtn');
-        const submitBtn = document.getElementById('offerCommentSubmitBtn');
         const analysisBox = document.getElementById('offerCommentAnalysis');
         const listBox = document.getElementById('offerCommentList');
 
@@ -533,7 +531,7 @@
         document.querySelectorAll('#offerCardsGrid .tb-module-card[data-offer-id]').forEach(function (card) {
             card.addEventListener('click', function () {
                 selectedOfferId = card.getAttribute('data-offer-id') || '';
-                setHint(selectedOfferId ? 'Offer #' + selectedOfferId + ' selected.' : 'Select an offer card before posting a comment.');
+                setHint(selectedOfferId ? 'Offer #' + selectedOfferId + ' selected.' : 'Select an offer card to review comments.');
                 renderAnalysis(null);
                 loadComments();
             });
@@ -583,48 +581,6 @@
                         analysisBox.textContent = String(error && error.message ? error.message : 'Unable to analyze comment.');
                         analysisBox.className = 'small text-danger';
                     }
-                }
-            });
-        }
-
-        if (submitBtn) {
-            submitBtn.addEventListener('click', async function () {
-                const text = textarea ? textarea.value.trim() : '';
-                if (!selectedOfferId) {
-                    setHint('Select an offer card before posting a comment.');
-                    return;
-                }
-
-                if (!text) {
-                    setHint('Comment cannot be empty.');
-                    return;
-                }
-
-                submitBtn.setAttribute('disabled', 'disabled');
-                setHint('Posting comment...');
-
-                try {
-                    const response = await fetch(buildCommentsUrl(createTemplate, selectedOfferId), {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                        },
-                        body: JSON.stringify({ comment: text }),
-                    });
-                    const payload = await response.json();
-                    if (!response.ok || !payload.ok) {
-                        throw new Error(payload.error || 'Unable to post comment');
-                    }
-
-                    if (textarea) textarea.value = '';
-                    renderAnalysis(payload.analysis || null);
-                    setHint('Comment posted with moderation status: ' + String((payload.comment && payload.comment.status) || 'APPROVED'));
-                    loadComments();
-                } catch (error) {
-                    setHint(String(error && error.message ? error.message : 'Unable to post comment.'));
-                } finally {
-                    submitBtn.removeAttribute('disabled');
                 }
             });
         }
