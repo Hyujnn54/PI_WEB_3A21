@@ -33,13 +33,13 @@ class InterviewLocationQrCodeService
         $qrCodeImageUrl = $this->buildEmailQrImageUrl($mapsUrl);
 
         try {
-            $result = (new Builder())->build(
-                writer: new SvgWriter(),
-                data: $mapsUrl,
-                size: 280,
-                margin: 10,
-                errorCorrectionLevel: ErrorCorrectionLevel::Medium,
-            );
+            $result = Builder::create()
+                ->writer(new SvgWriter())
+                ->data($mapsUrl)
+                ->size(280)
+                ->margin(10)
+                ->errorCorrectionLevel(ErrorCorrectionLevel::Medium)
+                ->build();
 
             return [
                 'mapsUrl' => $mapsUrl,

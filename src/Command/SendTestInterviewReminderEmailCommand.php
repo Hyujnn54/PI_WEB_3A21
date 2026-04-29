@@ -13,6 +13,11 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
+use Throwable;
 
 #[AsCommand(
     name: 'app:interviews:test-reminder-email',
@@ -22,8 +27,13 @@ class SendTestInterviewReminderEmailCommand extends Command
 {
     public function __construct(
         private readonly BrevoEmailSender $emailSender,
+        private readonly MailerInterface $mailer,
         private readonly ReminderMessageBuilder $messageBuilder,
         private readonly InterviewLocationQrCodeService $locationQrCodeService,
+        #[Autowire('%env(string:MAILER_FROM_ADDRESS)%')]
+        private readonly string $mailerFromAddress,
+        #[Autowire('%env(string:MAILER_FROM_NAME)%')]
+        private readonly string $mailerFromName,
     ) {
         parent::__construct();
     }
@@ -118,18 +128,46 @@ class SendTestInterviewReminderEmailCommand extends Command
             $locationQrCodeImageUrl
         );
 
-        if (!$this->emailSender->isEnabled()) {
-            $io->error('Brevo sender is not enabled. Configure BREVO_API_KEY and BREVO_SENDER_EMAIL first.');
+        if ($this->emailSender->isEnabled()) {
+            $ok = $this->emailSender->send($toEmail, $recipientName, $subject, $textBody, $htmlBody);
+            if ($ok) {
+                $io->success('Test reminder email sent successfully to ' . $toEmail . ' via Brevo.');
+                return Command::SUCCESS;
+            }
+
+            $io->warning('Brevo email send failed. Falling back to Symfony Mailer.');
+        } else {
+            $io->warning('Brevo sender is not enabled. Falling back to Symfony Mailer.');
+        }
+
+        if (!$this->sendWithSymfonyMailer($toEmail, $recipientName, $subject, $textBody, $htmlBody)) {
+            $io->error('Test reminder email failed. Check BREVO_API_KEY or MAILER_DSN and var/log/dev.log for details.');
             return Command::FAILURE;
         }
 
-        $ok = $this->emailSender->send($toEmail, $recipientName, $subject, $textBody, $htmlBody);
-        if (!$ok) {
-            $io->error('Brevo email send failed. Check var/log/dev.log for response details.');
-            return Command::FAILURE;
-        }
-
-        $io->success('Test reminder email sent successfully to ' . $toEmail . '.');
+        $io->success('Test reminder email sent successfully to ' . $toEmail . ' via Symfony Mailer.');
         return Command::SUCCESS;
+    }
+
+    private function sendWithSymfonyMailer(string $toEmail, string $toName, string $subject, string $textBody, string $htmlBody): bool
+    {
+        if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL) || !filter_var($this->mailerFromAddress, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        try {
+            $email = (new Email())
+                ->from(new Address($this->mailerFromAddress, trim($this->mailerFromName) !== '' ? trim($this->mailerFromName) : 'Talent Bridge'))
+                ->to(new Address($toEmail, $toName))
+                ->subject($subject)
+                ->text($textBody)
+                ->html($htmlBody);
+
+            $this->mailer->send($email);
+
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
     }
 }
