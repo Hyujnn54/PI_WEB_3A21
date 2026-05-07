@@ -1,8 +1,0 @@
-﻿
- [OK] No errors                                                                                                        
-
-💡 Tip of the Day:
-PHPStan is performing only the most basic checks.
-You can pass a higher rule level through the --level option
-(the default and current level is 0) to analyse code more thoroughly.
-
