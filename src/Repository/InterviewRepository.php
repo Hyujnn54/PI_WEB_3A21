@@ -6,6 +6,9 @@ use App\Entity\Interview;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Interview>
+ */
 class InterviewRepository extends ServiceEntityRepository
 {
     private const ALLOWED_CRITERIA = ['all', 'title', 'meta', 'description', 'status'];

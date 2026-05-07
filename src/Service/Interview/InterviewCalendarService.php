@@ -4,6 +4,10 @@ namespace App\Service\Interview;
 
 class InterviewCalendarService
 {
+    /**
+     * @param array<array-key, mixed> $cards
+     * @return list<array{interview_id: string, timestamp: int, date: string, ymd: string, title: string, mode: string, status: string, location: string, meeting_link: string}>
+     */
     public function buildUpcomingFromCards(array $cards): array
     {
         $upcomingInterviews = [];

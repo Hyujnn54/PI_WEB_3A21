@@ -184,7 +184,7 @@ class CandidateApplicationController extends AbstractController
 
         $offerStatus = strtolower(trim((string) $jobOffer->getStatus()));
         $offerDeadline = $jobOffer->getDeadline();
-        $isExpired = $offerDeadline instanceof \DateTimeInterface && $offerDeadline < new \DateTimeImmutable();
+        $isExpired = $offerDeadline < new \DateTimeImmutable();
         if ($offerStatus !== 'open' || $isExpired) {
             $this->addFlash('warning', 'This offer is closed and no longer accepts applications.');
             return $this->redirectToRoute('front_job_offers', ['role' => 'candidate']);
@@ -533,6 +533,9 @@ class CandidateApplicationController extends AbstractController
         return $candidate instanceof Candidate ? $candidate : null;
     }
 
+    /**
+     * @param FormInterface<Job_application> $form
+     */
     private function verifyApplyFormInController(
         FormInterface $form,
         Job_application $application,
@@ -643,9 +646,7 @@ class CandidateApplicationController extends AbstractController
         $candidateName = $this->resolveCandidateDisplayName($candidate);
         $offerTitle = trim((string) $jobOffer->getTitle());
         $appliedAt = $application->getApplied_at();
-        $appliedAtText = $appliedAt instanceof \DateTimeInterface
-            ? $appliedAt->format('F j, Y \\a\\t H:i')
-            : (new \DateTimeImmutable())->format('F j, Y \\a\\t H:i');
+        $appliedAtText = $appliedAt->format('F j, Y \\a\\t H:i');
 
         $body = $this->renderView('emails/application_confirmation.txt.twig', [
             'candidateName' => $candidateName,

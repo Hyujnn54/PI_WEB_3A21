@@ -100,7 +100,7 @@ class FrontPortalController extends AbstractController
         $warnings = [];
         $warningStatuses = [];
         $expiredOffers = [];
-        $now = date_create();
+        $now = new \DateTimeImmutable();
         $cards = [];
 
         $appliedOfferIds = [];
@@ -114,9 +114,7 @@ class FrontPortalController extends AbstractController
 
                 foreach ($activeApplications as $activeApplication) {
                     $offer = $activeApplication->getOffer_id();
-                    if ($offer instanceof Job_offer) {
-                        $appliedOfferIds[(string) $offer->getId()] = true;
-                    }
+                    $appliedOfferIds[(string) $offer->getId()] = true;
                 }
             }
         }
@@ -152,8 +150,10 @@ class FrontPortalController extends AbstractController
                 $isExpired = false;
                 try {
                     $deadlineAt = date_create((string) ($row['deadline'] ?? ''));
-                    $formattedDeadline = $deadlineAt->format('Y-m-d');
-                    $isExpired = $deadlineAt < $now;
+                    if ($deadlineAt instanceof \DateTimeInterface) {
+                        $formattedDeadline = $deadlineAt->format('Y-m-d');
+                        $isExpired = $deadlineAt < $now;
+                    }
                 } catch (\Throwable $exception) {
                     $formattedDeadline = '';
                     $isExpired = false;
@@ -617,14 +617,14 @@ class FrontPortalController extends AbstractController
 
         try {
             $aiResult = $this->requestGroqGenerateJobOffer($httpClient, $apiKey, $prompt);
-            if (($aiResult['ok'] ?? false) !== true) {
+            if ($aiResult['ok'] !== true) {
                 return $this->json([
                     'ok' => false,
-                    'error' => (string) ($aiResult['error'] ?? 'AI service is currently unavailable.'),
+                    'error' => $aiResult['error'],
                 ], Response::HTTP_BAD_GATEWAY);
             }
 
-            $rawText = trim((string) ($aiResult['text'] ?? ''));
+            $rawText = trim($aiResult['text']);
             $decoded = $this->decodeAiJsonPayload($rawText);
             if (!is_array($decoded)) {
                 return $this->json([
@@ -1144,9 +1144,7 @@ class FrontPortalController extends AbstractController
 
         if (count($myRegs) > 0) {
             foreach ($myRegs as $registration) {
-                if ($registration->getEvent_id()) {
-                    $registeredIds[] = $registration->getEvent_id()->getId();
-                }
+                $registeredIds[] = $registration->getEvent_id()->getId();
             }
             $session->set('registered_event_ids', $registeredIds);
         }
@@ -1166,6 +1164,11 @@ class FrontPortalController extends AbstractController
 
         $cards = [];
         foreach ($events as $event) {
+            $eventDate = $event->getEvent_date();
+            if (!$eventDate instanceof \DateTimeInterface) {
+                continue;
+            }
+
             $description = trim((string) $event->getDescription());
             $capacity = (int) $event->getCapacity();
             $registrationCount = $this->countActiveEventRegistrations($event);
@@ -1174,7 +1177,7 @@ class FrontPortalController extends AbstractController
 
             $cards[] = [
                 'id' => $event->getId(),
-                'meta' => sprintf('%s | %s', $event->getEvent_date()->format('d M Y'), (string) $event->getLocation()),
+                'meta' => sprintf('%s | %s', $eventDate->format('d M Y'), (string) $event->getLocation()),
                 'title' => (string) $event->getTitle(),
                 'text' => $description === '' ? 'No event description available yet.' : substr($description, 0, 190),
                 'event_type' => (string) $event->getEvent_type(),
@@ -1186,7 +1189,7 @@ class FrontPortalController extends AbstractController
                 'is_popular' => $registrationCount >= 3 || ($registrationCount > 0 && $fillRatio >= 0.5),
                 'popularity_score' => $registrationCount,
                 'meet_link' => (string) $event->getMeet_link(),
-                'event_date_value' => $event->getEvent_date()->format('Y-m-d\TH:i'),
+                'event_date_value' => $eventDate->format('Y-m-d\TH:i'),
                 'registered' => in_array($event->getId(), $registeredIds, true),
             ];
         }
@@ -1253,7 +1256,7 @@ class FrontPortalController extends AbstractController
             $registration->setId($this->nextNumericId(Event_registration::class));
             $registration->setEvent_id($event);
             $registration->setCandidate_id($candidate);
-            $registration->setRegistered_at(date_create());
+            $registration->setRegistered_at(new \DateTimeImmutable());
             $registration->setAttendance_status('registered');
 
             $entityManager->persist($registration);
@@ -1335,7 +1338,7 @@ class FrontPortalController extends AbstractController
     {
         $count = 0;
         foreach ($event->getEvent_registrations() as $registration) {
-            if ($registration instanceof Event_registration && $this->isActiveEventRegistrationStatus($registration->getAttendance_status())) {
+            if ($this->isActiveEventRegistrationStatus($registration->getAttendance_status())) {
                 $count += 1;
             }
         }
@@ -1358,14 +1361,11 @@ class FrontPortalController extends AbstractController
     ): void {
         $event = $registration->getEvent_id();
         $candidate = $registration->getCandidate_id();
-        if (!$event instanceof Recruitment_event || !$candidate instanceof Candidate) {
+        if (!$candidate instanceof Candidate) {
             return;
         }
 
         $recruiter = $event->getRecruiter_id();
-        if (!$recruiter instanceof Recruiter) {
-            return;
-        }
 
         $recruiterEmail = trim((string) $recruiter->getEmail());
         if (!filter_var($recruiterEmail, FILTER_VALIDATE_EMAIL)) {
@@ -1438,9 +1438,7 @@ class FrontPortalController extends AbstractController
 
         if (count($myRegs) > 0) {
             foreach ($myRegs as $registration) {
-                if ($registration->getEvent_id()) {
-                    $registeredIds[] = $registration->getEvent_id()->getId();
-                }
+                $registeredIds[] = $registration->getEvent_id()->getId();
             }
             $session->set('registered_event_ids', $registeredIds);
         }
@@ -1449,20 +1447,23 @@ class FrontPortalController extends AbstractController
         if (count($myRegs) > 0) {
             foreach ($myRegs as $registration) {
                 $event = $registration->getEvent_id();
-                if ($event) {
-                    $cards[] = [
-                        'id' => $event->getId(),
-                        'meta' => $event->getEvent_date()->format('d M Y') . ' | ' . $event->getLocation(),
-                        'title' => $event->getTitle(),
-                        'text' => $event->getDescription(),
-                        'event_type' => $event->getEvent_type(),
-                        'location' => $event->getLocation(),
-                        'capacity' => $event->getCapacity(),
-                        'meet_link' => $event->getMeet_link(),
-                        'event_date_value' => $event->getEvent_date()->format('Y-m-d\TH:i'),
-                        'status' => $registration->getAttendance_status() ?? 'registered',
-                    ];
+                $eventDate = $event->getEvent_date();
+                if (!$eventDate instanceof \DateTimeInterface) {
+                    continue;
                 }
+
+                $cards[] = [
+                    'id' => $event->getId(),
+                    'meta' => $eventDate->format('d M Y') . ' | ' . $event->getLocation(),
+                    'title' => $event->getTitle(),
+                    'text' => $event->getDescription(),
+                    'event_type' => $event->getEvent_type(),
+                    'location' => $event->getLocation(),
+                    'capacity' => $event->getCapacity(),
+                    'meet_link' => $event->getMeet_link(),
+                    'event_date_value' => $eventDate->format('Y-m-d\TH:i'),
+                    'status' => $registration->getAttendance_status(),
+                ];
             }
 
             usort($cards, static fn (array $a, array $b): int => strcmp($a['event_date_value'], $b['event_date_value']));
@@ -1531,6 +1532,11 @@ class FrontPortalController extends AbstractController
         $urgentNotifications = [];
         $eventsData = [];
         foreach ($events as $event) {
+            $eventDate = $event->getEvent_date();
+            if (!$eventDate instanceof \DateTimeInterface) {
+                continue;
+            }
+
             $registrations = $event->getEvent_registrations();
 
             $candidatesList = [];
@@ -1559,7 +1565,7 @@ class FrontPortalController extends AbstractController
                     'name' => $candidateFullName,
                     'email' => $candidateEmail,
                     'registered_at' => $registration->getRegistered_at(),
-                    'status' => $registration->getAttendance_status() ?? 'registered',
+                    'status' => $registration->getAttendance_status(),
                 ];
             }
 
@@ -1571,22 +1577,22 @@ class FrontPortalController extends AbstractController
                 }
             }
 
-            $secondsUntilEvent = $event->getEvent_date()->getTimestamp() - $now->getTimestamp();
+            $secondsUntilEvent = $eventDate->getTimestamp() - $now->getTimestamp();
             $isUrgent = $pendingActionsCount > 0 && $secondsUntilEvent >= 0 && $secondsUntilEvent <= (72 * 3600);
 
             if ($isUrgent) {
                 $urgentNotifications[] = [
                     'title' => (string) $event->getTitle(),
                     'pending_count' => $pendingActionsCount,
-                    'event_date' => $event->getEvent_date(),
+                    'event_date' => $eventDate,
                 ];
             }
 
             $eventsData[] = [
                 'id' => $event->getId(),
                 'title' => $event->getTitle(),
-                'meta' => $event->getEvent_date()->format('d M Y') . ' | ' . $event->getLocation(),
-                'date' => $event->getEvent_date(),
+                'meta' => $eventDate->format('d M Y') . ' | ' . $event->getLocation(),
+                'date' => $eventDate,
                 'location' => $event->getLocation(),
                 'capacity' => $event->getCapacity(),
                 'event_type' => $event->getEvent_type(),
@@ -1617,6 +1623,11 @@ class FrontPortalController extends AbstractController
 
         $eventsData = [];
         foreach ($events as $event) {
+            $eventDate = $event->getEvent_date();
+            if (!$eventDate instanceof \DateTimeInterface) {
+                continue;
+            }
+
             $registrations = $event->getEvent_registrations();
 
             $candidatesList = [];
@@ -1645,7 +1656,7 @@ class FrontPortalController extends AbstractController
                     'name' => $candidateFullName,
                     'email' => $candidateEmail,
                     'registered_at' => $registration->getRegistered_at(),
-                    'status' => $registration->getAttendance_status() ?? 'registered',
+                    'status' => $registration->getAttendance_status(),
                 ];
             }
 
@@ -1660,8 +1671,8 @@ class FrontPortalController extends AbstractController
             $eventsData[] = [
                 'id' => $event->getId(),
                 'title' => $event->getTitle(),
-                'meta' => $event->getEvent_date()->format('d M Y') . ' | ' . $event->getLocation(),
-                'date' => $event->getEvent_date(),
+                'meta' => $eventDate->format('d M Y') . ' | ' . $event->getLocation(),
+                'date' => $eventDate,
                 'location' => $event->getLocation(),
                 'capacity' => $event->getCapacity(),
                 'event_type' => $event->getEvent_type(),
@@ -1700,7 +1711,7 @@ class FrontPortalController extends AbstractController
 
         $event = $registration->getEvent_id();
         $recruiter = $this->resolveCurrentRecruiter($request);
-        if (!$event || !$recruiter instanceof Recruiter || $event->getRecruiter_id()->getId() !== $recruiter->getId()) {
+        if (!$recruiter instanceof Recruiter || $event->getRecruiter_id()->getId() !== $recruiter->getId()) {
             $this->addFlash('warning', 'You can only update registrations for your own events.');
             return $this->redirectToRoute('recruiter_event_registrations', ['role' => 'recruiter']);
         }
@@ -1730,7 +1741,7 @@ class FrontPortalController extends AbstractController
     ): bool {
         $candidate = $registration->getCandidate_id();
         $event = $registration->getEvent_id();
-        if (!$candidate instanceof Candidate || !$event instanceof Recruitment_event) {
+        if (!$candidate instanceof Candidate) {
             return false;
         }
 
@@ -2070,8 +2081,8 @@ class FrontPortalController extends AbstractController
 
         $currentRecruiter = $this->resolveCurrentRecruiter($request);
         $offer = $application->getOffer_id();
-        $recruiter = $offer ? $offer->getRecruiter_id() : null;
-        if (!$currentRecruiter instanceof Recruiter || !$recruiter instanceof Recruiter || (string) $currentRecruiter->getId() !== (string) $recruiter->getId()) {
+        $recruiter = $offer->getRecruiter_id();
+        if (!$currentRecruiter instanceof Recruiter || (string) $currentRecruiter->getId() !== (string) $recruiter->getId()) {
             $this->addFlash('warning', 'You can only schedule interviews for your own job offers.');
             return $this->redirectToRoute('front_job_applications', $request->query->all());
         }
@@ -2113,7 +2124,7 @@ class FrontPortalController extends AbstractController
                 $interview->setLocation($validation['location']);
                 $interview->setNotes($validation['notes']);
                 $interview->setStatus('scheduled');
-                $interview->setCreated_at(date_create());
+                $interview->setCreated_at(new \DateTimeImmutable());
                 $interview->setReminder_sent(false);
 
                 try {
@@ -2329,7 +2340,7 @@ class FrontPortalController extends AbstractController
         $feedback->setOverall_score($score);
         $feedback->setDecision($decision);
         $feedback->setComment((string) $commentValidation['value']);
-        $feedback->setCreated_at(date_create());
+        $feedback->setCreated_at(new \DateTimeImmutable());
 
         $interview->setStatus('completed');
         $application = $interview->getApplication_id();
@@ -2555,10 +2566,16 @@ class FrontPortalController extends AbstractController
         }
 
         try {
-            $legacyRecruiterId = $this->doctrine->getConnection()->fetchOne(
-                'SELECT id FROM recruiter WHERE user_id = :user_id LIMIT 1',
-                ['user_id' => $userId]
-            );
+            $entityManager = $this->doctrine->getManager();
+            if (!$entityManager instanceof EntityManagerInterface) {
+                return $userId;
+            }
+
+            $legacyRecruiterId = $entityManager->getConnection()
+                ->fetchOne(
+                    'SELECT id FROM recruiter WHERE user_id = :user_id LIMIT 1',
+                    ['user_id' => $userId]
+                );
             if ($legacyRecruiterId !== false && $legacyRecruiterId !== null && (string) $legacyRecruiterId !== '') {
                 return (string) $legacyRecruiterId;
             }
@@ -2569,6 +2586,9 @@ class FrontPortalController extends AbstractController
         return $userId;
     }
 
+    /**
+     * @return Pagerfanta<mixed>
+     */
     private function createPagerFromQueryBuilder(QueryBuilder $queryBuilder, int $page, int $perPage): Pagerfanta
     {
         $pager = new Pagerfanta(new QueryAdapter($queryBuilder, true, false));
@@ -2584,6 +2604,7 @@ class FrontPortalController extends AbstractController
 
     /**
      * @param array<int, mixed> $items
+     * @return Pagerfanta<mixed>
      */
     private function createPagerFromArray(array $items, int $page, int $perPage): Pagerfanta
     {
@@ -2599,6 +2620,7 @@ class FrontPortalController extends AbstractController
     }
 
     /**
+     * @param Pagerfanta<mixed> $pager
      * @param array<string, mixed> $routeParamsBase
      *
      * @return array<string, mixed>
@@ -2642,6 +2664,9 @@ class FrontPortalController extends AbstractController
             'lng' => $coords['lng'],
         ];
     }
+    /**
+     * @return array{ok: false, error: string}|array{ok: true, value: string}
+     */
     private function validateReviewComment(string $comment): array
     {
         $trimmed = trim($comment);
@@ -2685,10 +2710,10 @@ class FrontPortalController extends AbstractController
         $payload = json_decode((string) $request->getContent(), true);
         $comment = trim((string) ($payload['comment'] ?? ''));
         $validation = Job_offer_comment::validateCommentText($comment);
-        if (($validation['ok'] ?? false) !== true) {
+        if ($validation['ok'] !== true) {
             return $this->json([
                 'ok' => false,
-                'error' => (string) ($validation['error'] ?? 'Invalid comment.'),
+                'error' => $validation['error'],
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -2730,10 +2755,10 @@ class FrontPortalController extends AbstractController
         $payload = json_decode((string) $request->getContent(), true);
         $comment = trim((string) ($payload['comment'] ?? ''));
         $validation = Job_offer_comment::validateCommentText($comment);
-        if (($validation['ok'] ?? false) !== true) {
+        if ($validation['ok'] !== true) {
             return $this->json([
                 'ok' => false,
-                'error' => (string) ($validation['error'] ?? 'Invalid comment.'),
+                'error' => $validation['error'],
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -2883,6 +2908,9 @@ SQL;
         }
     }
 
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
     private function computeCandidateInterviewStatus(Interview $interview, ?Interview_feedback $latestFeedback = null): array
     {
         try {
@@ -2919,6 +2947,9 @@ SQL;
         return ['Pending', 'bg-blue-lt', 'pending'];
     }
 
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
     private function computeRecruiterInterviewStatus(Interview $interview, string $normalizedStatus, ?Interview_feedback $latestFeedback = null): array
     {
         try {
@@ -3005,9 +3036,18 @@ SQL;
         return null;
     }
 
+    /**
+     * @param class-string<Event_registration|Interview|Interview_feedback> $entityClass
+     */
     private function nextNumericId(string $entityClass): string
     {
-        $last = $this->doctrine->getRepository($entityClass)->findBy([], ['id' => 'DESC'], 1);
+        $last = match ($entityClass) {
+            Event_registration::class => $this->doctrine->getRepository(Event_registration::class)->findBy([], ['id' => 'DESC'], 1),
+            Interview::class => $this->doctrine->getRepository(Interview::class)->findBy([], ['id' => 'DESC'], 1),
+            Interview_feedback::class => $this->doctrine->getRepository(Interview_feedback::class)->findBy([], ['id' => 'DESC'], 1),
+            default => [],
+        };
+
         if (empty($last)) {
             return '1';
         }
@@ -3016,6 +3056,10 @@ SQL;
         return (string) ($lastId + 1);
     }
 
+    /**
+     * @param array<array-key, mixed> $rawSkills
+     * @return list<array{name: string, level: string}>
+     */
     private function normalizeSkills(array $rawSkills): array
     {
         $skills = [];
@@ -3115,6 +3159,9 @@ SQL;
         return '';
     }
 
+    /**
+     * @return array{ok: true, text: string, model: string}|array{ok: false, error: string}
+     */
     private function requestGroqGenerateJobOffer(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
     {
         $lastError = 'Groq service is currently unavailable.';
@@ -3162,6 +3209,9 @@ SQL;
         return ['ok' => false, 'error' => $lastError];
     }
 
+    /**
+     * @param array<string, mixed> $body
+     */
     private function extractGroqErrorMessage(array $body, string $fallback): string
     {
         $message = trim((string) ($body['error']['message'] ?? ''));
@@ -3172,6 +3222,9 @@ SQL;
         return mb_strlen($message) > 180 ? mb_substr($message, 0, 180) . '...' : $message;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function decodeAiJsonPayload(string $rawPayload): ?array
     {
         $payload = trim($rawPayload);
@@ -3200,6 +3253,10 @@ SQL;
         return is_array($decodedChunk) ? $decodedChunk : null;
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{title: string, description: string, contract_type: string, location: string, skills: list<array{name: string, level: string}>}
+     */
     private function normalizeAiJobOfferPayload(array $payload, string $title): array
     {
         $description = trim((string) ($payload['description'] ?? ''));
@@ -3243,6 +3300,9 @@ SQL;
         ];
     }
 
+    /**
+     * @return list<string>
+     */
     private function normalizeAiTextList(mixed $value, int $maxItems = 8): array
     {
         if (!is_array($value)) {

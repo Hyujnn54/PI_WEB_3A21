@@ -34,8 +34,8 @@ class GenerateInterviewLocationQrPreviewCommand extends Command
         $location = trim((string) $input->getArgument('location'));
 
         $payload = $this->locationQrCodeService->buildOnsiteLocationPayload($location);
-        $dataUri = (string) ($payload['qrCodeDataUri'] ?? '');
-        $mapsUrl = (string) ($payload['mapsUrl'] ?? '');
+        $dataUri = $payload['qrCodeDataUri'];
+        $mapsUrl = $payload['mapsUrl'];
 
         if (!str_starts_with($dataUri, 'data:image/') || !str_contains($dataUri, ';base64,')) {
             $io->error('QR code generation failed.');

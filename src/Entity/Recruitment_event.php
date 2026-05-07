@@ -70,105 +70,109 @@ class Recruitment_event
         return $this->id;
     }
 
-    public function setId($value)
+    public function setId(?int $value): void
     {
         $this->id = $value;
     }
 
-    public function getRecruiter_id()
+    public function getRecruiter_id(): Recruiter
     {
         return $this->recruiter_id;
     }
 
-    public function setRecruiter_id($value)
+    public function setRecruiter_id(Recruiter $value): void
     {
         $this->recruiter_id = $value;
     }
 
-    public function getTitle()
+    public function getTitle(): string
     {
         return $this->title;
     }
 
-    public function setTitle($value)
+    public function setTitle(string $value): void
     {
         $this->title = $value;
     }
 
-    public function getDescription()
+    public function getDescription(): string
     {
         return $this->description;
     }
 
-    public function setDescription($value)
+    public function setDescription(string $value): void
     {
         $this->description = $value;
     }
 
-    public function getEvent_type()
+    public function getEvent_type(): string
     {
         return $this->event_type;
     }
 
-    public function setEvent_type($value)
+    public function setEvent_type(string $value): void
     {
         $this->event_type = $value;
     }
 
-    public function getLocation()
+    public function getLocation(): string
     {
         return $this->location;
     }
 
-    public function setLocation($value)
+    public function setLocation(string $value): void
     {
         $this->location = $value;
     }
 
-    public function getEvent_date()
+    public function getEvent_date(): ?\DateTimeInterface
     {
         return $this->event_date;
     }
 
-    public function setEvent_date($value)
+    public function setEvent_date(?\DateTimeInterface $value): void
     {
         $this->event_date = $value;
     }
 
-    public function getCapacity()
+    public function getCapacity(): ?int
     {
         return $this->capacity;
     }
 
-    public function setCapacity($value)
+    public function setCapacity(?int $value): void
     {
         $this->capacity = $value;
     }
 
-    public function getMeet_link()
+    public function getMeet_link(): string
     {
         return $this->meet_link;
     }
 
-    public function setMeet_link($value)
+    public function setMeet_link(string $value): void
     {
         $this->meet_link = $value;
     }
 
-    public function getCreated_at()
+    public function getCreated_at(): \DateTimeInterface
     {
         return $this->created_at;
     }
 
-    public function setCreated_at($value)
+    public function setCreated_at(\DateTimeInterface $value): void
     {
         $this->created_at = $value;
     }
 
+    /** @var Collection<int, Event_registration> */
     #[ORM\OneToMany(mappedBy: "event_id", targetEntity: Event_registration::class)]
     private Collection $event_registrations;
 
-        public function getEvent_registrations(): Collection
+    /**
+     * @return Collection<int, Event_registration>
+     */
+    public function getEvent_registrations(): Collection
         {
             return $this->event_registrations;
         }
@@ -185,19 +189,18 @@ class Recruitment_event
     
         public function removeEvent_registration(Event_registration $event_registration): self
         {
-            if ($this->event_registrations->removeElement($event_registration)) {
-                // set the owning side to null (unless already changed)
-                if ($event_registration->getEvent_id() === $this) {
-                    $event_registration->setEvent_id(null);
-                }
-            }
+            $this->event_registrations->removeElement($event_registration);
     
             return $this;
         }
 
+    /** @var Collection<int, Event_review> */
     #[ORM\OneToMany(mappedBy: "event_id", targetEntity: Event_review::class)]
     private Collection $event_reviews;
 
+    /**
+     * @return Collection<int, Event_review>
+     */
     public function getEvent_reviews(): Collection
     {
         return $this->event_reviews;

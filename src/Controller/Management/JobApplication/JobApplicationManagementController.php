@@ -68,7 +68,7 @@ class JobApplicationManagementController extends AbstractController
                 default => 'SUBMITTED',
             };
             $offer = $application->getOffer_id();
-            $offerId = $offer ? (string) $offer->getId() : null;
+            $offerId = (string) $offer->getId();
 
             $global['total']++;
             if ($normalizedStatus === 'SUBMITTED') {
@@ -83,7 +83,7 @@ class JobApplicationManagementController extends AbstractController
                 $global['hired']++;
             }
 
-            if ($offerId === null || !isset($offerRows[$offerId])) {
+            if (!isset($offerRows[$offerId])) {
                 continue;
             }
 
@@ -168,7 +168,7 @@ class JobApplicationManagementController extends AbstractController
 
             $rows[] = [
                 'id' => $application->getId(),
-                'offer_title' => $offer ? $offer->getTitle() : 'Unknown Offer',
+                'offer_title' => $offer->getTitle(),
                 'candidate_name' => $candidateName,
                 'phone' => $application->getPhone(),
                 'status' => $application->getCurrent_status(),

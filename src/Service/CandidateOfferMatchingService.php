@@ -179,18 +179,23 @@ class CandidateOfferMatchingService
         ];
     }
 
+    /**
+     * @param array{required_skill_count: int, matching_skill_count: int, exact_match_count: int, partial_match_count: int, missing_skill_count: int, label: string} $details
+     * @param list<string> $matchingSkills
+     * @param list<string> $missingSkills
+     */
     private function buildMatchExplanation(int $score, array $details, array $matchingSkills, array $missingSkills): string
     {
-        $requiredSkillCount = (int) ($details['required_skill_count'] ?? 0);
-        $partialMatchCount = (int) ($details['partial_match_count'] ?? 0);
-        $missingSkillCount = (int) ($details['missing_skill_count'] ?? 0);
-        $label = (string) ($details['label'] ?? 'matching');
+        $requiredSkillCount = $details['required_skill_count'];
+        $partialMatchCount = $details['partial_match_count'];
+        $missingSkillCount = $details['missing_skill_count'];
+        $label = $details['label'];
 
         if ($requiredSkillCount === 0) {
             return 'Aucune compétence requise n’est définie pour cette offre. Le score est donc neutre et le matching reste favorable.';
         }
 
-        $exactMatchText = ((int) ($details['exact_match_count'] ?? 0)) === 1 ? 'correspondance complète' : 'correspondances complètes';
+        $exactMatchText = $details['exact_match_count'] === 1 ? 'correspondance complète' : 'correspondances complètes';
         $partialMatchText = $partialMatchCount === 1 ? 'correspondance partielle' : 'correspondances partielles';
         $missingMatchText = $missingSkillCount === 1 ? 'compétence manquante' : 'compétences manquantes';
 
@@ -198,7 +203,7 @@ class CandidateOfferMatchingService
             'Cette offre demande %d compétence%s. Vous avez %d %s, %d %s et %d %s.',
             $requiredSkillCount,
             $requiredSkillCount > 1 ? 's' : '',
-            (int) ($details['exact_match_count'] ?? 0),
+            $details['exact_match_count'],
             $exactMatchText,
             $partialMatchCount,
             $partialMatchText,

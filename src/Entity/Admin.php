@@ -11,6 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'admin')]
 class Admin extends Users
 {
+    /** @var Collection<int, Job_offer_warning> */
     #[ORM\OneToMany(mappedBy: "admin_id", targetEntity: Job_offer_warning::class)]
     private Collection $job_offer_warnings;
 
@@ -26,6 +27,9 @@ class Admin extends Users
     public function getAssignedArea(): ?string { return $this->assignedArea; }
     public function setAssignedArea(?string $assignedArea): self { $this->assignedArea = $assignedArea; return $this; }
 
+    /**
+     * @return Collection<int, Job_offer_warning>
+     */
     public function getJob_offer_warnings(): Collection { return $this->job_offer_warnings; }
 
     public function addJob_offer_warning(Job_offer_warning $jobOfferWarning): self

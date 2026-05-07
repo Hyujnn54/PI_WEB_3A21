@@ -63,18 +63,18 @@ class ApplicationAiRankingService
         $offer = $application->getOffer_id();
         $candidate = $application->getCandidate_id();
 
-        $offerTitle = $offer instanceof Job_offer ? trim((string) $offer->getTitle()) : '';
-        $offerDescription = $offer instanceof Job_offer ? trim((string) $offer->getDescription()) : '';
+        $offerTitle = trim((string) $offer->getTitle());
+        $offerDescription = trim((string) $offer->getDescription());
         $requiredSkills = $this->extractOfferSkills($offer);
 
         $candidateName = $this->resolveCandidateName($candidate);
         $candidateSkills = $this->extractCandidateSkills($candidate);
-        $experienceYears = $candidate instanceof Candidate ? $candidate->getExperienceYears() : null;
-        $educationLevel = $candidate instanceof Candidate ? trim((string) $candidate->getEducationLevel()) : '';
+        $experienceYears = $candidate->getExperienceYears();
+        $educationLevel = trim((string) $candidate->getEducationLevel());
         $coverLetter = trim((string) $application->getCover_letter());
 
         $applicationCvPath = trim((string) $application->getCv_path());
-        $profileCvPath = $candidate instanceof Candidate ? trim((string) $candidate->getCvPath()) : '';
+        $profileCvPath = trim((string) $candidate->getCvPath());
         $cvText = $this->extractCvText($applicationCvPath, $profileCvPath);
 
         return [
@@ -584,10 +584,6 @@ class ApplicationAiRankingService
 
         $skills = [];
         foreach ($offer->getOffer_skills() as $offerSkill) {
-            if (!method_exists($offerSkill, 'getSkill_name')) {
-                continue;
-            }
-
             $skill = trim((string) $offerSkill->getSkill_name());
             if ($skill === '') {
                 continue;

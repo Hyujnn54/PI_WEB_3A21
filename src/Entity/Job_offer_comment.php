@@ -276,6 +276,9 @@ class Job_offer_comment
         return $this;
     }
 
+    /**
+     * @return array{ok: false, error: string}|array{ok: true, value: string}
+     */
     public static function validateCommentText(string $comment): array
     {
         $value = trim($comment);

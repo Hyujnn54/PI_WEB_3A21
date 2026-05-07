@@ -24,6 +24,9 @@ class InterviewReminderDispatcher
     ) {
     }
 
+    /**
+     * @return array{due: int, processed: int, skipped: int, emails_sent: int, sms_sent: int}
+     */
     public function dispatchDueReminders(): array
     {
         $stats = [
@@ -180,6 +183,9 @@ class InterviewReminderDispatcher
         return $stats;
     }
 
+    /**
+     * @return array{ok: false}|array{ok: true, offerTitle: string, scheduledAt: string, durationMinutes: int, modeLabel: string, placeLabel: string, notes: string, mapsUrl: string, locationQrCodeImageUrl: string, recipients: list<array{role: string, name: string, email: string, phone: string}>}
+     */
     private function buildReminderContext(Interview $interview): array
     {
         try {
@@ -206,8 +212,8 @@ class InterviewReminderDispatcher
 
             if ($mode === 'onsite') {
                 $locationPayload = $this->locationQrCodeService->buildOnsiteLocationPayload($location);
-                $mapsUrl = (string) ($locationPayload['mapsUrl'] ?? '');
-                $locationQrCodeImageUrl = (string) ($locationPayload['qrCodeImageUrl'] ?? '');
+                $mapsUrl = $locationPayload['mapsUrl'];
+                $locationQrCodeImageUrl = $locationPayload['qrCodeImageUrl'];
             }
 
             $placeLabel = $mode === 'onsite'
@@ -257,6 +263,9 @@ class InterviewReminderDispatcher
         return null;
     }
 
+    /**
+     * @return array{role: string, name: string, email: string, phone: string}
+     */
     private function buildRecipient(string $role, ?Users $user, string $fallbackPhone): array
     {
         $firstName = $user instanceof Users ? trim((string) $user->getFirstName()) : '';

@@ -32,22 +32,22 @@ class Event_registration
 
     private ?string $candidate_email = null;
 
-    public function getId()
+    public function getId(): string
     {
         return $this->id;
     }
 
-    public function setId($value)
+    public function setId(string $value): void
     {
         $this->id = $value;
     }
 
-    public function getEvent_id()
+    public function getEvent_id(): Recruitment_event
     {
         return $this->event_id;
     }
 
-    public function setEvent_id($value)
+    public function setEvent_id(Recruitment_event $value): void
     {
         $this->event_id = $value;
     }
@@ -57,47 +57,47 @@ class Event_registration
         return $this->candidate_id;
     }
 
-    public function setCandidate_id(?Candidate $value)
+    public function setCandidate_id(?Candidate $value): void
     {
         $this->candidate_id = $value;
     }
 
-    public function getRegistered_at()
+    public function getRegistered_at(): \DateTimeInterface
     {
         return $this->registered_at;
     }
 
-    public function setRegistered_at($value)
+    public function setRegistered_at(\DateTimeInterface $value): void
     {
         $this->registered_at = $value;
     }
 
-    public function getAttendance_status()
+    public function getAttendance_status(): string
     {
         return $this->attendance_status;
     }
 
-    public function setAttendance_status($value)
+    public function setAttendance_status(string $value): void
     {
         $this->attendance_status = $value;
     }
 
-    public function getCandidate_name()
+    public function getCandidate_name(): ?string
     {
         return $this->candidate_name;
     }
 
-    public function setCandidate_name($value)
+    public function setCandidate_name(?string $value): void
     {
         $this->candidate_name = $value;
     }
 
-    public function getCandidate_email()
+    public function getCandidate_email(): ?string
     {
         return $this->candidate_email;
     }
 
-    public function setCandidate_email($value)
+    public function setCandidate_email(?string $value): void
     {
         $this->candidate_email = $value;
     }

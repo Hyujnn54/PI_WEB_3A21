@@ -21,6 +21,9 @@ class UsersRepository extends ServiceEntityRepository
 
     
 }
+/**
+ * @return list<Users>
+ */
 public function findBySearchAndRole(?string $search = null, ?string $role = null): array
 {
     $users = $this->findAll();   // Get all users
@@ -55,13 +58,16 @@ public function findBySearchAndRole(?string $search = null, ?string $role = null
     }
 
     // Optional: sort by first name
-    usort($filtered, function($a, $b) {
-        return strcmp($a->getFirstName(), $b->getFirstName());
+    usort($filtered, function(Users $a, Users $b): int {
+        return strcmp($a->getFirstName() ?? '', $b->getFirstName() ?? '');
     });
 
     return $filtered;
 }
-public function findByRole(string $role)
+/**
+ * @return list<Users>
+ */
+public function findByRole(string $role): array
 {
     return $this->createQueryBuilder('u')
         ->andWhere('u.roles LIKE :role')

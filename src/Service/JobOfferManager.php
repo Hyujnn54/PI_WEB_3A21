@@ -59,12 +59,7 @@ class JobOfferManager
             throw new \InvalidArgumentException('Location must be 3-120 characters and contain valid text.');
         }
 
-        $deadline = $offer->getDeadline();
-        if (!$deadline instanceof \DateTimeInterface) {
-            throw new \InvalidArgumentException('Deadline is required.');
-        }
-
-        if ($deadline <= new \DateTimeImmutable()) {
+        if ($offer->getDeadline() <= new \DateTimeImmutable()) {
             throw new \InvalidArgumentException('Deadline must be greater than today.');
         }
 

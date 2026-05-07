@@ -39,7 +39,7 @@ class RecruiterController extends AbstractController
             return $this->redirectToRoute('front_home');
         }
 
-        $now = date_create();
+        $now = new \DateTimeImmutable();
         $recruiterName = $this->resolveRecruiterName($recruiter, (string) $session->get('user_name', 'Recruiter'));
         $companyName = trim((string) ($recruiter->getCompanyName() ?? ''));
 
@@ -58,15 +58,11 @@ class RecruiterController extends AbstractController
         ];
 
         foreach ($offers as $offer) {
-            if (!$offer instanceof Job_offer) {
-                continue;
-            }
-
             $jobOffersSummary['total']++;
 
             $status = strtolower(trim((string) $offer->getStatus()));
             $deadline = $offer->getDeadline();
-            $isExpired = is_object($deadline) && method_exists($deadline, 'getTimestamp') && $deadline < $now;
+            $isExpired = $deadline < $now;
             $isActive = $status === 'open' && !$isExpired;
 
             if ($isActive) {
@@ -99,10 +95,6 @@ class RecruiterController extends AbstractController
         ];
 
         foreach ($applications as $application) {
-            if (!$application instanceof Job_application) {
-                continue;
-            }
-
             [$statusLabel, $statusKey] = $this->mapRecruiterApplicationStatus((string) $application->getCurrent_status());
             $applicationCounters[$statusKey]++;
 
@@ -111,8 +103,8 @@ class RecruiterController extends AbstractController
 
             $applicationCards[] = [
                 'id' => (string) $application->getId(),
-                'offer_title' => $offer instanceof Job_offer ? (string) $offer->getTitle() : 'Unknown offer',
-                'candidate_name' => $candidate instanceof Candidate ? $this->resolveCandidateName($candidate) : 'Candidate',
+                'offer_title' => (string) $offer->getTitle(),
+                'candidate_name' => $this->resolveCandidateName($candidate),
                 'applied_at' => $application->getApplied_at(),
                 'status_label' => $statusLabel,
                 'status_key' => $statusKey,
@@ -132,19 +124,15 @@ class RecruiterController extends AbstractController
 
         $interviewCards = [];
         foreach ($interviews as $interview) {
-            if (!$interview instanceof Interview) {
-                continue;
-            }
-
             $application = $interview->getApplication_id();
-            $offer = $application instanceof Job_application ? $application->getOffer_id() : null;
-            $candidate = $application instanceof Job_application ? $application->getCandidate_id() : null;
+            $offer = $application->getOffer_id();
+            $candidate = $application->getCandidate_id();
             $location = trim((string) $interview->getLocation());
             $meetingLink = trim((string) $interview->getMeeting_link());
 
             $interviewCards[] = [
-                'title' => $offer instanceof Job_offer ? (string) $offer->getTitle() : 'Interview',
-                'candidate_name' => $candidate instanceof Candidate ? $this->resolveCandidateName($candidate) : 'Candidate',
+                'title' => (string) $offer->getTitle(),
+                'candidate_name' => $this->resolveCandidateName($candidate),
                 'scheduled_at' => $interview->getScheduled_at(),
                 'mode' => ucfirst((string) $interview->getMode()),
                 'status' => ucfirst(strtolower((string) $interview->getStatus())),
@@ -205,6 +193,9 @@ class RecruiterController extends AbstractController
         return 'Candidate';
     }
 
+    /**
+     * @return array{0: string, 1: 'accepted'|'pending'|'rejected'|'reviewed'}
+     */
     private function mapRecruiterApplicationStatus(string $status): array
     {
         $normalized = strtoupper(trim($status));

@@ -51,7 +51,7 @@ class RecruiterApplicationController extends AbstractController
         }
 
         $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$this->recruiterOwnsApplication($recruiter, $application)) {
+        if (!$application instanceof Job_application || !$this->recruiterOwnsApplication($recruiter, $application)) {
             $this->addFlash('error', 'Application not found for your offers.');
 
             return $this->redirectToRoute('front_job_applications', ['role' => 'recruiter']);
@@ -95,7 +95,7 @@ class RecruiterApplicationController extends AbstractController
         }
 
         $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$this->recruiterOwnsApplication($recruiter, $application)) {
+        if (!$application instanceof Job_application || !$this->recruiterOwnsApplication($recruiter, $application)) {
             $this->addFlash('error', 'Application not found for your offers.');
 
             return $this->redirectToRoute('front_job_applications', ['role' => 'recruiter']);
@@ -160,7 +160,7 @@ class RecruiterApplicationController extends AbstractController
         }
 
         $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$this->recruiterOwnsApplication($recruiter, $application)) {
+        if (!$application instanceof Job_application || !$this->recruiterOwnsApplication($recruiter, $application)) {
             return $this->json([
                 'ok' => false,
                 'error' => 'Application not found for your offers.',
@@ -222,7 +222,7 @@ class RecruiterApplicationController extends AbstractController
         }
 
         $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$this->recruiterOwnsApplication($recruiter, $application)) {
+        if (!$application instanceof Job_application || !$this->recruiterOwnsApplication($recruiter, $application)) {
             return $this->json([
                 'ok' => false,
                 'error' => 'Application not found for your offers.',
@@ -389,7 +389,7 @@ class RecruiterApplicationController extends AbstractController
         }
 
         $application = $em->getRepository(Job_application::class)->find($applicationId);
-        if (!$this->recruiterOwnsApplication($recruiter, $application)) {
+        if (!$application instanceof Job_application || !$this->recruiterOwnsApplication($recruiter, $application)) {
             $this->addFlash('error', 'Application not found for your offers.');
 
             return $this->redirectToRoute('front_job_applications', ['role' => 'recruiter']);
@@ -455,25 +455,14 @@ class RecruiterApplicationController extends AbstractController
         return $recruiter instanceof Recruiter ? $recruiter : null;
     }
 
-    private function recruiterOwnsApplication(Recruiter $recruiter, ?Job_application $application): bool
+    private function recruiterOwnsApplication(Recruiter $recruiter, Job_application $application): bool
     {
-        if (!$application) {
-            return false;
-        }
-
         if ($application->getIs_archived()) {
             return false;
         }
 
         $offer = $application->getOffer_id();
-        if (!$offer) {
-            return false;
-        }
-
         $offerRecruiter = $offer->getRecruiter_id();
-        if (!$offerRecruiter) {
-            return false;
-        }
 
         return (string) $offerRecruiter->getId() === (string) $recruiter->getId();
     }
@@ -536,7 +525,7 @@ class RecruiterApplicationController extends AbstractController
         $historyAuthor = $history->getChanged_by();
         $recruiterId = $recruiter->getId();
 
-        if (!$historyAuthor || !$recruiterId) {
+        if (!$recruiterId) {
             return false;
         }
 

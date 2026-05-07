@@ -62,109 +62,113 @@ class Job_offer_warning
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $resolved_at;
 
-    public function getId()
+    public function getId(): string
     {
         return $this->id;
     }
 
-    public function setId($value)
+    public function setId(string $value): void
     {
         $this->id = $value;
     }
 
-    public function getJob_offer_id()
+    public function getJob_offer_id(): Job_offer
     {
         return $this->job_offer_id;
     }
 
-    public function setJob_offer_id($value)
+    public function setJob_offer_id(Job_offer $value): void
     {
         $this->job_offer_id = $value;
     }
 
-    public function getRecruiter_id()
+    public function getRecruiter_id(): Recruiter
     {
         return $this->recruiter_id;
     }
 
-    public function setRecruiter_id($value)
+    public function setRecruiter_id(Recruiter $value): void
     {
         $this->recruiter_id = $value;
     }
 
-    public function getAdmin_id()
+    public function getAdmin_id(): Admin
     {
         return $this->admin_id;
     }
 
-    public function setAdmin_id($value)
+    public function setAdmin_id(Admin $value): void
     {
         $this->admin_id = $value;
     }
 
-    public function getReason()
+    public function getReason(): string
     {
         return $this->reason;
     }
 
-    public function setReason($value)
+    public function setReason(string $value): void
     {
         $this->reason = $value;
     }
 
-    public function getMessage()
+    public function getMessage(): string
     {
         return $this->message;
     }
 
-    public function setMessage($value)
+    public function setMessage(string $value): void
     {
         $this->message = $value;
     }
 
-    public function getStatus()
+    public function getStatus(): string
     {
         return $this->status;
     }
 
-    public function setStatus($value)
+    public function setStatus(string $value): void
     {
         $this->status = $value;
     }
 
-    public function getCreated_at()
+    public function getCreated_at(): \DateTimeInterface
     {
         return $this->created_at;
     }
 
-    public function setCreated_at($value)
+    public function setCreated_at(\DateTimeInterface $value): void
     {
         $this->created_at = $value;
     }
 
-    public function getSeen_at()
+    public function getSeen_at(): \DateTimeInterface
     {
         return $this->seen_at;
     }
 
-    public function setSeen_at($value)
+    public function setSeen_at(\DateTimeInterface $value): void
     {
         $this->seen_at = $value;
     }
 
-    public function getResolved_at()
+    public function getResolved_at(): \DateTimeInterface
     {
         return $this->resolved_at;
     }
 
-    public function setResolved_at($value)
+    public function setResolved_at(\DateTimeInterface $value): void
     {
         $this->resolved_at = $value;
     }
 
+    /** @var Collection<int, Warning_correction> */
     #[ORM\OneToMany(mappedBy: "warning_id", targetEntity: Warning_correction::class)]
     private Collection $warning_corrections;
 
+    /**
+     * @return Collection<int, Warning_correction>
+     */
     public function getWarning_corrections(): Collection
     {
         return $this->warning_corrections;
@@ -172,6 +176,9 @@ class Job_offer_warning
 
     /**
      * @return array{ok: bool, error?: string, warningType?: string, warningText?: string}
+     */
+    /**
+     * @return array{ok: false, error: string}|array{ok: true, warningType: string, warningText: string}
      */
     public static function validateWarningInput(string $warningType, string $warningText): array
     {

@@ -60,10 +60,6 @@ class CandidateController extends AbstractController
 
         $offerCards = [];
         foreach ($offers as $offer) {
-            if (!$offer instanceof Job_offer) {
-                continue;
-            }
-
             $offerCards[] = [
                 'id' => (string) $offer->getId(),
                 'title' => (string) $offer->getTitle(),
@@ -98,7 +94,7 @@ class CandidateController extends AbstractController
             $offer = $application->getOffer_id();
             $applicationCards[] = [
                 'id' => (string) $application->getId(),
-                'offer_title' => $offer instanceof Job_offer ? (string) $offer->getTitle() : 'Unknown offer',
+                'offer_title' => (string) $offer->getTitle(),
                 'status_label' => $statusLabel,
                 'status_key' => $statusKey,
                 'applied_at' => $application->getApplied_at(),
@@ -123,11 +119,10 @@ class CandidateController extends AbstractController
                 continue;
             }
 
-            $application = $interview->getApplication_id();
-            $offer = $application instanceof Job_application ? $application->getOffer_id() : null;
+            $offer = $interview->getApplication_id()->getOffer_id();
 
             $interviewCards[] = [
-                'title' => $offer instanceof Job_offer ? (string) $offer->getTitle() : 'Interview',
+                'title' => (string) $offer->getTitle(),
                 'scheduled_at' => $interview->getScheduled_at(),
                 'mode' => ucfirst((string) $interview->getMode()),
                 'status' => ucfirst(strtolower((string) $interview->getStatus())),
@@ -163,6 +158,9 @@ class CandidateController extends AbstractController
         return $fallback !== '' ? $fallback : 'Candidate';
     }
 
+    /**
+     * @return array{0: string, 1: 'accepted'|'pending'|'rejected'}
+     */
     private function mapCandidateApplicationStatus(string $status): array
     {
         $normalized = strtoupper(trim($status));
@@ -195,8 +193,8 @@ class CandidateController extends AbstractController
             $candidate = $em->getRepository(Candidate::class)->find($userId);
 
             $newSkill = new Candidate_skill();
-            $newSkill->setSkillName($request->request->get('skill_name'));
-            $newSkill->setLevel($request->request->get('level'));
+            $newSkill->setSkillName((string) $request->request->get('skill_name', ''));
+            $newSkill->setLevel((string) $request->request->get('level', ''));
             $newSkill->setCandidate($candidate);
 
             $em->persist($newSkill);
@@ -223,13 +221,14 @@ class CandidateController extends AbstractController
         $userId = (string) $user->getId();
 
         // Security: Make sure the skill belongs to the logged-in candidate
-        if ($skill->getCandidate()->getId() !== $userId) {
+        $candidate = $skill->getCandidate();
+        if (!$candidate instanceof Candidate || $candidate->getId() !== $userId) {
             throw $this->createAccessDeniedException();
         }
 
         if ($request->isMethod('POST')) {
-            $skill->setSkillName($request->request->get('skill_name'));
-            $skill->setLevel($request->request->get('level'));
+            $skill->setSkillName((string) $request->request->get('skill_name', ''));
+            $skill->setLevel((string) $request->request->get('level', ''));
 
             $em->flush();
 
@@ -253,7 +252,8 @@ public function delete(
     $user = $this->getUser();
     $userId = $user instanceof Users ? (string) $user->getId() : '';
 
-    if (!$userId || $skill->getCandidate()->getId() !== $userId) {
+    $candidate = $skill->getCandidate();
+    if ($userId === '' || !$candidate instanceof Candidate || $candidate->getId() !== $userId) {
         throw $this->createAccessDeniedException();
     }
 

@@ -32,6 +32,7 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface, Google
     #[Assert\Length(max: 255)]
     protected ?string $email = null;
 
+    /** @var list<string> */
     #[ORM\Column(type: "json")]
     protected array $roles = [];
 
@@ -73,13 +74,13 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface, Google
     protected bool $isActive = true;
 
     #[ORM\Column(name: "created_at", type: Types::DATETIME_MUTABLE)]
-    protected $createdAt = null;
+    protected ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column(name: "forget_code", length: 10, nullable: true)]
     protected ?string $forgetCode = null;
 
     #[ORM\Column(name: "forget_code_expires", type: Types::DATETIME_MUTABLE, nullable: true)]
-    protected $forgetCodeExpires = null;
+    protected ?\DateTimeInterface $forgetCodeExpires = null;
 
     #[ORM\Column(name: "face_person_id", length: 128, nullable: true)]
     protected ?string $facePersonId = null;
@@ -140,6 +141,9 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface, Google
         return array_unique($roles); 
     }
 
+    /**
+     * @param list<string> $roles
+     */
     public function setRoles(array $roles): static
     {
         $this->roles = $roles;
@@ -158,14 +162,14 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface, Google
     public function isActive(): bool { return $this->isActive; }
     public function setIsActive(bool $isActive): self { $this->isActive = $isActive; return $this; }
 
-    public function getCreatedAt() { return $this->createdAt; }
-    public function setCreatedAt($createdAt): self { $this->createdAt = $createdAt; return $this; }
+    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
+    public function setCreatedAt(?\DateTimeInterface $createdAt): self { $this->createdAt = $createdAt; return $this; }
 
     public function getForgetCode(): ?string { return $this->forgetCode; }
     public function setForgetCode(?string $forgetCode): self { $this->forgetCode = $forgetCode; return $this; }
 
-    public function getForgetCodeExpires() { return $this->forgetCodeExpires; }
-    public function setForgetCodeExpires($forgetCodeExpires): self { $this->forgetCodeExpires = $forgetCodeExpires; return $this; }
+    public function getForgetCodeExpires(): ?\DateTimeInterface { return $this->forgetCodeExpires; }
+    public function setForgetCodeExpires(?\DateTimeInterface $forgetCodeExpires): self { $this->forgetCodeExpires = $forgetCodeExpires; return $this; }
 
     public function getFacePersonId(): ?string { return $this->facePersonId; }
     public function setFacePersonId(?string $facePersonId): self { $this->facePersonId = $facePersonId; return $this; }

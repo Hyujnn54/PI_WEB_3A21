@@ -25,10 +25,6 @@ class InterviewManagementController extends AbstractController
         $latestFeedbackByInterviewId = [];
         foreach ($feedbackRows as $feedback) {
             $feedbackInterview = $feedback->getInterview_id();
-            if (!$feedbackInterview instanceof Interview) {
-                continue;
-            }
-
             $feedbackInterviewId = (string) $feedbackInterview->getId();
             if (!isset($latestFeedbackByInterviewId[$feedbackInterviewId])) {
                 $latestFeedbackByInterviewId[$feedbackInterviewId] = $feedback;
@@ -52,13 +48,13 @@ class InterviewManagementController extends AbstractController
                 $stats['total']++;
 
                 $application = $interview->getApplication_id();
-                $offer = $application ? $application->getOffer_id() : null;
-                $candidate = $application ? $application->getCandidate_id() : null;
+                $offer = $application->getOffer_id();
+                $candidate = $application->getCandidate_id();
                 $recruiter = $interview->getRecruiter_id();
 
                 $scheduledAt = $interview->getScheduled_at();
                 $duration = max(0, (int) $interview->getDuration_minutes());
-                $endAt = (clone $scheduledAt)->modify('+' . $duration . ' minutes');
+                $endAt = \DateTimeImmutable::createFromInterface($scheduledAt)->modify('+' . $duration . ' minutes');
 
                 if ($scheduledAt > $now) {
                     $stats['upcoming']++;
@@ -107,12 +103,10 @@ class InterviewManagementController extends AbstractController
                     $stats['completed']++;
                 }
 
-                $offerTitle = $offer ? trim((string) $offer->getTitle()) : '';
-                $candidateName = $candidate ? $this->buildUserLabel($candidate, 'Unknown candidate') : 'Unknown candidate';
-                $recruiterFallback = $recruiter ? trim((string) $recruiter->getCompanyName()) : '';
-                $recruiterName = $recruiter
-                    ? $this->buildUserLabel($recruiter, $recruiterFallback !== '' ? $recruiterFallback : 'Unknown recruiter')
-                    : 'Unknown recruiter';
+                $offerTitle = trim((string) $offer->getTitle());
+                $candidateName = $this->buildUserLabel($candidate, 'Unknown candidate');
+                $recruiterFallback = trim((string) $recruiter->getCompanyName());
+                $recruiterName = $this->buildUserLabel($recruiter, $recruiterFallback !== '' ? $recruiterFallback : 'Unknown recruiter');
                 $notes = trim((string) $interview->getNotes());
 
                 $rows[] = [
@@ -172,11 +166,9 @@ class InterviewManagementController extends AbstractController
 
         foreach ($feedbacks as $feedback) {
             $feedbackInterview = $feedback->getInterview_id();
-            if ($feedbackInterview instanceof Interview) {
-                $reviewedInterviewIds[(string) $feedbackInterview->getId()] = true;
-            }
+            $reviewedInterviewIds[(string) $feedbackInterview->getId()] = true;
 
-            $decision = strtolower($feedback->getDecision() ?? '');
+            $decision = strtolower($feedback->getDecision());
             if ($decision === 'accepted') {
                 $acceptedDecisions++;
             } elseif ($decision === 'rejected') {
@@ -214,7 +206,7 @@ class InterviewManagementController extends AbstractController
             }
 
             $scheduledAt = $interview->getScheduled_at();
-            if ($scheduledAt && $scheduledAt > $now) {
+            if ($scheduledAt > $now) {
                 $upcomingCount++;
             } else {
                 $pastCount++;
@@ -228,11 +220,8 @@ class InterviewManagementController extends AbstractController
         foreach ($offers as $offer) {
             $offerInterviews = array_filter($interviews, function ($interview) use ($offer) {
                 $app = $interview->getApplication_id();
-                if (!$app) {
-                    return false;
-                }
                 $offerId = $app->getOffer_id();
-                return $offerId && $offerId->getId() === $offer->getId();
+                return $offerId->getId() === $offer->getId();
             });
 
             $offerTotal = count($offerInterviews);

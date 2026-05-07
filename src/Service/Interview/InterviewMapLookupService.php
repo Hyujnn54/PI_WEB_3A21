@@ -17,6 +17,9 @@ class InterviewMapLookupService
     ) {
     }
 
+    /**
+     * @return list<array{name: string, displayName: string, lat: float, lng: float}>
+     */
     public function search(string $query, int $limit = 8): array
     {
         $normalizedQuery = trim($query);
@@ -61,6 +64,9 @@ class InterviewMapLookupService
         }
     }
 
+    /**
+     * @return array{name: string, displayName: string, lat: float, lng: float}|null
+     */
     public function reverse(float $lat, float $lng): ?array
     {
         if ($lat < -90.0 || $lat > 90.0 || $lng < -180.0 || $lng > 180.0) {
@@ -93,6 +99,10 @@ class InterviewMapLookupService
         }
     }
 
+    /**
+     * @param array<string, mixed> $place
+     * @return array{name: string, displayName: string, lat: float, lng: float}|null
+     */
     private function normalizePlace(array $place): ?array
     {
         $lat = isset($place['lat']) ? (float) $place['lat'] : null;
@@ -133,6 +143,9 @@ class InterviewMapLookupService
         ];
     }
 
+    /**
+     * @param array<string, mixed> $address
+     */
     private function buildExactFallbackLabel(string $primary, array $address): string
     {
         $parts = [];
@@ -169,6 +182,9 @@ class InterviewMapLookupService
         return mb_substr(trim($sanitized), 0, 120);
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function buildHeaders(): array
     {
         return [

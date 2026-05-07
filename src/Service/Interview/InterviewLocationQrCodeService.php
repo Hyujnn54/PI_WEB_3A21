@@ -18,6 +18,9 @@ class InterviewLocationQrCodeService
     {
     }
 
+    /**
+     * @return array{mapsUrl: string, qrCodeDataUri: string, qrCodeImageUrl: string}
+     */
     public function buildOnsiteLocationPayload(?string $location): array
     {
         $normalizedLocation = trim((string) $location);

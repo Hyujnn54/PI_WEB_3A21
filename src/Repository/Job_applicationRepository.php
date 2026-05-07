@@ -12,6 +12,9 @@ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Job_application>
+ */
 class Job_applicationRepository extends ServiceEntityRepository
 {
     private const SORT_MODES = ['default', 'title_asc', 'title_desc', 'date_desc', 'date_asc'];

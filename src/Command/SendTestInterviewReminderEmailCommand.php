@@ -99,8 +99,8 @@ class SendTestInterviewReminderEmailCommand extends Command
 
         if ($mode === 'onsite') {
             $locationPayload = $this->locationQrCodeService->buildOnsiteLocationPayload($placeLabel);
-            $mapsUrl = (string) ($locationPayload['mapsUrl'] ?? '');
-            $locationQrCodeImageUrl = (string) ($locationPayload['qrCodeImageUrl'] ?? '');
+            $mapsUrl = $locationPayload['mapsUrl'];
+            $locationQrCodeImageUrl = $locationPayload['qrCodeImageUrl'];
         }
 
         $subject = $this->messageBuilder->buildSubject($offerTitle);

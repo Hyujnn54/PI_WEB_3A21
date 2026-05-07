@@ -53,63 +53,63 @@ class Application_status_history
         )]
     private string $note;
 
-    public function getId()
+    public function getId(): string
     {
         return $this->id;
     }
 
-    public function setId($value)
+    public function setId(string $value): void
     {
         $this->id = $value;
     }
 
-    public function getApplication_id()
+    public function getApplication_id(): Job_application
     {
         return $this->application_id;
     }
 
-    public function setApplication_id($value)
+    public function setApplication_id(Job_application $value): void
     {
         $this->application_id = $value;
     }
 
-    public function getStatus()
+    public function getStatus(): string
     {
         return $this->status;
     }
 
-    public function setStatus($value)
+    public function setStatus(string $value): void
     {
-        $this->status = strtoupper(trim((string) ($value ?? '')));
+        $this->status = strtoupper(trim($value));
     }
 
-    public function getChanged_at()
+    public function getChanged_at(): \DateTimeInterface
     {
         return $this->changed_at;
     }
 
-    public function setChanged_at($value)
+    public function setChanged_at(\DateTimeInterface $value): void
     {
         $this->changed_at = $value;
     }
 
-    public function getChanged_by()
+    public function getChanged_by(): Users
     {
         return $this->changed_by;
     }
 
-    public function setChanged_by($value)
+    public function setChanged_by(Users $value): void
     {
         $this->changed_by = $value;
     }
 
-    public function getNote()
+    public function getNote(): string
     {
         return $this->note;
     }
 
-    public function setNote($value)
+    public function setNote(string $value): void
     {
-        $this->note = trim((string) ($value ?? ''));
+        $this->note = trim($value);
     }
 }

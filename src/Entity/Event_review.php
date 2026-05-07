@@ -31,62 +31,62 @@ class Event_review
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $created_at;
 
-    public function getId()
+    public function getId(): string
     {
         return $this->id;
     }
 
-    public function setId($value)
+    public function setId(string $value): void
     {
         $this->id = $value;
     }
 
-    public function getEvent_id()
+    public function getEvent_id(): Recruitment_event
     {
         return $this->event_id;
     }
 
-    public function setEvent_id($value)
+    public function setEvent_id(Recruitment_event $value): void
     {
         $this->event_id = $value;
     }
 
-    public function getCandidate_id()
+    public function getCandidate_id(): Candidate
     {
         return $this->candidate_id;
     }
 
-    public function setCandidate_id($value)
+    public function setCandidate_id(Candidate $value): void
     {
         $this->candidate_id = $value;
     }
 
-    public function getRating()
+    public function getRating(): int
     {
         return $this->rating;
     }
 
-    public function setRating($value)
+    public function setRating(int $value): void
     {
         $this->rating = $value;
     }
 
-    public function getComment()
+    public function getComment(): string
     {
         return $this->comment;
     }
 
-    public function setComment($value)
+    public function setComment(string $value): void
     {
         $this->comment = $value;
     }
 
-    public function getCreated_at()
+    public function getCreated_at(): \DateTimeInterface
     {
         return $this->created_at;
     }
 
-    public function setCreated_at($value)
+    public function setCreated_at(\DateTimeInterface $value): void
     {
         $this->created_at = $value;
     }

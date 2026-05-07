@@ -6,6 +6,9 @@ use App\Entity\Job_offer_warning;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Job_offer_warning>
+ */
 class Job_offer_warningRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)

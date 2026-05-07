@@ -118,7 +118,7 @@ class FaceAuthController extends AbstractController
                     $bestShot = $shot;
                 }
 
-                if (($live['isReal'] ?? false) && ($live['score'] ?? 0) >= 0.70) {
+                if ($live['isReal'] && $live['score'] >= 0.70) {
                     $bestLive = $live;
                     $bestShot = $shot;
                     break;
@@ -129,8 +129,7 @@ class FaceAuthController extends AbstractController
                 return new JsonResponse(['success' => false, 'error' => 'Liveness check failed.'], 422);
             }
 
-            $accepted = (bool) ($bestLive['isReal'] ?? false)
-                || (float) ($bestLive['score'] ?? 0) >= $luxand->livenessThreshold();
+            $accepted = $bestLive['isReal'] || $bestLive['score'] >= $luxand->livenessThreshold();
 
             if (!$accepted) {
                 return new JsonResponse([
@@ -144,7 +143,7 @@ class FaceAuthController extends AbstractController
                 return new JsonResponse(['success' => false, 'error' => 'Face not recognized.'], 401);
             }
 
-            if ((float) ($match['probability'] ?? 0) < $luxand->faceThreshold()) {
+            if ($match['probability'] < $luxand->faceThreshold()) {
                 return new JsonResponse(['success' => false, 'error' => 'Face match confidence is too low.'], 401);
             }
 

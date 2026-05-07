@@ -95,14 +95,16 @@ class BackOfficeController extends AbstractController
                 'type' => 'application',
                 'icon' => 'ti ti-file-check',
                 'label' => 'Application submitted',
-                'description' => $offer instanceof Job_offer ? (string) $offer->getTitle() : 'Job application submitted',
+                'description' => (string) $offer->getTitle(),
                 'created_at' => $application->getApplied_at(),
             ];
         }
 
         usort($recentActivity, static function (array $a, array $b): int {
-            $aTime = is_object($a['created_at'] ?? null) && method_exists($a['created_at'], 'getTimestamp') ? $a['created_at']->getTimestamp() : 0;
-            $bTime = is_object($b['created_at'] ?? null) && method_exists($b['created_at'], 'getTimestamp') ? $b['created_at']->getTimestamp() : 0;
+            $aCreatedAt = $a['created_at'] ?? null;
+            $bCreatedAt = $b['created_at'] ?? null;
+            $aTime = $aCreatedAt instanceof \DateTimeInterface ? $aCreatedAt->getTimestamp() : 0;
+            $bTime = $bCreatedAt instanceof \DateTimeInterface ? $bCreatedAt->getTimestamp() : 0;
 
             return $bTime <=> $aTime;
         });
@@ -310,7 +312,7 @@ class BackOfficeController extends AbstractController
 
         $offers = [];
         $expiredOffers = [];
-        $now = date_create();
+        $now = new \DateTimeImmutable();
 
         try {
             try {
@@ -462,7 +464,7 @@ class BackOfficeController extends AbstractController
             (string) $request->request->get('warning_text', '')
         );
         if ($validation['ok'] !== true) {
-            $this->addFlash('warning_modal_error', (string) ($validation['error'] ?? 'Invalid warning input.'));
+            $this->addFlash('warning_modal_error', $validation['error']);
             $this->addFlash('warning_modal_mode', 'warn');
             $this->addFlash('warning_modal_type', trim((string) $request->request->get('warning_type', '')));
             $this->addFlash('warning_modal_text', trim((string) $request->request->get('warning_text', '')));
@@ -516,7 +518,7 @@ class BackOfficeController extends AbstractController
                     'status' => 'RESOLVED',
                 ]);
 
-                $now = date_create();
+                $now = new \DateTimeImmutable();
                 $warningId = (string) ((int) round(microtime(true) * 1000) . random_int(100, 999));
 
                 $connection->insert('job_offer_warning', [
@@ -550,7 +552,11 @@ class BackOfficeController extends AbstractController
     public function generateWarningMessageWithAi(Request $request, Connection $connection, HttpClientInterface $httpClient): JsonResponse
     {
         $user = $this->getUser();
-        $currentAdminId = $user instanceof Users ? (string) $user->getId() : '';
+        if (!$user instanceof Users) {
+            return new JsonResponse(['ok' => false, 'error' => 'Admin session is required.'], 403);
+        }
+
+        $currentAdminId = (string) $user->getId();
         if ($currentAdminId === '') {
             return new JsonResponse(['ok' => false, 'error' => 'Admin session is required.'], 403);
         }
@@ -611,8 +617,8 @@ class BackOfficeController extends AbstractController
 
         if ($apiKey !== '') {
             $aiResult = $this->requestGroqWarningMessage($httpClient, $apiKey, $prompt);
-            if (($aiResult['ok'] ?? false) === true) {
-                $warningMessage = $this->normalizeWarningMessage((string) ($aiResult['message'] ?? ''));
+            if ($aiResult['ok'] === true) {
+                $warningMessage = $this->normalizeWarningMessage($aiResult['message']);
                 $source = 'ai';
             }
         }
@@ -646,7 +652,7 @@ class BackOfficeController extends AbstractController
             (string) $request->request->get('warning_text', '')
         );
         if ($validation['ok'] !== true) {
-            $this->addFlash('warning_modal_error', (string) ($validation['error'] ?? 'Invalid warning input.'));
+            $this->addFlash('warning_modal_error', $validation['error']);
             $this->addFlash('warning_modal_mode', 'reject');
             $this->addFlash('warning_modal_type', trim((string) $request->request->get('warning_type', '')));
             $this->addFlash('warning_modal_text', trim((string) $request->request->get('warning_text', '')));
@@ -672,7 +678,7 @@ class BackOfficeController extends AbstractController
                 'status' => 'SENT',
                 'reason' => $reason,
                 'message' => $reason,
-                'created_at' => date_create()->format('Y-m-d H:i:s'),
+                'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ], [
                 'id' => (string) $warning['id'],
             ]);
@@ -930,10 +936,10 @@ SQL;
         $payload = json_decode((string) $request->getContent(), true);
         $comment = trim((string) ($payload['comment'] ?? ''));
         $validation = Job_offer_comment::validateCommentText($comment);
-        if (($validation['ok'] ?? false) !== true) {
+        if ($validation['ok'] !== true) {
             return new JsonResponse([
                 'ok' => false,
-                'error' => (string) ($validation['error'] ?? 'Invalid comment.'),
+                'error' => $validation['error'],
             ], 400);
         }
 
@@ -1052,7 +1058,7 @@ SQL;
      * @param array<int, array<string, mixed>> $offers
      * @return array<int, array<string, mixed>>
      */
-    private function extractExpiredOffers(array $offers, $now): array
+    private function extractExpiredOffers(array $offers, \DateTimeInterface $now): array
     {
         $expiredOffers = [];
 
@@ -1063,6 +1069,10 @@ SQL;
 
             try {
                 $deadlineAt = date_create((string) $offer['deadline']);
+                if (!$deadlineAt instanceof \DateTimeInterface) {
+                    continue;
+                }
+
                 if ($deadlineAt < $now) {
                     $expiredOffers[] = $offer;
                 }
@@ -1175,16 +1185,17 @@ SQL;
             }
 
             if ($errors === []) {
+                $eventDateObject = new \DateTimeImmutable($eventDate);
                 $event = new Recruitment_event();
                 $event->setRecruiter_id($currentRecruiter);
                 $event->setTitle($title);
                 $event->setDescription($description);
                 $event->setEvent_type($eventType);
                 $event->setLocation($location);
-                $event->setEvent_date(date_create($eventDate));
+                $event->setEvent_date($eventDateObject);
                 $event->setCapacity((int) $capacity);
                 $event->setMeet_link($meetLink);
-                $event->setCreated_at(date_create());
+                $event->setCreated_at(new \DateTimeImmutable());
 
                 $entityManager->persist($event);
                 $entityManager->flush();
@@ -1346,6 +1357,8 @@ SQL;
         }
 
         if ($request->isMethod('GET')) {
+            $eventDate = $event->getEvent_date();
+
             return $this->render('back/create_event.html.twig', [
                 'authUser' => ['role' => 'recruiter'],
                 'errors' => [],
@@ -1358,7 +1371,7 @@ SQL;
                     'location' => (string) $event->getLocation(),
                     'location_lat' => '',
                     'location_lng' => '',
-                    'event_date' => $event->getEvent_date()->format('Y-m-d\TH:i'),
+                    'event_date' => $eventDate instanceof \DateTimeInterface ? $eventDate->format('Y-m-d\TH:i') : '',
                     'capacity' => (string) $event->getCapacity(),
                     'meet_link' => (string) $event->getMeet_link(),
                 ],
@@ -1455,7 +1468,7 @@ SQL;
         $event->setDescription($description);
         $event->setEvent_type($eventType);
         $event->setLocation($location);
-        $event->setEvent_date(date_create($eventDate));
+        $event->setEvent_date(new \DateTimeImmutable($eventDate));
         $event->setCapacity((int) $capacity);
         $event->setMeet_link($meetLink);
 
@@ -1584,6 +1597,9 @@ SQL;
         return '';
     }
 
+    /**
+     * @return array{ok: true, message: string, model: string}|array{ok: false, message: string}
+     */
     private function requestGroqWarningMessage(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
     {
         foreach (self::GROQ_WARNING_MODELS as $model) {

@@ -7,6 +7,9 @@ use App\Entity\Job_application;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Application_status_history>
+ */
 class Application_status_historyRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)

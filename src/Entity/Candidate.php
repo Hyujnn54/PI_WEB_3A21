@@ -13,15 +13,19 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'candidate')]
 class Candidate extends Users
 {
+    /** @var Collection<int, Job_application> */
     #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Job_application::class)]
     private Collection $job_applications;
 
+    /** @var Collection<int, Candidate_skill> */
     #[ORM\OneToMany(mappedBy: "candidate", targetEntity: Candidate_skill::class)]
     private Collection $candidate_skills;
 
+    /** @var Collection<int, Event_registration> */
     #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Event_registration::class)]
     private Collection $event_registrations;
 
+    /** @var Collection<int, Event_review> */
     #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Event_review::class)]
     private Collection $event_reviews;
 
@@ -77,6 +81,9 @@ class Candidate extends Users
     public function getCvPath(): ?string { return $this->cvPath; }
     public function setCvPath(?string $cvPath): self { $this->cvPath = $cvPath; return $this; }
 
+    /**
+     * @return Collection<int, Job_application>
+     */
     public function getJob_applications(): Collection { return $this->job_applications; }
 
     public function addJob_application(Job_application $jobApplication): self
@@ -96,6 +103,9 @@ class Candidate extends Users
         return $this;
     }
 
+    /**
+     * @return Collection<int, Candidate_skill>
+     */
     public function getCandidate_skills(): Collection { return $this->candidate_skills; }
 
     public function addCandidate_skill(Candidate_skill $candidateSkill): self
@@ -115,6 +125,9 @@ class Candidate extends Users
         return $this;
     }
 
+    /**
+     * @return Collection<int, Event_registration>
+     */
     public function getEvent_registrations(): Collection { return $this->event_registrations; }
 
     public function addEvent_registration(Event_registration $eventRegistration): self
@@ -134,6 +147,9 @@ class Candidate extends Users
         return $this;
     }
 
+    /**
+     * @return Collection<int, Event_review>
+     */
     public function getEvent_reviews(): Collection { return $this->event_reviews; }
 
     public function addEvent_review(Event_review $eventReview): self

@@ -71,42 +71,42 @@ class Job_offer
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $flagged_at;
 
-    public function getId()
+    public function getId(): string
     {
         return $this->id;
     }
 
-    public function setId($value)
+    public function setId(string $value): void
     {
         $this->id = $value;
     }
 
-    public function getRecruiter_id()
+    public function getRecruiter_id(): Recruiter
     {
         return $this->recruiter_id;
     }
 
-    public function setRecruiter_id($value)
+    public function setRecruiter_id(Recruiter $value): void
     {
         $this->recruiter_id = $value;
     }
 
-    public function getTitle()
+    public function getTitle(): string
     {
         return $this->title;
     }
 
-    public function setTitle($value)
+    public function setTitle(string $value): void
     {
         $this->title = $value;
     }
 
-    public function getDescription()
+    public function getDescription(): string
     {
         return $this->description;
     }
 
-    public function setDescription($value)
+    public function setDescription(string $value): void
     {
         $this->description = $value;
     }
@@ -147,90 +147,94 @@ class Job_offer
         return $this;
     }
 
-    public function getContract_type()
+    public function getContract_type(): string
     {
         return $this->contract_type;
     }
 
-    public function setContract_type($value)
+    public function setContract_type(string $value): void
     {
         $this->contract_type = $value;
     }
 
-    public function getCreated_at()
+    public function getCreated_at(): \DateTimeInterface
     {
         return $this->created_at;
     }
 
-    public function setCreated_at($value)
+    public function setCreated_at(\DateTimeInterface $value): void
     {
         $this->created_at = $value;
     }
 
-    public function getDeadline()
+    public function getDeadline(): \DateTimeInterface
     {
         return $this->deadline;
     }
 
-    public function setDeadline($value)
+    public function setDeadline(\DateTimeInterface $value): void
     {
         $this->deadline = $value;
     }
 
-    public function getStatus()
+    public function getStatus(): string
     {
         return $this->status;
     }
 
-    public function setStatus($value)
+    public function setStatus(string $value): void
     {
         $this->status = $value;
     }
 
-    public function getQuality_score()
+    public function getQuality_score(): int
     {
         return $this->quality_score;
     }
 
-    public function setQuality_score($value)
+    public function setQuality_score(int $value): void
     {
         $this->quality_score = $value;
     }
 
-    public function getAi_suggestions()
+    public function getAi_suggestions(): string
     {
         return $this->ai_suggestions;
     }
 
-    public function setAi_suggestions($value)
+    public function setAi_suggestions(string $value): void
     {
         $this->ai_suggestions = $value;
     }
 
-    public function getIs_flagged()
+    public function getIs_flagged(): bool
     {
         return $this->is_flagged;
     }
 
-    public function setIs_flagged($value)
+    public function setIs_flagged(bool $value): void
     {
         $this->is_flagged = $value;
     }
 
-    public function getFlagged_at()
+    public function getFlagged_at(): \DateTimeInterface
     {
         return $this->flagged_at;
     }
 
-    public function setFlagged_at($value)
+    public function setFlagged_at(\DateTimeInterface $value): void
     {
         $this->flagged_at = $value;
     }
 
+    /** @var Collection<int, Offer_skill> */
     #[ORM\OneToMany(mappedBy: "offer_id", targetEntity: Offer_skill::class)]
     private Collection $offer_skills;
 
-        public function getOffer_skills(): Collection
+    /**
+     * @return Collection<int, Offer_skill>
+     */
+    public function getOffer_skills(): Collection
         {
             return $this->offer_skills;
         }
@@ -247,28 +251,31 @@ class Job_offer
     
         public function removeOffer_skill(Offer_skill $offer_skill): self
         {
-            if ($this->offer_skills->removeElement($offer_skill)) {
-                // set the owning side to null (unless already changed)
-                if ($offer_skill->getOffer_id() === $this) {
-                    $offer_skill->setOffer_id(null);
-                }
-            }
+            $this->offer_skills->removeElement($offer_skill);
     
             return $this;
         }
 
+    /** @var Collection<int, Job_application> */
     #[ORM\OneToMany(mappedBy: "offer_id", targetEntity: Job_application::class)]
     private Collection $job_applications;
 
+    /**
+     * @return Collection<int, Job_application>
+     */
     public function getJob_applications(): Collection
     {
         return $this->job_applications;
     }
 
+    /** @var Collection<int, Warning_correction> */
     #[ORM\OneToMany(mappedBy: "job_offer_id", targetEntity: Warning_correction::class)]
     private Collection $warning_corrections;
 
-        public function getWarning_corrections(): Collection
+    /**
+     * @return Collection<int, Warning_correction>
+     */
+    public function getWarning_corrections(): Collection
         {
             return $this->warning_corrections;
         }
@@ -285,19 +292,18 @@ class Job_offer
     
         public function removeWarning_correction(Warning_correction $warning_correction): self
         {
-            if ($this->warning_corrections->removeElement($warning_correction)) {
-                // set the owning side to null (unless already changed)
-                if ($warning_correction->getJob_offer_id() === $this) {
-                    $warning_correction->setJob_offer_id(null);
-                }
-            }
+            $this->warning_corrections->removeElement($warning_correction);
     
             return $this;
         }
 
+    /** @var Collection<int, Job_offer_warning> */
     #[ORM\OneToMany(mappedBy: "job_offer_id", targetEntity: Job_offer_warning::class)]
     private Collection $job_offer_warnings;
 
+    /**
+     * @return Collection<int, Job_offer_warning>
+     */
     public function getJob_offer_warnings(): Collection
     {
         return $this->job_offer_warnings;

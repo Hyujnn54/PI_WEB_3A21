@@ -35,10 +35,20 @@ class TwoFactorSetupController extends AbstractController
             $entityManager->flush();
         }
 
-        $secret = (string) $user->getGoogleAuthenticatorSecret();
+        $secret = trim((string) $user->getGoogleAuthenticatorSecret());
+        if ($secret === '') {
+            $secret = TOTP::create(null, 30, 'sha1', 6, 0, null, 32)->getSecret();
+            $user->setGoogleAuthenticatorSecret($secret);
+            $entityManager->flush();
+        }
+
         $totp = TOTP::create($secret, 30, 'sha1', 6);
         $totp->setIssuer('Talent Bridge');
-        $totp->setLabel($user->getGoogleAuthenticatorUsername());
+        $label = trim($user->getGoogleAuthenticatorUsername());
+        if ($label === '') {
+            $label = 'Talent Bridge User';
+        }
+        $totp->setLabel($label);
 
         $qrCodeDataUri = Builder::create()
             ->writer(new SvgWriter())
@@ -49,9 +59,9 @@ class TwoFactorSetupController extends AbstractController
             ->getDataUri();
 
         if ($request->isMethod('POST')) {
-            $code = preg_replace('/\s+/', '', (string) $request->request->get('verification_code', ''));
+            $code = preg_replace('/\s+/', '', (string) $request->request->get('verification_code', '')) ?? '';
 
-            if (!preg_match('/^[0-9]{6}$/', $code)) {
+            if ($code === '' || preg_match('/^[0-9]{6}$/', $code) !== 1) {
                 $this->addFlash('error', 'Enter the 6-digit code from your authenticator app.');
             } elseif (!$totp->verify($code, null, 1)) {
                 $this->addFlash('error', 'The code is not valid. Scan the QR code again and try a fresh code.');

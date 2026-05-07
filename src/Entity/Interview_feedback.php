@@ -34,72 +34,72 @@ class Interview_feedback
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $created_at;
 
-    public function getId()
+    public function getId(): string
     {
         return $this->id;
     }
 
-    public function setId($value)
+    public function setId(string $value): void
     {
         $this->id = $value;
     }
 
-    public function getInterview_id()
+    public function getInterview_id(): Interview
     {
         return $this->interview_id;
     }
 
-    public function setInterview_id($value)
+    public function setInterview_id(Interview $value): void
     {
         $this->interview_id = $value;
     }
 
-    public function getRecruiter_id()
+    public function getRecruiter_id(): Recruiter
     {
         return $this->recruiter_id;
     }
 
-    public function setRecruiter_id($value)
+    public function setRecruiter_id(Recruiter $value): void
     {
         $this->recruiter_id = $value;
     }
 
-    public function getOverall_score()
+    public function getOverall_score(): int
     {
         return $this->overall_score;
     }
 
-    public function setOverall_score($value)
+    public function setOverall_score(int $value): void
     {
         $this->overall_score = $value;
     }
 
-    public function getDecision()
+    public function getDecision(): string
     {
         return $this->decision;
     }
 
-    public function setDecision($value)
+    public function setDecision(string $value): void
     {
         $this->decision = $value;
     }
 
-    public function getComment()
+    public function getComment(): string
     {
         return $this->comment;
     }
 
-    public function setComment($value)
+    public function setComment(string $value): void
     {
         $this->comment = $value;
     }
 
-    public function getCreated_at()
+    public function getCreated_at(): \DateTimeInterface
     {
         return $this->created_at;
     }
 
-    public function setCreated_at($value)
+    public function setCreated_at(\DateTimeInterface $value): void
     {
         $this->created_at = $value;
     }

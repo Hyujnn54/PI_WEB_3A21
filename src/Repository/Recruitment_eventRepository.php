@@ -6,6 +6,9 @@ use App\Entity\Recruitment_event;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Recruitment_event>
+ */
 class Recruitment_eventRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)

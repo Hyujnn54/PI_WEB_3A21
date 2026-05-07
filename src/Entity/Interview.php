@@ -61,57 +61,57 @@ class Interview
         $this->created_at = new \DateTime();
     }
 
-    public function getId()
+    public function getId(): string
     {
         return $this->id;
     }
 
-    public function setId($value)
+    public function setId(string $value): void
     {
         $this->id = $value;
     }
 
-    public function getApplication_id()
+    public function getApplication_id(): Job_application
     {
         return $this->application_id;
     }
 
-    public function setApplication_id($value)
+    public function setApplication_id(Job_application $value): void
     {
         $this->application_id = $value;
     }
 
-    public function getRecruiter_id()
+    public function getRecruiter_id(): Recruiter
     {
         return $this->recruiter_id;
     }
 
-    public function setRecruiter_id($value)
+    public function setRecruiter_id(Recruiter $value): void
     {
         $this->recruiter_id = $value;
     }
 
-    public function getScheduled_at()
+    public function getScheduled_at(): \DateTimeInterface
     {
         return $this->scheduled_at;
     }
 
-    public function setScheduled_at($value)
+    public function setScheduled_at(\DateTimeInterface $value): void
     {
         $this->scheduled_at = $value;
     }
 
-    public function getDuration_minutes()
+    public function getDuration_minutes(): int
     {
         return $this->duration_minutes;
     }
 
-    public function setDuration_minutes($value)
+    public function setDuration_minutes(int $value): void
     {
         $this->duration_minutes = $value;
     }
 
-    public function getMode()
+    public function getMode(): string
     {
         $raw = strtolower(trim($this->mode));
 
@@ -133,73 +133,77 @@ class Interview
         return 'online';
     }
 
-    public function setMode($value)
+    public function setMode(string $value): void
     {
         $raw = strtolower(trim((string) $value));
         $isOnsite = in_array($raw, ['onsite', 'on_site', 'on-site', 'on site', 'in_person', 'in-person', 'in person'], true);
         $this->mode = $isOnsite ? 'ON_SITE' : 'ONLINE';
     }
 
-    public function getMeeting_link()
+    public function getMeeting_link(): string
     {
         return $this->meeting_link;
     }
 
-    public function setMeeting_link($value)
+    public function setMeeting_link(string $value): void
     {
         $this->meeting_link = $value;
     }
 
-    public function getLocation()
+    public function getLocation(): string
     {
         return $this->location;
     }
 
-    public function setLocation($value)
+    public function setLocation(string $value): void
     {
         $this->location = $value;
     }
 
-    public function getStatus()
+    public function getStatus(): string
     {
         return $this->status;
     }
 
-    public function setStatus($value)
+    public function setStatus(string $value): void
     {
         $this->status = $value;
     }
 
-    public function getNotes()
+    public function getNotes(): string
     {
         return $this->notes;
     }
 
-    public function setNotes($value)
+    public function setNotes(string $value): void
     {
         $this->notes = $value;
     }
 
-    public function getCreated_at()
+    public function getCreated_at(): ?\DateTimeInterface
     {
         return $this->created_at;
     }
 
-    public function setCreated_at($value)
+    public function setCreated_at(?\DateTimeInterface $value): void
     {
         $this->created_at = $value;
     }
 
-    public function getReminder_sent()
+    public function getReminder_sent(): ?bool
     {
         return isset($this->reminder_sent) ? (bool) $this->reminder_sent : false;
     }
 
-    public function setReminder_sent($value)
+    public function setReminder_sent(?bool $value): void
     {
         $this->reminder_sent = $value;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     * @return array{ok: false, error: string}|array{ok: true, scheduledAt: \DateTime, duration: int, mode: string, meetingLink: string, location: string, notes: string}
+     */
     public static function validateInput(array $data, int $maxFutureDays = 90): array
     {
         try {
@@ -288,10 +292,14 @@ class Interview
         return (bool) preg_match(self::NOTES_REGEX, $value);
     }
 
+    /** @var Collection<int, Interview_feedback> */
     #[ORM\OneToMany(mappedBy: "interview_id", targetEntity: Interview_feedback::class)]
     private Collection $interview_feedbacks;
 
-        public function getInterview_feedbacks(): Collection
+    /**
+     * @return Collection<int, Interview_feedback>
+     */
+    public function getInterview_feedbacks(): Collection
         {
             return $this->interview_feedbacks;
         }
@@ -308,12 +316,7 @@ class Interview
     
         public function removeInterview_feedback(Interview_feedback $interview_feedback): self
         {
-            if ($this->interview_feedbacks->removeElement($interview_feedback)) {
-                // set the owning side to null (unless already changed)
-                if ($interview_feedback->getInterview_id() === $this) {
-                    $interview_feedback->setInterview_id(null);
-                }
-            }
+            $this->interview_feedbacks->removeElement($interview_feedback);
     
             return $this;
         }

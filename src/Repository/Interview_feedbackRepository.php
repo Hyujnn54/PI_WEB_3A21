@@ -6,6 +6,9 @@ use App\Entity\Interview_feedback;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Interview_feedback>
+ */
 class Interview_feedbackRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)

@@ -80,6 +80,9 @@ class LuxandFaceService
         ], 'photo', $photo);
     }
 
+    /**
+     * @return array{uuid: string, probability: float}|null
+     */
     public function searchBestMatch(UploadedFile $photo): ?array
     {
         $payload = $this->sendMultipart('/photo/search/v2', [
@@ -102,6 +105,9 @@ class LuxandFaceService
         ];
     }
 
+    /**
+     * @return array{isReal: bool, score: float, rectangle: array{left: int, top: int, right: int, bottom: int}}
+     */
     public function checkLiveness(UploadedFile $photo): array
     {
         $payload = $this->sendMultipart('/photo/liveness', [], 'photo', $photo);
@@ -118,6 +124,10 @@ class LuxandFaceService
         ];
     }
 
+    /**
+     * @param array<string, string> $fields
+     * @return array<array-key, mixed>
+     */
     private function sendMultipart(string $path, array $fields, string $fileField, UploadedFile $photo): array
     {
         if ($this->apiToken === '') {

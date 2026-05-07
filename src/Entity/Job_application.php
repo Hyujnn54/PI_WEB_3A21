@@ -65,127 +65,135 @@ class Job_application
     #[ORM\Column(type: "boolean")]
     private bool $is_archived;
 
-    public function getId()
+    public function getId(): string
     {
         return $this->id;
     }
 
-    public function setId($value)
+    public function setId(string $value): void
     {
         $this->id = $value;
     }
 
-    public function getOffer_id()
+    public function getOffer_id(): Job_offer
     {
         return $this->offer_id;
     }
 
-    public function setOffer_id($value)
+    public function setOffer_id(Job_offer $value): void
     {
         $this->offer_id = $value;
     }
 
-    public function getCandidate_id()
+    public function getCandidate_id(): Candidate
     {
         return $this->candidate_id;
     }
 
-    public function setCandidate_id($value)
+    public function setCandidate_id(Candidate $value): void
     {
         $this->candidate_id = $value;
     }
 
-    public function getPhone()
+    public function getPhone(): string
     {
         return $this->phone;
     }
 
-    public function setPhone($value)
+    public function setPhone(string $value): void
     {
-        $this->phone = trim((string) ($value ?? ''));
+        $this->phone = trim($value);
     }
 
-    public function getCover_letter()
-    {
-        return $this->cover_letter;
-    }
-
-    public function getCoverLetter()
+    public function getCover_letter(): string
     {
         return $this->cover_letter;
     }
 
-    public function setCover_letter($value)
+    public function getCoverLetter(): string
     {
-        $this->cover_letter = trim((string) ($value ?? ''));
+        return $this->cover_letter;
     }
 
-    public function setCoverLetter($value)
+    public function setCover_letter(string $value): void
+    {
+        $this->cover_letter = trim($value);
+    }
+
+    public function setCoverLetter(string $value): void
     {
         $this->cover_letter = $value;
     }
 
-    public function getCv_path()
+    public function getCv_path(): string
     {
         return $this->cv_path;
     }
 
-    public function setCv_path($value)
+    public function setCv_path(string $value): void
     {
-        $this->cv_path = (string) ($value ?? '');
+        $this->cv_path = $value;
     }
 
-    public function getCvPath()
+    public function getCvPath(): string
     {
         return $this->getCv_path();
     }
 
-    public function setCvPath($value)
+    public function setCvPath(string $value): void
     {
         $this->setCv_path($value);
     }
 
-    public function getApplied_at()
+    public function getApplied_at(): \DateTimeInterface
     {
         return $this->applied_at;
     }
 
-    public function setApplied_at($value)
+    public function setApplied_at(\DateTimeInterface $value): void
     {
         $this->applied_at = $value;
     }
 
-    public function getCurrent_status()
+    public function getCurrent_status(): string
     {
         return $this->current_status;
     }
 
-    public function setCurrent_status($value)
+    public function setCurrent_status(string $value): void
     {
         $this->current_status = $value;
     }
 
-    public function getIs_archived()
+    public function getIs_archived(): bool
     {
         return $this->is_archived;
     }
 
-    public function setIs_archived($value)
+    public function setIs_archived(bool $value): void
     {
         $this->is_archived = $value;
     }
 
+    /** @var Collection<int, Application_status_history> */
     #[ORM\OneToMany(mappedBy: "application_id", targetEntity: Application_status_history::class)]
     private Collection $application_status_historys;
 
+    /**
+     * @return Collection<int, Application_status_history>
+     */
     public function getApplication_status_historys(): Collection
     {
         return $this->application_status_historys;
     }
 
+    /** @var Collection<int, Interview> */
     #[ORM\OneToMany(mappedBy: "application_id", targetEntity: Interview::class)]
     private Collection $interviews;
 
+    /**
+     * @return Collection<int, Interview>
+     */
     public function getInterviews(): Collection
     {
         return $this->interviews;
