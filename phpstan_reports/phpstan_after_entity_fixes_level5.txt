@@ -1,0 +1,4 @@
+﻿Note: Using configuration file E:\pidev\PI_WEB_3A21\phpstan.neon.
+
+ [OK] No errors                                                                                                        
+

@@ -1,0 +1,156 @@
+﻿Note: Using configuration file E:\pidev\PI_WEB_3A21\phpstan.neon.
+Instructions for interpreting errors
+---------
+System.Management.Automation.RemoteException
+Each error has an associated identifier, like `argument.type`
+or `return.missing`.
+System.Management.Automation.RemoteException
+Each error identifier has documentation at URL https://phpstan.org/error-identifiers/<identifier>
+This page contains code example, explanation why is this an error
+and instruction how to fix it.
+Before fixing the error, fetch the documentation page for its identifier.
+System.Management.Automation.RemoteException
+The error usually indicates a real bug or incorrect type in the code. Fix the underlying cause, do not just make the error go away.
+Do not add `@phpstan-ignore` comments, `@phpstan-ignore-next-line` comments, or baseline entries to suppress the error.
+Do not use assert() or inline @var PHPDoc tag to override PHPStan's inferred type.
+Do not add type casts just to silence errors.
+Do not widen parameter or return types just to make the error go away.
+ ------ --------------------------------------------------------------------------------------------------------- 
+  Line   Candidate_skill.php                                                                                      
+ ------ --------------------------------------------------------------------------------------------------------- 
+  14     Property App\Entity\Candidate_skill::$id (int|null) is never assigned int so it can be removed from the  
+         property type.                                                                                           
+         🪪  property.unusedType                                                                                  
+ ------ --------------------------------------------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------------------------------------- 
+  Line   Interview.php                                                                              
+ ------ ------------------------------------------------------------------------------------------- 
+  109    Property App\Entity\Interview::$mode (string) on left side of ?? is not nullable.          
+         🪪  nullCoalesce.property                                                                  
+  120    Property App\Entity\Interview::$location (string) on left side of ?? is not nullable.      
+         🪪  nullCoalesce.property                                                                  
+  121    Property App\Entity\Interview::$meeting_link (string) on left side of ?? is not nullable.  
+         🪪  nullCoalesce.property                                                                  
+  138    Property App\Entity\Interview::$meeting_link (string) in isset() is not nullable.          
+         🪪  isset.property                                                                         
+  148    Property App\Entity\Interview::$location (string) in isset() is not nullable.              
+         🪪  isset.property                                                                         
+  158    Property App\Entity\Interview::$status (string) in isset() is not nullable.                
+         🪪  isset.property                                                                         
+  168    Property App\Entity\Interview::$notes (string) in isset() is not nullable.                 
+         🪪  isset.property                                                                         
+ ------ ------------------------------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------------------------------ 
+  Line   Job_application.php                                                                 
+ ------ ------------------------------------------------------------------------------------ 
+  124    Property App\Entity\Job_application::$cv_path (string) in isset() is not nullable.  
+         🪪  isset.property                                                                  
+  173    Property App\Entity\Job_application::$application_status_historys is unused.        
+         🪪  property.unused                                                                 
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties   
+  176    Property App\Entity\Job_application::$interviews is unused.                         
+         🪪  property.unused                                                                 
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties   
+ ------ ------------------------------------------------------------------------------------ 
+
+ ------ ----------------------------------------------------------------------------------- 
+  Line   Job_offer.php                                                                      
+ ------ ----------------------------------------------------------------------------------- 
+  253    Property App\Entity\Job_offer::$job_applications is unused.                        
+         🪪  property.unused                                                                
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties  
+  286    Property App\Entity\Job_offer::$job_offer_warnings is unused.                      
+         🪪  property.unused                                                                
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties  
+ ------ ----------------------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------------------------------------------------------ 
+  Line   Job_offer_comment.php                                                                                       
+ ------ ------------------------------------------------------------------------------------------------------------ 
+  22     Property App\Entity\Job_offer_comment::$id is unused.                                                       
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  26     Property App\Entity\Job_offer_comment::$job_offer_id is unused.                                             
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  30     Property App\Entity\Job_offer_comment::$candidate_id is unused.                                             
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  33     Property App\Entity\Job_offer_comment::$comment_text is unused.                                             
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  36     Property App\Entity\Job_offer_comment::$toxicity_score is unused.                                           
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  39     Property App\Entity\Job_offer_comment::$spam_score is unused.                                               
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  42     Property App\Entity\Job_offer_comment::$sentiment is unused.                                                
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  45     Property App\Entity\Job_offer_comment::$labels is unused.                                                   
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  48     Property App\Entity\Job_offer_comment::$moderation_status is unused.                                        
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  51     Property App\Entity\Job_offer_comment::$visibility_status is unused.                                        
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  54     Property App\Entity\Job_offer_comment::$is_auto_flagged is unused.                                          
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  57     Property App\Entity\Job_offer_comment::$analyzer_source is unused.                                          
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  60     Property App\Entity\Job_offer_comment::$created_at is unused.                                               
+         🪪  property.unused                                                                                         
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  63     Property App\Entity\Job_offer_comment::$analyzed_at (DateTimeInterface|null) is never assigned              
+         DateTimeInterface so it can be removed from the property type.                                              
+         🪪  property.unusedType                                                                                     
+  63     Property App\Entity\Job_offer_comment::$analyzed_at is never read, only written.                            
+         🪪  property.onlyWritten                                                                                    
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  66     Property App\Entity\Job_offer_comment::$moderated_at (DateTimeInterface|null) is never assigned             
+         DateTimeInterface so it can be removed from the property type.                                              
+         🪪  property.unusedType                                                                                     
+  66     Property App\Entity\Job_offer_comment::$moderated_at is never read, only written.                           
+         🪪  property.onlyWritten                                                                                    
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  70     Property App\Entity\Job_offer_comment::$moderator_id (App\Entity\Admin|null) is never assigned              
+         App\Entity\Admin so it can be removed from the property type.                                               
+         🪪  property.unusedType                                                                                     
+  70     Property App\Entity\Job_offer_comment::$moderator_id is never read, only written.                           
+         🪪  property.onlyWritten                                                                                    
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+  73     Property App\Entity\Job_offer_comment::$moderator_action_note (string|null) is never assigned string so it  
+         can be removed from the property type.                                                                      
+         🪪  property.unusedType                                                                                     
+  73     Property App\Entity\Job_offer_comment::$moderator_action_note is never read, only written.                  
+         🪪  property.onlyWritten                                                                                    
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties                           
+ ------ ------------------------------------------------------------------------------------------------------------ 
+
+ ------ ----------------------------------------------------------------------------------- 
+  Line   Job_offer_warning.php                                                              
+ ------ ----------------------------------------------------------------------------------- 
+  160    Property App\Entity\Job_offer_warning::$warning_corrections is unused.             
+         🪪  property.unused                                                                
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties  
+ ------ ----------------------------------------------------------------------------------- 
+
+ ------ ---------------------------------------------------------------------------------------- 
+  Line   Recruitment_event.php                                                                   
+ ------ ---------------------------------------------------------------------------------------- 
+  144    Property App\Entity\Recruitment_event::$meet_link (string) in isset() is not nullable.  
+         🪪  isset.property                                                                      
+  193    Property App\Entity\Recruitment_event::$event_reviews is unused.                        
+         🪪  property.unused                                                                     
+         💡  See: https://phpstan.org/developing-extensions/always-read-written-properties       
+ ------ ---------------------------------------------------------------------------------------- 
+
+ [ERROR] Found 37 errors                                                                                               
+
