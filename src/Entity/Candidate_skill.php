@@ -15,7 +15,7 @@ class Candidate_skill
 
     // FIX 3: Renamed property to $candidate (it represents the WHOLE object, not just the ID)
     #[ORM\ManyToOne(targetEntity: Candidate::class, inversedBy: "candidate_skills")]
-    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id')]
     private ?Candidate $candidate = null;
 
     #[ORM\Column(type: "string", length: 100)]

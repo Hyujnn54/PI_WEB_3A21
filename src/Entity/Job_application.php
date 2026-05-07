@@ -31,7 +31,7 @@ class Job_application
     private Job_offer $offer_id;
 
         #[ORM\ManyToOne(targetEntity: Candidate::class, inversedBy: "job_applications")]
-    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id')]
         #[Assert\NotNull(message: 'A candidate is required.')]
     private Candidate $candidate_id;
 

@@ -21,11 +21,11 @@ class Interview
     private string $id;
 
         #[ORM\ManyToOne(targetEntity: Job_application::class, inversedBy: "interviews")]
-    #[ORM\JoinColumn(name: 'application_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'application_id', referencedColumnName: 'id')]
     private Job_application $application_id;
 
         #[ORM\ManyToOne(targetEntity: Recruiter::class, inversedBy: "interviews")]
-    #[ORM\JoinColumn(name: 'recruiter_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'recruiter_id', referencedColumnName: 'id')]
     private Recruiter $recruiter_id;
 
     #[ORM\Column(type: "datetime")]

@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Admin;
+use App\Entity\Candidate;
 use App\Entity\Interview;
 use App\Entity\Job_application;
 use App\Entity\Job_offer;
@@ -46,46 +47,19 @@ class BackOfficeController extends AbstractController
     #[Route('/admin', name: 'app_admin')]
     public function index(UsersRepository $userRepo, EntityManagerInterface $entityManager): Response
     {
-        $allUsers = $userRepo->findAll();
-        $allOffers = $entityManager->getRepository(Job_offer::class)->findAll();
-        $allApplications = $entityManager->getRepository(Job_application::class)->findAll();
-        $allInterviews = $entityManager->getRepository(Interview::class)->findAll();
+        $totalUsers = $userRepo->count([]);
+        $totalOffers = $entityManager->getRepository(Job_offer::class)->count([]);
+        $totalApplications = $entityManager->getRepository(Job_application::class)->count([]);
+        $totalInterviews = $entityManager->getRepository(Interview::class)->count([]);
+        $admins = $entityManager->getRepository(Admin::class)->count([]);
+        $candidates = $entityManager->getRepository(Candidate::class)->count([]);
+        $recruiters = $entityManager->getRepository(Recruiter::class)->count([]);
 
-        $admins = 0;
-        $candidates = 0;
-        $recruiters = 0;
-
-        foreach ($allUsers as $user) {
-            $roles = $user->getRoles();
-
-            if (in_array('ROLE_ADMIN', $roles, true)) {
-                $admins += 1;
-            }
-
-            if (in_array('ROLE_CANDIDATE', $roles, true)) {
-                $candidates += 1;
-            }
-
-            if (in_array('ROLE_RECRUITER', $roles, true)) {
-                $recruiters += 1;
-            }
-        }
-
-        $offersActive = 0;
-        $offersInactive = 0;
-        $now = date_create();
-        foreach ($allOffers as $offer) {
-            $status = strtolower(trim((string) $offer->getStatus()));
-            $deadline = $offer->getDeadline();
-            $isExpired = is_object($deadline) && method_exists($deadline, 'getTimestamp') && $deadline < $now;
-            $isActive = $status === 'open' && !$isExpired;
-
-            if ($isActive) {
-                $offersActive++;
-            } else {
-                $offersInactive++;
-            }
-        }
+        $offerSummary = $entityManager->getConnection()->fetchAssociative(
+            "SELECT SUM(CASE WHEN LOWER(TRIM(status)) = 'open' AND (deadline IS NULL OR deadline >= NOW()) THEN 1 ELSE 0 END) AS active FROM job_offer"
+        );
+        $offersActive = is_array($offerSummary) ? (int) ($offerSummary['active'] ?? 0) : 0;
+        $offersInactive = max(0, $totalOffers - $offersActive);
 
         $recentUsers = $entityManager->getRepository(Users::class)->findBy([], ['createdAt' => 'DESC'], 5);
         $recentOffers = $entityManager->getRepository(Job_offer::class)->findBy([], ['created_at' => 'DESC'], 5);
@@ -136,10 +110,10 @@ class BackOfficeController extends AbstractController
         $recentActivity = array_slice($recentActivity, 0, 8);
 
         $kpis = [
-            ['label' => 'Total Users', 'value' => (string) count($allUsers), 'icon' => 'ti ti-users', 'tone' => 'primary'],
-            ['label' => 'Total Job Offers', 'value' => (string) count($allOffers), 'icon' => 'ti ti-briefcase-2', 'tone' => 'warning'],
-            ['label' => 'Total Applications', 'value' => (string) count($allApplications), 'icon' => 'ti ti-file-check', 'tone' => 'azure'],
-            ['label' => 'Total Interviews', 'value' => (string) count($allInterviews), 'icon' => 'ti ti-message-2', 'tone' => 'success'],
+            ['label' => 'Total Users', 'value' => (string) $totalUsers, 'icon' => 'ti ti-users', 'tone' => 'primary'],
+            ['label' => 'Total Job Offers', 'value' => (string) $totalOffers, 'icon' => 'ti ti-briefcase-2', 'tone' => 'warning'],
+            ['label' => 'Total Applications', 'value' => (string) $totalApplications, 'icon' => 'ti ti-file-check', 'tone' => 'azure'],
+            ['label' => 'Total Interviews', 'value' => (string) $totalInterviews, 'icon' => 'ti ti-message-2', 'tone' => 'success'],
         ];
 
         return $this->render('admin/index.html.twig', [
@@ -149,7 +123,7 @@ class BackOfficeController extends AbstractController
                 'admins' => $admins,
                 'candidates' => $candidates,
                 'recruiters' => $recruiters,
-                'interviews' => count($allInterviews),
+                'interviews' => $totalInterviews,
             ],
             'usersPreview' => $recentUsers,
             'recentActivity' => $recentActivity,

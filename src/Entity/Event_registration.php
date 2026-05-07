@@ -19,7 +19,7 @@ class Event_registration
     private Recruitment_event $event_id;
 
         #[ORM\ManyToOne(targetEntity: Candidate::class, inversedBy: "event_registrations")]
-    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id', onDelete: 'CASCADE', nullable: true)]
+    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id', nullable: true)]
     private ?Candidate $candidate_id = null;
 
     #[ORM\Column(type: "datetime")]

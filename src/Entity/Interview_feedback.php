@@ -15,7 +15,7 @@ class Interview_feedback
     private string $id;
 
         #[ORM\ManyToOne(targetEntity: Interview::class, inversedBy: "interview_feedbacks")]
-    #[ORM\JoinColumn(name: 'interview_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'interview_id', referencedColumnName: 'id')]
     private Interview $interview_id;
 
         #[ORM\ManyToOne(targetEntity: Recruiter::class, inversedBy: "interview_feedbacks")]

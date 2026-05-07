@@ -64,6 +64,7 @@ class FrontPortalController extends AbstractController
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
     private const GROQ_JOB_OFFER_MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+    private const EVENT_LIST_LIMIT = 50;
 
     public function __construct(
         private readonly ManagerRegistry $doctrine,
@@ -1157,10 +1158,10 @@ class FrontPortalController extends AbstractController
             } else {
                 $events = $entityManager->getRepository(Recruitment_event::class)->findBy([
                     'recruiter_id' => $recruiter,
-                ], ['id' => 'DESC']);
+                ], ['id' => 'DESC'], self::EVENT_LIST_LIMIT);
             }
         } else {
-            $events = $entityManager->getRepository(Recruitment_event::class)->findBy([], ['id' => 'DESC']);
+            $events = $entityManager->getRepository(Recruitment_event::class)->findBy([], ['id' => 'DESC'], self::EVENT_LIST_LIMIT);
         }
 
         $cards = [];
@@ -1612,7 +1613,7 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_events');
         }
 
-        $events = $entityManager->getRepository(Recruitment_event::class)->findBy([], ['id' => 'DESC']);
+        $events = $entityManager->getRepository(Recruitment_event::class)->findBy([], ['id' => 'DESC'], self::EVENT_LIST_LIMIT);
 
         $eventsData = [];
         foreach ($events as $event) {

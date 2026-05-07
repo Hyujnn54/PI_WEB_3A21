@@ -41,7 +41,7 @@ class Job_offer_warning
     private Recruiter $recruiter_id;
 
         #[ORM\ManyToOne(targetEntity: Admin::class, inversedBy: "job_offer_warnings")]
-    #[ORM\JoinColumn(name: 'admin_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'admin_id', referencedColumnName: 'id')]
     private Admin $admin_id;
 
     #[ORM\Column(type: "string", length: 255)]

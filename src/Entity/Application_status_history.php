@@ -18,7 +18,7 @@ class Application_status_history
     private string $id;
 
         #[ORM\ManyToOne(targetEntity: Job_application::class, inversedBy: "application_status_historys")]
-    #[ORM\JoinColumn(name: 'application_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'application_id', referencedColumnName: 'id')]
         #[Assert\NotNull(message: 'Application is required for status history.')]
     private Job_application $application_id;
 
@@ -39,7 +39,7 @@ class Application_status_history
     private \DateTimeInterface $changed_at;
 
         #[ORM\ManyToOne(targetEntity: Users::class)]
-    #[ORM\JoinColumn(name: 'changed_by', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'changed_by_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
         #[Assert\NotNull(message: 'Author is required for status history.')]
     private Users $changed_by;
 

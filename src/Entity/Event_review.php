@@ -19,7 +19,7 @@ class Event_review
     private Recruitment_event $event_id;
 
         #[ORM\ManyToOne(targetEntity: Candidate::class, inversedBy: "event_reviews")]
-    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'candidate_id', referencedColumnName: 'id')]
     private Candidate $candidate_id;
 
     #[ORM\Column(type: "integer")]

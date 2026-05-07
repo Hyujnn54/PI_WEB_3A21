@@ -13,11 +13,14 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class InterviewManagementController extends AbstractController
 {
+    private const INTERVIEW_LIST_LIMIT = 300;
+    private const FEEDBACK_LIST_LIMIT = 1000;
+
     #[Route('/admin/interviews', name: 'management_interviews')]
     public function index(EntityManagerInterface $em): Response
     {
-        $interviews = $em->getRepository(Interview::class)->findBy([], ['scheduled_at' => 'DESC']);
-        $feedbackRows = $em->getRepository(Interview_feedback::class)->findBy([], ['created_at' => 'DESC']);
+        $interviews = $em->getRepository(Interview::class)->findBy([], ['scheduled_at' => 'DESC'], self::INTERVIEW_LIST_LIMIT);
+        $feedbackRows = $em->getRepository(Interview_feedback::class)->findBy([], ['created_at' => 'DESC'], self::FEEDBACK_LIST_LIMIT);
 
         $latestFeedbackByInterviewId = [];
         foreach ($feedbackRows as $feedback) {
