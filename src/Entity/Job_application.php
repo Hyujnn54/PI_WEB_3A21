@@ -7,12 +7,18 @@ use Symfony\Component\Validator\Constraints as Assert;
 use App\Repository\Job_applicationRepository;
 
 use App\Entity\Candidate;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Interview;
 
 #[ORM\Entity(repositoryClass: Job_applicationRepository::class)]
 class Job_application
 {
+    public function __construct()
+    {
+        $this->application_status_historys = new ArrayCollection();
+        $this->interviews = new ArrayCollection();
+    }
 
     #[ORM\Id]
     #[ORM\GeneratedValue(strategy: "IDENTITY")]
@@ -121,7 +127,7 @@ class Job_application
 
     public function getCv_path()
     {
-        return isset($this->cv_path) ? $this->cv_path : '';
+        return $this->cv_path;
     }
 
     public function setCv_path($value)
@@ -172,6 +178,16 @@ class Job_application
     #[ORM\OneToMany(mappedBy: "application_id", targetEntity: Application_status_history::class)]
     private Collection $application_status_historys;
 
+    public function getApplication_status_historys(): Collection
+    {
+        return $this->application_status_historys;
+    }
+
     #[ORM\OneToMany(mappedBy: "application_id", targetEntity: Interview::class)]
     private Collection $interviews;
+
+    public function getInterviews(): Collection
+    {
+        return $this->interviews;
+    }
 }

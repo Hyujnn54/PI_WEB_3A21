@@ -37,9 +37,6 @@ class InterviewMapLookupService
             ]);
 
             $payload = $response->toArray(false);
-            if (!is_array($payload)) {
-                return [];
-            }
 
             $results = [];
             foreach ($payload as $item) {
@@ -83,9 +80,6 @@ class InterviewMapLookupService
             ]);
 
             $payload = $response->toArray(false);
-            if (!is_array($payload)) {
-                return null;
-            }
 
             return $this->normalizePlace($payload);
         } catch (Throwable $exception) {
@@ -124,7 +118,6 @@ class InterviewMapLookupService
                 ?? $address['leisure']
                 ?? $address['road']
                 ?? $exactDisplayName
-                ?? 'Pinned location'
             )
         );
 

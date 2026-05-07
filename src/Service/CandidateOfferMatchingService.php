@@ -132,8 +132,8 @@ class CandidateOfferMatchingService
                 continue;
             }
 
-            $candidateRank = max(0, (int) ($candidateSkill['rank'] ?? 0));
-            $candidateLevel = (string) ($candidateSkill['level'] ?? '');
+            $candidateRank = max(0, $candidateSkill['rank']);
+            $candidateLevel = $candidateSkill['level'];
             $fitRatio = min($candidateRank, $requiredRank) / $requiredRank;
             $matchingScore += $fitRatio;
 

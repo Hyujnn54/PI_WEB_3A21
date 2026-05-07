@@ -4,6 +4,7 @@ namespace App\Service\Interview;
 
 use App\Entity\Interview;
 use App\Entity\Users;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -43,9 +44,17 @@ class InterviewReminderDispatcher
         $windowStart = $now->modify('+' . self::WINDOW_START_HOURS . ' hours');
         $windowEnd = $now->modify('+' . self::WINDOW_END_HOURS . ' hours');
 
-        $interviews = $this->doctrine
-            ->getRepository(Interview::class)
-            ->createQueryBuilder('i')
+        $entityManager = $this->doctrine->getManagerForClass(Interview::class);
+        if (!$entityManager instanceof EntityManagerInterface) {
+            $this->logger->warning('Interview reminders cannot be dispatched because the Doctrine entity manager is unavailable.');
+
+            return $stats;
+        }
+
+        $interviews = $entityManager
+            ->createQueryBuilder()
+            ->select('i')
+            ->from(Interview::class, 'i')
             ->andWhere('i.reminder_sent = :sent')
             ->andWhere('i.scheduled_at BETWEEN :windowStart AND :windowEnd')
             ->andWhere('LOWER(i.status) = :status')

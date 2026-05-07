@@ -11,7 +11,6 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Filesystem\Filesystem;
 
 #[AsCommand(
     name: 'app:generate:entities',
@@ -20,7 +19,6 @@ use Symfony\Component\Filesystem\Filesystem;
 class GenerateEntitiesCommand extends Command
 {
     private Connection $connection;
-    // private Filesystem $filesystem;
     private ?AbstractSchemaManager $schemaManager = null;
     private array $generatedRelations = [];
 
@@ -28,13 +26,11 @@ class GenerateEntitiesCommand extends Command
      * Constructor.
      *
      * @param Connection $connection The database connection instance.
-     * @param Filesystem $filesystem The filesystem instance.
      */
-    public function __construct(Connection $connection, Filesystem $filesystem)
+    public function __construct(Connection $connection)
     {
         parent::__construct();
         $this->connection = $connection;
-        // $this->filesystem = $filesystem;
     }
 
     /**
@@ -110,6 +106,7 @@ class GenerateEntitiesCommand extends Command
      * @param Table $table The database table.
      * @param array &$oneToManyRelations Reference to OneToMany relations.
      * @param array &$manyToOneRelationsName Reference to ManyToOne relations.
+     * @param array &$oneToManyRelationsName Reference to OneToMany relation names.
      */
     private function generateEntity(Table $table, array &$oneToManyRelations, array &$manyToOneRelationsName, array &$oneToManyRelationsName): void
     {
@@ -172,8 +169,8 @@ class GenerateEntitiesCommand extends Command
     /**
      * Generates necessary import statements based on detected relations.
      *
-     * @param array $oneToManyRelations OneToMany relations.
      * @param array $manyToOneRelationsName ManyToOne relations.
+     * @param array $oneToManyRelationsName OneToMany relation names.
      * @param string $className The name of the entity class.
      * @return string Formatted import statements.
      */

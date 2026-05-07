@@ -29,6 +29,13 @@ class Candidate_skill
         return $this->id;
     }
 
+    public function setId(int $id): self
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
     public function getCandidate(): ?Candidate
     {
         return $this->candidate;

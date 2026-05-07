@@ -72,6 +72,210 @@ class Job_offer_comment
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $moderator_action_note = null;
 
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function setId(string $id): self
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function getJob_offer_id(): Job_offer
+    {
+        return $this->job_offer_id;
+    }
+
+    public function setJob_offer_id(Job_offer $job_offer_id): self
+    {
+        $this->job_offer_id = $job_offer_id;
+
+        return $this;
+    }
+
+    public function getCandidate_id(): Candidate
+    {
+        return $this->candidate_id;
+    }
+
+    public function setCandidate_id(Candidate $candidate_id): self
+    {
+        $this->candidate_id = $candidate_id;
+
+        return $this;
+    }
+
+    public function getComment_text(): string
+    {
+        return $this->comment_text;
+    }
+
+    public function setComment_text(string $comment_text): self
+    {
+        $this->comment_text = $comment_text;
+
+        return $this;
+    }
+
+    public function getToxicity_score(): float
+    {
+        return $this->toxicity_score;
+    }
+
+    public function setToxicity_score(float $toxicity_score): self
+    {
+        $this->toxicity_score = $toxicity_score;
+
+        return $this;
+    }
+
+    public function getSpam_score(): float
+    {
+        return $this->spam_score;
+    }
+
+    public function setSpam_score(float $spam_score): self
+    {
+        $this->spam_score = $spam_score;
+
+        return $this;
+    }
+
+    public function getSentiment(): string
+    {
+        return $this->sentiment;
+    }
+
+    public function setSentiment(string $sentiment): self
+    {
+        $this->sentiment = $sentiment;
+
+        return $this;
+    }
+
+    public function getLabels(): string
+    {
+        return $this->labels;
+    }
+
+    public function setLabels(string $labels): self
+    {
+        $this->labels = $labels;
+
+        return $this;
+    }
+
+    public function getModeration_status(): string
+    {
+        return $this->moderation_status;
+    }
+
+    public function setModeration_status(string $moderation_status): self
+    {
+        $this->moderation_status = $moderation_status;
+
+        return $this;
+    }
+
+    public function getVisibility_status(): string
+    {
+        return $this->visibility_status;
+    }
+
+    public function setVisibility_status(string $visibility_status): self
+    {
+        $this->visibility_status = $visibility_status;
+
+        return $this;
+    }
+
+    public function isAuto_flagged(): bool
+    {
+        return $this->is_auto_flagged;
+    }
+
+    public function setIs_auto_flagged(bool $is_auto_flagged): self
+    {
+        $this->is_auto_flagged = $is_auto_flagged;
+
+        return $this;
+    }
+
+    public function getAnalyzer_source(): string
+    {
+        return $this->analyzer_source;
+    }
+
+    public function setAnalyzer_source(string $analyzer_source): self
+    {
+        $this->analyzer_source = $analyzer_source;
+
+        return $this;
+    }
+
+    public function getCreated_at(): \DateTimeInterface
+    {
+        return $this->created_at;
+    }
+
+    public function setCreated_at(\DateTimeInterface $created_at): self
+    {
+        $this->created_at = $created_at;
+
+        return $this;
+    }
+
+    public function getAnalyzed_at(): ?\DateTimeInterface
+    {
+        return $this->analyzed_at;
+    }
+
+    public function setAnalyzed_at(?\DateTimeInterface $analyzed_at): self
+    {
+        $this->analyzed_at = $analyzed_at;
+
+        return $this;
+    }
+
+    public function getModerated_at(): ?\DateTimeInterface
+    {
+        return $this->moderated_at;
+    }
+
+    public function setModerated_at(?\DateTimeInterface $moderated_at): self
+    {
+        $this->moderated_at = $moderated_at;
+
+        return $this;
+    }
+
+    public function getModerator_id(): ?Admin
+    {
+        return $this->moderator_id;
+    }
+
+    public function setModerator_id(?Admin $moderator_id): self
+    {
+        $this->moderator_id = $moderator_id;
+
+        return $this;
+    }
+
+    public function getModerator_action_note(): ?string
+    {
+        return $this->moderator_action_note;
+    }
+
+    public function setModerator_action_note(?string $moderator_action_note): self
+    {
+        $this->moderator_action_note = $moderator_action_note;
+
+        return $this;
+    }
+
     public static function validateCommentText(string $comment): array
     {
         $value = trim($comment);

@@ -106,7 +106,7 @@ class Interview
 
     public function getMode()
     {
-        $raw = strtolower(trim((string) ($this->mode ?? '')));
+        $raw = strtolower(trim($this->mode));
 
         if (in_array($raw, ['onsite', 'on_site', 'on-site', 'on site', 'in_person', 'in-person', 'in person'], true)) {
             return 'onsite';
@@ -117,8 +117,8 @@ class Interview
         }
 
         // Fallback for legacy rows where mode is empty/invalid but location/link imply the mode.
-        $location = trim((string) ($this->location ?? ''));
-        $meetingLink = trim((string) ($this->meeting_link ?? ''));
+        $location = trim($this->location);
+        $meetingLink = trim($this->meeting_link);
         if ($location !== '' && $meetingLink === '') {
             return 'onsite';
         }
@@ -135,7 +135,7 @@ class Interview
 
     public function getMeeting_link()
     {
-        return isset($this->meeting_link) ? (string) $this->meeting_link : '';
+        return $this->meeting_link;
     }
 
     public function setMeeting_link($value)
@@ -145,7 +145,7 @@ class Interview
 
     public function getLocation()
     {
-        return isset($this->location) ? (string) $this->location : '';
+        return $this->location;
     }
 
     public function setLocation($value)
@@ -155,7 +155,7 @@ class Interview
 
     public function getStatus()
     {
-        return isset($this->status) ? (string) $this->status : 'SCHEDULED';
+        return $this->status;
     }
 
     public function setStatus($value)
@@ -165,7 +165,7 @@ class Interview
 
     public function getNotes()
     {
-        return isset($this->notes) ? (string) $this->notes : '';
+        return $this->notes;
     }
 
     public function setNotes($value)

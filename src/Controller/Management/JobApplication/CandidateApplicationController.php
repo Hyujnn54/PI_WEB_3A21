@@ -58,7 +58,7 @@ class CandidateApplicationController extends AbstractController
         $useProfileCv = filter_var((string) $request->request->get('use_profile_cv', '0'), FILTER_VALIDATE_BOOL);
         $uploadedCv = $request->files->get('cv_file');
         $applicationId = (int) $request->request->get('application_id', 0);
-        $profileCvPath = method_exists($candidate, 'getCvPath') ? trim((string) $candidate->getCvPath()) : '';
+        $profileCvPath = trim((string) $candidate->getCvPath());
         $applicationCvPath = '';
 
         if ($useProfileCv && $profileCvPath === '') {
@@ -203,7 +203,7 @@ class CandidateApplicationController extends AbstractController
         $application->setCandidate_id($candidate);
         
         // Pre-fill phone if available on candidate profile (assuming string)
-        if (method_exists($candidate, 'getPhone') && $candidate->getPhone()) {
+        if ($candidate->getPhone()) {
             $application->setPhone($candidate->getPhone());
         }
 
@@ -226,7 +226,7 @@ class CandidateApplicationController extends AbstractController
             }
 
             if ($useProfileCv) {
-                $profileCvPath = method_exists($candidate, 'getCvPath') ? $candidate->getCvPath() : null;
+                $profileCvPath = $candidate->getCvPath();
                 if (empty($profileCvPath)) {
                     $form->get('use_profile_cv')->addError(new FormError('No CV found in your profile. Uncheck this option and upload a CV.'));
 
@@ -426,7 +426,7 @@ class CandidateApplicationController extends AbstractController
             }
 
             if ($useProfileCv) {
-                $profileCvPath = method_exists($candidate, 'getCvPath') ? $candidate->getCvPath() : null;
+                $profileCvPath = $candidate->getCvPath();
                 if (empty($profileCvPath)) {
                     $form->get('use_profile_cv')->addError(new FormError('No CV found in your profile. Uncheck this option and upload a CV.'));
 
@@ -562,7 +562,7 @@ class CandidateApplicationController extends AbstractController
         }
 
         if ($useProfileCv) {
-            $profileCvPath = method_exists($candidate, 'getCvPath') ? (string) $candidate->getCvPath() : '';
+            $profileCvPath = (string) $candidate->getCvPath();
             if ($profileCvPath === '') {
                 $form->get('use_profile_cv')->addError(new FormError('No CV found in your profile. Uncheck this option and upload a CV.'));
                 $isValid = false;
@@ -779,7 +779,7 @@ class CandidateApplicationController extends AbstractController
     private function extractPdfText(string $rawPdf): string
     {
         $chunks = [];
-        if (preg_match_all('/\(([^()]*)\)/s', $rawPdf, $matches) > 0 && isset($matches[1])) {
+        if (preg_match_all('/\(([^()]*)\)/s', $rawPdf, $matches) > 0) {
             foreach ($matches[1] as $chunk) {
                 $cleanChunk = preg_replace('/\\\\[nrt]/', ' ', (string) $chunk);
                 $cleanChunk = preg_replace('/\\\\\d{3}/', ' ', (string) $cleanChunk);

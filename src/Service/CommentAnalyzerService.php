@@ -408,7 +408,7 @@ class CommentAnalyzerService
         $lettersOnly = preg_replace('/[^A-Za-z]/', '', $raw) ?? '';
         if ($lettersOnly !== '') {
             $upperLetters = preg_replace('/[^A-Z]/', '', $lettersOnly) ?? '';
-            $ratio = strlen($lettersOnly) > 0 ? (strlen($upperLetters) / strlen($lettersOnly)) : 0.0;
+            $ratio = strlen($upperLetters) / strlen($lettersOnly);
             if ($ratio >= 0.55) {
                 $score += 0.16;
             }

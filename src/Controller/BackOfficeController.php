@@ -75,10 +75,6 @@ class BackOfficeController extends AbstractController
         $offersInactive = 0;
         $now = date_create();
         foreach ($allOffers as $offer) {
-            if (!$offer instanceof Job_offer) {
-                continue;
-            }
-
             $status = strtolower(trim((string) $offer->getStatus()));
             $deadline = $offer->getDeadline();
             $isExpired = is_object($deadline) && method_exists($deadline, 'getTimestamp') && $deadline < $now;
@@ -98,10 +94,6 @@ class BackOfficeController extends AbstractController
         $recentActivity = [];
 
         foreach ($recentUsers as $user) {
-            if (!$user instanceof Users) {
-                continue;
-            }
-
             $recentActivity[] = [
                 'type' => 'user',
                 'icon' => 'ti ti-user-plus',
@@ -114,10 +106,6 @@ class BackOfficeController extends AbstractController
         }
 
         foreach ($recentOffers as $offer) {
-            if (!$offer instanceof Job_offer) {
-                continue;
-            }
-
             $recentActivity[] = [
                 'type' => 'offer',
                 'icon' => 'ti ti-briefcase-2',
@@ -128,10 +116,6 @@ class BackOfficeController extends AbstractController
         }
 
         foreach ($recentApplications as $application) {
-            if (!$application instanceof Job_application) {
-                continue;
-            }
-
             $offer = $application->getOffer_id();
             $recentActivity[] = [
                 'type' => 'application',
@@ -254,9 +238,7 @@ class BackOfficeController extends AbstractController
             $user->setEmail((string) $request->request->get('email'));
             $user->setPhone((string) $request->request->get('phone'));
 
-            if (method_exists($user, 'setAssignedArea')) {
-                $user->setAssignedArea('General Management');
-            }
+            $user->setAssignedArea('General Management');
 
             $plainPassword = (string) $request->request->get('password');
             $user->setPassword($hasher->hashPassword($user, $plainPassword));
@@ -519,7 +501,7 @@ class BackOfficeController extends AbstractController
             (string) $request->request->get('warning_type', ''),
             (string) $request->request->get('warning_text', '')
         );
-        if (($validation['ok'] ?? false) !== true) {
+        if ($validation['ok'] !== true) {
             $this->addFlash('warning_modal_error', (string) ($validation['error'] ?? 'Invalid warning input.'));
             $this->addFlash('warning_modal_mode', 'warn');
             $this->addFlash('warning_modal_type', trim((string) $request->request->get('warning_type', '')));
@@ -685,7 +667,7 @@ class BackOfficeController extends AbstractController
         }
 
         $validation = Job_offer_warning::validateWarningInput($warningType, $warningMessage);
-        if (($validation['ok'] ?? false) !== true) {
+        if ($validation['ok'] !== true) {
             $warningMessage = $this->normalizeWarningMessage('Please revise this job offer. The content currently does not meet platform quality and compliance standards. Update the listing with clear, accurate, and complete information, then resubmit for review.');
         }
 
@@ -703,7 +685,7 @@ class BackOfficeController extends AbstractController
             (string) $request->request->get('warning_type', ''),
             (string) $request->request->get('warning_text', '')
         );
-        if (($validation['ok'] ?? false) !== true) {
+        if ($validation['ok'] !== true) {
             $this->addFlash('warning_modal_error', (string) ($validation['error'] ?? 'Invalid warning input.'));
             $this->addFlash('warning_modal_mode', 'reject');
             $this->addFlash('warning_modal_type', trim((string) $request->request->get('warning_type', '')));
@@ -1107,43 +1089,6 @@ SQL;
     }
 
     /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function fetchAdminOffers(Connection $connection): array
-    {
-        $sql = <<<'SQL'
-SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
-             COALESCE(jw.status, NULL) AS warning_status,
-             jw.reason AS warning_reason
-FROM job_offer jo
-LEFT JOIN job_offer_warning jw
-    ON jw.job_offer_id = jo.id
- AND jw.status IN ('SENT', 'RESOLVED')
- AND jw.created_at = (
-         SELECT MAX(w2.created_at)
-         FROM job_offer_warning w2
-         WHERE w2.job_offer_id = jo.id
-             AND w2.status IN ('SENT', 'RESOLVED')
- )
-ORDER BY jo.created_at DESC
-SQL;
-
-        try {
-            return $connection->fetchAllAssociative($sql);
-        } catch (\Throwable) {
-            $fallbackSql = <<<'SQL'
-SELECT jo.id, jo.recruiter_id, jo.title, jo.location, jo.contract_type, jo.status, jo.created_at, jo.deadline,
-       NULL AS warning_status,
-    NULL AS warning_reason
-FROM job_offer jo
-ORDER BY jo.created_at DESC
-SQL;
-
-            return $connection->fetchAllAssociative($fallbackSql);
-        }
-    }
-
-    /**
      * @param array<int, array<string, mixed>> $offers
      * @return array<int, array<string, mixed>>
      */
@@ -1167,87 +1112,6 @@ SQL;
         }
 
         return $expiredOffers;
-    }
-
-    private function buildOfferStats(array $offers): array
-    {
-        $totalPublished = count($offers);
-        $totalClosed = 0;
-        $totalOpen = 0;
-        $cityStats = [];
-        $contractStats = [];
-
-        foreach ($offers as $offer) {
-            $city = trim((string) ($offer['location'] ?? 'Unknown'));
-            if ($city === '') {
-                $city = 'Unknown';
-            }
-
-            $contractType = trim((string) ($offer['contract_type'] ?? 'Unknown'));
-            if ($contractType === '') {
-                $contractType = 'Unknown';
-            }
-
-            $status = strtolower(trim((string) ($offer['status'] ?? 'open')));
-            $isClosed = $status === 'closed';
-            $isOpen = $status === 'open';
-
-            if ($isClosed) {
-                $totalClosed += 1;
-            }
-            if ($isOpen) {
-                $totalOpen += 1;
-            }
-
-            if (!isset($cityStats[$city])) {
-                $cityStats[$city] = ['city' => $city, 'total' => 0, 'open' => 0, 'closed' => 0];
-            }
-            $cityStats[$city]['total'] += 1;
-            if ($isOpen) {
-                $cityStats[$city]['open'] += 1;
-            }
-            if ($isClosed) {
-                $cityStats[$city]['closed'] += 1;
-            }
-
-            if (!isset($contractStats[$contractType])) {
-                $contractStats[$contractType] = ['contract_type' => $contractType, 'total' => 0, 'open' => 0, 'closed' => 0];
-            }
-            $contractStats[$contractType]['total'] += 1;
-            if ($isOpen) {
-                $contractStats[$contractType]['open'] += 1;
-            }
-            if ($isClosed) {
-                $contractStats[$contractType]['closed'] += 1;
-            }
-        }
-
-        $closedPercentage = $totalPublished > 0 ? round(($totalClosed / $totalPublished) * 100, 2) : 0.0;
-        $openPercentage = $totalPublished > 0 ? round(($totalOpen / $totalPublished) * 100, 2) : 0.0;
-
-        $cityStatsList = array_values($cityStats);
-        foreach ($cityStatsList as &$row) {
-            $row['open_rate'] = $row['total'] > 0 ? round(($row['open'] / $row['total']) * 100, 2) : 0.0;
-            $row['closed_rate'] = $row['total'] > 0 ? round(($row['closed'] / $row['total']) * 100, 2) : 0.0;
-        }
-
-        $contractStatsList = array_values($contractStats);
-        foreach ($contractStatsList as &$row) {
-            $row['percentage'] = $totalPublished > 0 ? round(($row['total'] / $totalPublished) * 100, 2) : 0.0;
-        }
-
-        usort($cityStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
-        usort($contractStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
-
-        return [
-            'total_published' => $totalPublished,
-            'total_closed' => $totalClosed,
-            'total_open' => $totalOpen,
-            'closed_percentage' => $closedPercentage,
-            'open_percentage' => $openPercentage,
-            'city_stats' => $cityStatsList,
-            'contract_stats' => $contractStatsList,
-        ];
     }
 
     #[Route('/recruiter/create-event', name: 'recruiter_create_event', methods: ['GET', 'POST'])]

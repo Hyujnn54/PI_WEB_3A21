@@ -86,7 +86,7 @@ class LuxandFaceService
             'collections' => $this->collection,
         ], 'photo', $photo);
 
-        if (!is_array($payload) || $payload === [] || !isset($payload[0]) || !is_array($payload[0])) {
+        if ($payload === [] || !isset($payload[0]) || !is_array($payload[0])) {
             return null;
         }
 

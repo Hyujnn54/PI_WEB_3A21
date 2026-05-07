@@ -5,6 +5,7 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 
 use App\Entity\Recruiter;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Job_offer_warning;
 
@@ -15,6 +16,13 @@ class Job_offer
     private const LOCATION_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-]{3,120}$/u';
     private const TEXTAREA_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,1000}$/u';
 
+    public function __construct()
+    {
+        $this->offer_skills = new ArrayCollection();
+        $this->job_applications = new ArrayCollection();
+        $this->warning_corrections = new ArrayCollection();
+        $this->job_offer_warnings = new ArrayCollection();
+    }
 
     #[ORM\Id]
     #[ORM\Column(type: "bigint")]
@@ -252,6 +260,11 @@ class Job_offer
     #[ORM\OneToMany(mappedBy: "offer_id", targetEntity: Job_application::class)]
     private Collection $job_applications;
 
+    public function getJob_applications(): Collection
+    {
+        return $this->job_applications;
+    }
+
     #[ORM\OneToMany(mappedBy: "job_offer_id", targetEntity: Warning_correction::class)]
     private Collection $warning_corrections;
 
@@ -284,6 +297,11 @@ class Job_offer
 
     #[ORM\OneToMany(mappedBy: "job_offer_id", targetEntity: Job_offer_warning::class)]
     private Collection $job_offer_warnings;
+
+    public function getJob_offer_warnings(): Collection
+    {
+        return $this->job_offer_warnings;
+    }
 
     /**
      * Keep create-form validation rules in the entity so controller stays focused on flow.

@@ -63,7 +63,6 @@ class FrontPortalController extends AbstractController
     private const CONTRACT_TYPES = ['CDI', 'CDD', 'Internship', 'Freelance', 'Full-time', 'Part-time', 'Remote Contract'];
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced'];
     private const JOB_STATUSES = ['open', 'paused', 'closed'];
-    private const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
     private const GROQ_JOB_OFFER_MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
 
     public function __construct(
@@ -251,7 +250,7 @@ class FrontPortalController extends AbstractController
                     $candidateLng
                 )['distance'];
 
-                if (($dbCard['is_expired'] ?? false) === true) {
+                if ($dbCard['is_expired'] === true) {
                     $expiredOffers[] = $dbCard;
                 }
 
@@ -900,9 +899,7 @@ class FrontPortalController extends AbstractController
                     if (count($applications) > 0) {
                         try {
                             $rankingPayload = $this->applicationAiRankingService->rankApplications($applications);
-                            $rankingsByApplicationId = is_array($rankingPayload['results'] ?? null)
-                                ? $rankingPayload['results']
-                                : [];
+                            $rankingsByApplicationId = $rankingPayload['results'];
 
                             usort($applications, static function (Job_application $left, Job_application $right) use ($rankingsByApplicationId): int {
                                 $leftScore = (int) ($rankingsByApplicationId[(string) $left->getId()]['score'] ?? -1);
@@ -911,7 +908,7 @@ class FrontPortalController extends AbstractController
                                 return $rightScore <=> $leftScore;
                             });
 
-                            $errors = is_array($rankingPayload['errors'] ?? null) ? $rankingPayload['errors'] : [];
+                            $errors = $rankingPayload['errors'];
                             if ($errors !== []) {
                                 $this->addFlash('warning', sprintf(
                                     'AI ranking completed with %d fallback case(s). %s',
@@ -1501,9 +1498,7 @@ class FrontPortalController extends AbstractController
         if (count($registrations) > 0) {
 
             foreach ($registrations as $registration) {
-                if ($registration instanceof Event_registration) {
-                    $this->sendEventRegistrationBundleNotification($notifier, $logger, $registration, 'unregistered');
-                }
+                $this->sendEventRegistrationBundleNotification($notifier, $logger, $registration, 'unregistered');
                 $entityManager->remove($registration);
             }
             $entityManager->flush();
@@ -1569,7 +1564,7 @@ class FrontPortalController extends AbstractController
 
             $pendingActionsCount = 0;
             foreach ($candidatesList as $candidateRow) {
-                $status = strtolower(trim((string) ($candidateRow['status'] ?? '')));
+                $status = strtolower(trim((string) $candidateRow['status']));
                 if (!in_array($status, ['confirmed', 'rejected'], true)) {
                     $pendingActionsCount += 1;
                 }
@@ -1655,7 +1650,7 @@ class FrontPortalController extends AbstractController
 
             $pendingActionsCount = 0;
             foreach ($candidatesList as $candidateRow) {
-                $status = strtolower(trim((string) ($candidateRow['status'] ?? '')));
+                $status = strtolower(trim((string) $candidateRow['status']));
                 if (!in_array($status, ['confirmed', 'rejected'], true)) {
                     $pendingActionsCount += 1;
                 }
@@ -3089,8 +3084,8 @@ SQL;
 
         $parts = [];
         foreach ($skills as $skill) {
-            $name = trim((string) ($skill['name'] ?? ''));
-            $level = trim((string) ($skill['level'] ?? ''));
+            $name = trim($skill['name']);
+            $level = trim($skill['level']);
             if ($name === '') {
                 continue;
             }
@@ -3174,89 +3169,6 @@ SQL;
         }
 
         return mb_strlen($message) > 180 ? mb_substr($message, 0, 180) . '...' : $message;
-    }
-
-    private function resolveGeminiApiKey(): string
-    {
-        $candidates = [
-            $_ENV['GEMINI_API_KEY'] ?? null,
-            $_SERVER['GEMINI_API_KEY'] ?? null,
-            getenv('GEMINI_API_KEY') ?: null,
-        ];
-
-        foreach ($candidates as $candidate) {
-            $value = trim((string) $candidate);
-            if ($value !== '') {
-                return $value;
-            }
-        }
-
-        return '';
-    }
-
-    private function requestGeminiGenerateContent(HttpClientInterface $httpClient, string $apiKey, string $prompt): array
-    {
-        $lastError = 'AI service is currently unavailable.';
-
-        foreach (self::GEMINI_MODELS as $model) {
-            try {
-                $response = $httpClient->request('POST', 'https://generativelanguage.googleapis.com/v1beta/models/' . $model . ':generateContent', [
-                    'query' => ['key' => $apiKey],
-                    'json' => [
-                        'contents' => [
-                            [
-                                'parts' => [
-                                    ['text' => $prompt],
-                                ],
-                            ],
-                        ],
-                        'generationConfig' => [
-                            'temperature' => 0.4,
-                            'responseMimeType' => 'application/json',
-                        ],
-                    ],
-                    'timeout' => 25,
-                ]);
-
-                $statusCode = $response->getStatusCode();
-                $body = $response->toArray(false);
-
-                if ($statusCode >= 400) {
-                    $lastError = $this->extractGeminiErrorMessage($body, $lastError);
-                    if ($statusCode === 404) {
-                        continue;
-                    }
-
-                    return ['ok' => false, 'error' => $lastError];
-                }
-
-                $text = trim((string) ($body['candidates'][0]['content']['parts'][0]['text'] ?? ''));
-                if ($text === '') {
-                    $lastError = 'AI returned an empty response.';
-                    continue;
-                }
-
-                return ['ok' => true, 'text' => $text, 'model' => $model];
-            } catch (\Throwable) {
-                $lastError = 'Failed to contact AI provider.';
-            }
-        }
-
-        return ['ok' => false, 'error' => $lastError];
-    }
-
-    private function extractGeminiErrorMessage(array $body, string $fallback): string
-    {
-        $message = trim((string) ($body['error']['message'] ?? ''));
-        if ($message === '') {
-            return $fallback;
-        }
-
-        if (mb_strlen($message) > 180) {
-            return mb_substr($message, 0, 180) . '...';
-        }
-
-        return $message;
     }
 
     private function decodeAiJsonPayload(string $rawPayload): ?array
@@ -3371,86 +3283,6 @@ SQL;
         };
     }
 
-    private function buildOfferStats(array $offers): array
-    {
-        $totalPublished = count($offers);
-        $totalClosed = 0;
-        $totalOpen = 0;
-        $cityStats = [];
-        $contractStats = [];
-
-        foreach ($offers as $offer) {
-            $city = trim((string) ($offer['location'] ?? 'Unknown'));
-            if ($city === '') {
-                $city = 'Unknown';
-            }
-
-            $contractType = trim((string) ($offer['contract_type'] ?? 'Unknown'));
-            if ($contractType === '') {
-                $contractType = 'Unknown';
-            }
-
-            $status = strtolower(trim((string) ($offer['status'] ?? 'open')));
-            $isClosed = $status === 'closed';
-            $isOpen = $status === 'open';
-
-            if ($isClosed) {
-                $totalClosed += 1;
-            }
-            if ($isOpen) {
-                $totalOpen += 1;
-            }
-
-            if (!isset($cityStats[$city])) {
-                $cityStats[$city] = ['city' => $city, 'total' => 0, 'open' => 0, 'closed' => 0];
-            }
-            $cityStats[$city]['total'] += 1;
-            if ($isOpen) {
-                $cityStats[$city]['open'] += 1;
-            }
-            if ($isClosed) {
-                $cityStats[$city]['closed'] += 1;
-            }
-
-            if (!isset($contractStats[$contractType])) {
-                $contractStats[$contractType] = ['contract_type' => $contractType, 'total' => 0, 'open' => 0, 'closed' => 0];
-            }
-            $contractStats[$contractType]['total'] += 1;
-            if ($isOpen) {
-                $contractStats[$contractType]['open'] += 1;
-            }
-            if ($isClosed) {
-                $contractStats[$contractType]['closed'] += 1;
-            }
-        }
-
-        $closedPercentage = $totalPublished > 0 ? round(($totalClosed / $totalPublished) * 100, 2) : 0.0;
-        $openPercentage = $totalPublished > 0 ? round(($totalOpen / $totalPublished) * 100, 2) : 0.0;
-
-        $cityStatsList = array_values($cityStats);
-        foreach ($cityStatsList as &$row) {
-            $row['open_rate'] = $row['total'] > 0 ? round(($row['open'] / $row['total']) * 100, 2) : 0.0;
-            $row['closed_rate'] = $row['total'] > 0 ? round(($row['closed'] / $row['total']) * 100, 2) : 0.0;
-        }
-
-        $contractStatsList = array_values($contractStats);
-        foreach ($contractStatsList as &$row) {
-            $row['percentage'] = $totalPublished > 0 ? round(($row['total'] / $totalPublished) * 100, 2) : 0.0;
-        }
-
-        usort($cityStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
-        usort($contractStatsList, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
-
-        return [
-            'total_published' => $totalPublished,
-            'total_closed' => $totalClosed,
-            'total_open' => $totalOpen,
-            'closed_percentage' => $closedPercentage,
-            'open_percentage' => $openPercentage,
-            'city_stats' => $cityStatsList,
-            'contract_stats' => $contractStatsList,
-        ];
-    }
 }
 
 

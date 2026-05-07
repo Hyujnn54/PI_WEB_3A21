@@ -217,8 +217,8 @@ SQL,
 
         $cityStatsList = array_values($cityStats);
         foreach ($cityStatsList as &$row) {
-            $row['open_rate'] = $row['total'] > 0 ? round(($row['open'] / $row['total']) * 100, 2) : 0.0;
-            $row['closed_rate'] = $row['total'] > 0 ? round(($row['closed'] / $row['total']) * 100, 2) : 0.0;
+            $row['open_rate'] = round(($row['open'] / $row['total']) * 100, 2);
+            $row['closed_rate'] = round(($row['closed'] / $row['total']) * 100, 2);
         }
 
         $contractStatsList = array_values($contractStats);

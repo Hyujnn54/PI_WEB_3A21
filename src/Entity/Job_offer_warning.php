@@ -5,6 +5,7 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 
 use App\Entity\Admin;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Warning_correction;
 
@@ -21,6 +22,11 @@ class Job_offer_warning
     ];
 
     private const WARNING_TEXT_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{10,500}$/u';
+
+    public function __construct()
+    {
+        $this->warning_corrections = new ArrayCollection();
+    }
 
     #[ORM\Id]
     #[ORM\Column(type: "bigint")]
@@ -158,6 +164,11 @@ class Job_offer_warning
 
     #[ORM\OneToMany(mappedBy: "warning_id", targetEntity: Warning_correction::class)]
     private Collection $warning_corrections;
+
+    public function getWarning_corrections(): Collection
+    {
+        return $this->warning_corrections;
+    }
 
     /**
      * @return array{ok: bool, error?: string, warningType?: string, warningText?: string}

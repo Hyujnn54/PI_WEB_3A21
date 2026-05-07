@@ -29,7 +29,7 @@ class JobOfferFilterType extends AbstractType
 
                     $qb = $filterQuery->getQueryBuilder();
                     $alias = $qb->getRootAliases()[0] ?? 'jo';
-                    $expr = $filterQuery->getExpr();
+                    $expr = $qb->expr();
                     $paramName = 'p_search_bundle';
                     $normalized = '%' . mb_strtolower($value) . '%';
 
@@ -74,7 +74,7 @@ class JobOfferFilterType extends AbstractType
 
                     $qb = $filterQuery->getQueryBuilder();
                     $alias = $qb->getRootAliases()[0] ?? 'jo';
-                    $expr = $filterQuery->getExpr();
+                    $expr = $qb->expr();
 
                     return $filterQuery->createCondition(
                         $expr->andX(

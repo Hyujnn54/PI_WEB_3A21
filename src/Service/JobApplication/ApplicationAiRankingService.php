@@ -35,10 +35,6 @@ class ApplicationAiRankingService
         $errors = [];
 
         foreach ($applications as $application) {
-            if (!$application instanceof Job_application) {
-                continue;
-            }
-
             $applicationId = (string) $application->getId();
 
             try {
@@ -256,7 +252,7 @@ class ApplicationAiRankingService
     private function extractRetryAfterSeconds(string $errorMessage): float
     {
         if (preg_match('/try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s/i', $errorMessage, $matches) === 1) {
-            $seconds = (float) ($matches[1] ?? 0.0);
+            $seconds = (float) $matches[1];
             if ($seconds > 0) {
                 return min(max($seconds, 1.0), 12.0);
             }
@@ -734,7 +730,7 @@ class ApplicationAiRankingService
     private function extractPdfText(string $rawPdf): string
     {
         $chunks = [];
-        if (preg_match_all('/\(([^()]*)\)/s', $rawPdf, $matches) > 0 && isset($matches[1])) {
+        if (preg_match_all('/\(([^()]*)\)/s', $rawPdf, $matches) > 0) {
             foreach ($matches[1] as $chunk) {
                 $cleanChunk = preg_replace('/\\\\[nrt]/', ' ', (string) $chunk);
                 $cleanChunk = preg_replace('/\\\\\d{3}/', ' ', (string) $cleanChunk);

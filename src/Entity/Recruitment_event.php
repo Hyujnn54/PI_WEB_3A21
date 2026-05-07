@@ -6,12 +6,18 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
 use App\Entity\Recruiter;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Event_review;
 
 #[ORM\Entity]
 class Recruitment_event
 {
+    public function __construct()
+    {
+        $this->event_registrations = new ArrayCollection();
+        $this->event_reviews = new ArrayCollection();
+    }
 
     #[ORM\Id]
     #[ORM\GeneratedValue(strategy: "AUTO")]
@@ -141,7 +147,7 @@ class Recruitment_event
 
     public function getMeet_link()
     {
-        return isset($this->meet_link) ? $this->meet_link : '';
+        return $this->meet_link;
     }
 
     public function setMeet_link($value)
@@ -191,4 +197,9 @@ class Recruitment_event
 
     #[ORM\OneToMany(mappedBy: "event_id", targetEntity: Event_review::class)]
     private Collection $event_reviews;
+
+    public function getEvent_reviews(): Collection
+    {
+        return $this->event_reviews;
+    }
 }

@@ -31,8 +31,8 @@ public function findBySearchAndRole(?string $search = null, ?string $role = null
         $match = true;
 
         // Search filter (name or email)
-        if ($search && $search !== '') {
-            $searchLower = strtolower($search);
+        if (trim((string) $search) !== '') {
+            $searchLower = strtolower((string) $search);
             $fullName = strtolower($user->getFirstName() . ' ' . $user->getLastName());
             $email = strtolower($user->getEmail() ?? '');
 

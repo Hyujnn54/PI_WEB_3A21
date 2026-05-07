@@ -64,10 +64,10 @@ class LoginController extends AbstractController
             }
 
             $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-            $expiresAt = date_create('+5 minutes');
+            $expiresAt = new \DateTimeImmutable('+5 minutes');
 
             $user->setForgetCode($code);
-            $user->setForgetCodeExpires($expiresAt === false ? null : $expiresAt);
+            $user->setForgetCodeExpires($expiresAt);
             $entityManager->flush();
 
             try {

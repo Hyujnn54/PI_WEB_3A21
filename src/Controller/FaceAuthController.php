@@ -99,7 +99,7 @@ class FaceAuthController extends AbstractController
         }
 
         $shots = $request->files->all('shots');
-        if (!is_array($shots) || count($shots) === 0) {
+        if (count($shots) === 0) {
             return new JsonResponse(['success' => false, 'error' => 'No camera frames were received.'], 400);
         }
 
