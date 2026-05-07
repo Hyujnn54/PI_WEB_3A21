@@ -16,6 +16,15 @@ class Candidate extends Users
     #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Job_application::class)]
     private Collection $job_applications;
 
+    #[ORM\OneToMany(mappedBy: "candidate", targetEntity: Candidate_skill::class)]
+    private Collection $candidate_skills;
+
+    #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Event_registration::class)]
+    private Collection $event_registrations;
+
+    #[ORM\OneToMany(mappedBy: "candidate_id", targetEntity: Event_review::class)]
+    private Collection $event_reviews;
+
     #[ORM\Column(name: 'location', length: 255, nullable: true)]
     #[Assert\Length(max: 255)]
     private ?string $location = null;
@@ -42,6 +51,9 @@ class Candidate extends Users
     {
         parent::__construct();
         $this->job_applications = new ArrayCollection();
+        $this->candidate_skills = new ArrayCollection();
+        $this->event_registrations = new ArrayCollection();
+        $this->event_reviews = new ArrayCollection();
     }
 
     public function getLocation(): ?string { return $this->location; }
@@ -80,6 +92,63 @@ class Candidate extends Users
     public function removeJob_application(Job_application $jobApplication): self
     {
         $this->job_applications->removeElement($jobApplication);
+
+        return $this;
+    }
+
+    public function getCandidate_skills(): Collection { return $this->candidate_skills; }
+
+    public function addCandidate_skill(Candidate_skill $candidateSkill): self
+    {
+        if (!$this->candidate_skills->contains($candidateSkill)) {
+            $this->candidate_skills[] = $candidateSkill;
+            $candidateSkill->setCandidate($this);
+        }
+
+        return $this;
+    }
+
+    public function removeCandidate_skill(Candidate_skill $candidateSkill): self
+    {
+        $this->candidate_skills->removeElement($candidateSkill);
+
+        return $this;
+    }
+
+    public function getEvent_registrations(): Collection { return $this->event_registrations; }
+
+    public function addEvent_registration(Event_registration $eventRegistration): self
+    {
+        if (!$this->event_registrations->contains($eventRegistration)) {
+            $this->event_registrations[] = $eventRegistration;
+            $eventRegistration->setCandidate_id($this);
+        }
+
+        return $this;
+    }
+
+    public function removeEvent_registration(Event_registration $eventRegistration): self
+    {
+        $this->event_registrations->removeElement($eventRegistration);
+
+        return $this;
+    }
+
+    public function getEvent_reviews(): Collection { return $this->event_reviews; }
+
+    public function addEvent_review(Event_review $eventReview): self
+    {
+        if (!$this->event_reviews->contains($eventReview)) {
+            $this->event_reviews[] = $eventReview;
+            $eventReview->setCandidate_id($this);
+        }
+
+        return $this;
+    }
+
+    public function removeEvent_review(Event_review $eventReview): self
+    {
+        $this->event_reviews->removeElement($eventReview);
 
         return $this;
     }

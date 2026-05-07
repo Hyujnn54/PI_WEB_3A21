@@ -303,28 +303,14 @@ class BackOfficeController extends AbstractController
     #[Route('/admin/stats', name: 'app_admin_stats')]
     public function userStats(UsersRepository $userRepo): Response
     {
-        $allUsers = $userRepo->findAll();
-        $admins = 0;
-        $candidates = 0;
-        $recruiters = 0;
-
-        foreach ($allUsers as $user) {
-            $roles = $user->getRoles();
-
-            if (in_array('ROLE_ADMIN', $roles, true)) {
-                $admins += 1;
-            }
-            if (in_array('ROLE_CANDIDATE', $roles, true)) {
-                $candidates += 1;
-            }
-            if (in_array('ROLE_RECRUITER', $roles, true)) {
-                $recruiters += 1;
-            }
-        }
+        $totalUsers = $userRepo->count([]);
+        $admins = $userRepo->countByRole('ROLE_ADMIN');
+        $candidates = $userRepo->countByRole('ROLE_CANDIDATE');
+        $recruiters = $userRepo->countByRole('ROLE_RECRUITER');
 
         return $this->render('admin/stats.html.twig', [
             'authUser' => ['role' => 'admin'],
-            'totalUsers' => count($allUsers),
+            'totalUsers' => $totalUsers,
             'admins' => $admins,
             'candidates' => $candidates,
             'recruiters' => $recruiters,

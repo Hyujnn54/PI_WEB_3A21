@@ -9,6 +9,7 @@ use Scheb\TwoFactorBundle\Model\Google\TwoFactorInterface as GoogleTwoFactorInte
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Serializer\Attribute\Ignore;
 use Symfony\Component\Validator\Constraints as Assert;
 
 
@@ -35,6 +36,7 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface, Google
     protected array $roles = [];
 
     #[ORM\Column(length: 255)]
+    #[Ignore]
     protected ?string $password = null;
 
     #[ORM\Column(name: "first_name", length: 100, nullable: true)]
@@ -64,6 +66,7 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface, Google
         pattern: '/^(?=.*[A-Za-z])(?=.*\d).+$/',
         message: 'Password must contain at least one letter and one number.'
     )]
+    #[Ignore]
     private ?string $plainPassword = null;
 
     #[ORM\Column(name: "is_active")]
@@ -85,6 +88,7 @@ class Users implements UserInterface, PasswordAuthenticatedUserInterface, Google
     protected bool $faceEnabled = false;
 
     #[ORM\Column(name: "google_authenticator_secret", length: 255, nullable: true)]
+    #[Ignore]
     protected ?string $googleAuthenticatorSecret = null;
 
     #[ORM\Column(name: "google_authenticator_enabled", type: Types::BOOLEAN)]

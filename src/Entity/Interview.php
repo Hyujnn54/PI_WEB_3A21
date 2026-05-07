@@ -5,6 +5,7 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 
 use App\Entity\Recruiter;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Interview_feedback;
 
@@ -53,6 +54,12 @@ class Interview
 
     #[ORM\Column(type: "boolean")]
     private ?bool $reminder_sent = false;
+
+    public function __construct()
+    {
+        $this->interview_feedbacks = new ArrayCollection();
+        $this->created_at = new \DateTime();
+    }
 
     public function getId()
     {

@@ -5,6 +5,7 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 
 use App\Entity\Job_offer;
+use App\Entity\Recruiter;
 
 #[ORM\Entity]
 class Warning_correction
@@ -22,8 +23,9 @@ class Warning_correction
     #[ORM\JoinColumn(name: 'job_offer_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
     private Job_offer $job_offer_id;
 
-    #[ORM\Column(type: "bigint")]
-    private string $recruiter_id;
+        #[ORM\ManyToOne(targetEntity: Recruiter::class)]
+    #[ORM\JoinColumn(name: 'recruiter_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    private Recruiter $recruiter_id;
 
     #[ORM\Column(type: "text")]
     private string $correction_note;
