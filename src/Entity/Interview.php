@@ -167,7 +167,13 @@ class Interview
 
     public function setStatus(string $value): void
     {
-        $this->status = $value;
+        $normalized = strtoupper(trim($value));
+        $this->status = match ($normalized) {
+            'SCHEDULED' => 'SCHEDULED',
+            'CANCELLED', 'CANCELED' => 'CANCELLED',
+            'DONE', 'COMPLETED', 'FINISHED' => 'DONE',
+            default => $normalized,
+        };
     }
 
     public function getNotes(): string

@@ -1256,7 +1256,7 @@ class FrontPortalController extends AbstractController
             $registration->setId($this->nextNumericId(Event_registration::class));
             $registration->setEvent_id($event);
             $registration->setCandidate_id($candidate);
-            $registration->setRegistered_at(new \DateTimeImmutable());
+            $registration->setRegistered_at(new \DateTime());
             $registration->setAttendance_status('registered');
 
             $entityManager->persist($registration);
@@ -1982,8 +1982,8 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_job_applications', $request->query->all());
         }
 
-        $allowedStatuses = ['accepted', 'declined', 'under_review', 'interview_scheduled'];
-        if (!in_array($status, $allowedStatuses, true)) {
+        $normalizedStatus = $this->normalizeApplicationStatus($status);
+        if ($normalizedStatus === null) {
             $this->addFlash('warning', 'Invalid status selected.');
             return $this->redirectToRoute('front_job_applications', $request->query->all());
         }
@@ -1994,7 +1994,7 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('front_job_applications', $request->query->all());
         }
 
-        $application->setCurrent_status($status);
+        $application->setCurrent_status($normalizedStatus);
         $this->doctrine->getManager()->flush();
         $this->addFlash('success', 'Application status updated.');
 
@@ -2066,7 +2066,7 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/interviews/create/{applicationId}', name: 'front_interview_create', methods: ['GET', 'POST'])]
-    public function createInterview(string $applicationId, Request $request): Response
+    public function createInterview(string $applicationId, Request $request, LoggerInterface $logger): Response
     {
         $role = $this->resolveSessionRole($request);
         $application = $this->doctrine->getRepository(Job_application::class)->find($applicationId);
@@ -2123,8 +2123,8 @@ class FrontPortalController extends AbstractController
                 $interview->setMeeting_link($validation['meetingLink']);
                 $interview->setLocation($validation['location']);
                 $interview->setNotes($validation['notes']);
-                $interview->setStatus('scheduled');
-                $interview->setCreated_at(new \DateTimeImmutable());
+                $interview->setStatus('SCHEDULED');
+                $interview->setCreated_at(new \DateTime());
                 $interview->setReminder_sent(false);
 
                 try {
@@ -2132,16 +2132,16 @@ class FrontPortalController extends AbstractController
                     $entityManager->persist($interview);
 
                     $oldStatus = strtoupper(trim((string) $application->getCurrent_status()));
-                    $application->setCurrent_status('IN_REVIEW');
+                    $application->setCurrent_status('INTERVIEW');
 
                     $history = new Application_status_history();
                     $history->setApplication_id($application);
-                    $history->setStatus('IN_REVIEW');
+                    $history->setStatus('INTERVIEW');
                     $history->setChanged_at(new \DateTime());
                     $history->setChanged_by($recruiter);
-                    $history->setNote($oldStatus === 'IN_REVIEW'
-                        ? 'Interview scheduled while the application remains in review.'
-                        : 'Interview scheduled; application moved to In Review.'
+                    $history->setNote($oldStatus === 'INTERVIEW'
+                        ? 'Interview scheduled while the application remains in interview stage.'
+                        : 'Interview scheduled; application moved to Interview stage.'
                     );
                     $entityManager->persist($history);
 
@@ -2149,8 +2149,14 @@ class FrontPortalController extends AbstractController
 
                     $this->addFlash('success', 'Interview created successfully.');
                     return $this->redirectToRoute('front_interviews', $request->query->all());
-                } catch (Throwable) {
-                    $this->addFlash('warning', 'Could not create interview. Please check if one already exists for this application.');
+                } catch (Throwable $exception) {
+                    $logger->error('Interview creation failed.', [
+                        'application_id' => $applicationId,
+                        'recruiter_id' => (string) $recruiter->getId(),
+                        'error_message' => $exception->getMessage(),
+                    ]);
+
+                    $this->addFlash('warning', 'Could not create interview. Please check the information and try again.');
                     return $this->redirectToRoute('front_job_applications', $request->query->all() + ['openCreateFor' => $applicationId]);
                 }
             }
@@ -2263,7 +2269,7 @@ class FrontPortalController extends AbstractController
         $entityManager->remove($interview);
         $entityManager->flush();
 
-        if (!$this->hasActiveInterviewForApplication($application) && strtoupper((string) $application->getCurrent_status()) === 'INTERVIEW_SCHEDULED') {
+        if (!$this->hasActiveInterviewForApplication($application) && strtoupper((string) $application->getCurrent_status()) === 'INTERVIEW') {
             $application->setCurrent_status('IN_REVIEW');
             $entityManager->flush();
         }
@@ -2340,11 +2346,11 @@ class FrontPortalController extends AbstractController
         $feedback->setOverall_score($score);
         $feedback->setDecision($decision);
         $feedback->setComment((string) $commentValidation['value']);
-        $feedback->setCreated_at(new \DateTimeImmutable());
+        $feedback->setCreated_at(new \DateTime());
 
-        $interview->setStatus('completed');
+        $interview->setStatus('DONE');
         $application = $interview->getApplication_id();
-        $application->setCurrent_status($decision === 'accepted' ? 'accepted' : 'declined');
+        $application->setCurrent_status($decision === 'accepted' ? 'HIRED' : 'REJECTED');
 
         $entityManager->flush();
         $this->addFlash('success', 'Interview review saved.');
@@ -2891,6 +2897,25 @@ SQL;
             'ok' => true,
             'comments' => $comments,
         ]);
+    }
+
+    private function normalizeApplicationStatus(string $status): ?string
+    {
+        $normalized = strtoupper(trim($status));
+        $aliases = [
+            'SUBMITTED' => 'SUBMITTED',
+            'UNDER_REVIEW' => 'IN_REVIEW',
+            'IN_REVIEW' => 'IN_REVIEW',
+            'SHORTLISTED' => 'SHORTLISTED',
+            'DECLINED' => 'REJECTED',
+            'REJECTED' => 'REJECTED',
+            'INTERVIEW_SCHEDULED' => 'INTERVIEW',
+            'INTERVIEW' => 'INTERVIEW',
+            'ACCEPTED' => 'HIRED',
+            'HIRED' => 'HIRED',
+        ];
+
+        return $aliases[$normalized] ?? null;
     }
 
     private function canSubmitFeedback(Interview $interview): bool

@@ -69,6 +69,10 @@ class Event_registration
 
     public function setRegistered_at(\DateTimeInterface $value): void
     {
+        if ($value instanceof \DateTimeImmutable) {
+            $value = \DateTime::createFromImmutable($value);
+        }
+
         $this->registered_at = $value;
     }
 

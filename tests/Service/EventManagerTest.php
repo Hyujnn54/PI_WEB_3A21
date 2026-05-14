@@ -147,6 +147,16 @@ class EventManagerTest extends TestCase
         $manager->validate($event);
     }
 
+    public function testImmutableEventDatesAreStoredAsMutableDateTimes(): void
+    {
+        $event = $this->createValidEvent();
+        $event->setEvent_date(new \DateTimeImmutable('+12 days'));
+        $event->setCreated_at(new \DateTimeImmutable('-2 days'));
+
+        $this->assertInstanceOf(\DateTime::class, $event->getEvent_date());
+        $this->assertInstanceOf(\DateTime::class, $event->getCreated_at());
+    }
+
     private function createValidEvent(): Recruitment_event
     {
         $event = new Recruitment_event();
@@ -170,10 +180,10 @@ class EventManagerTest extends TestCase
         $event->setDescription('Meet recruiters and discover Symfony job opportunities.');
         $event->setEvent_type('Hiring Day');
         $event->setLocation('Tunis');
-        $event->setEvent_date(new \DateTimeImmutable('+10 days'));
+        $event->setEvent_date(new \DateTime('+10 days'));
         $event->setCapacity(50);
         $event->setMeet_link('');
-        $event->setCreated_at(new \DateTimeImmutable('-1 day'));
+        $event->setCreated_at(new \DateTime('-1 day'));
     }
 
     private function createRecruiter(): Recruiter

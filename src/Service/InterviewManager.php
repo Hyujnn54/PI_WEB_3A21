@@ -9,7 +9,7 @@ use App\Entity\Recruiter;
 class InterviewManager
 {
     private const MAX_FUTURE_DAYS = 90;
-    private const INTERVIEW_STATUSES = ['SCHEDULED', 'COMPLETED', 'CANCELLED'];
+    private const INTERVIEW_STATUSES = ['SCHEDULED', 'DONE', 'CANCELLED'];
     private const LOCATION_REGEX = '/^(?=.{3,120}$)[^\p{Cc}\p{Cf}<>]+$/u';
     private const NOTES_REGEX = '/^[\p{L}\p{N}\s,\.\/#()\-!?;:\'"\n\r]{0,1000}$/u';
 

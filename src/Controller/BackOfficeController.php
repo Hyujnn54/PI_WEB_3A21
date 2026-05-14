@@ -1185,7 +1185,7 @@ SQL;
             }
 
             if ($errors === []) {
-                $eventDateObject = new \DateTimeImmutable($eventDate);
+                $eventDateObject = new \DateTime($eventDate);
                 $event = new Recruitment_event();
                 $event->setRecruiter_id($currentRecruiter);
                 $event->setTitle($title);
@@ -1195,7 +1195,7 @@ SQL;
                 $event->setEvent_date($eventDateObject);
                 $event->setCapacity((int) $capacity);
                 $event->setMeet_link($meetLink);
-                $event->setCreated_at(new \DateTimeImmutable());
+                $event->setCreated_at(new \DateTime());
 
                 $entityManager->persist($event);
                 $entityManager->flush();
@@ -1468,7 +1468,7 @@ SQL;
         $event->setDescription($description);
         $event->setEvent_type($eventType);
         $event->setLocation($location);
-        $event->setEvent_date(new \DateTimeImmutable($eventDate));
+        $event->setEvent_date(new \DateTime($eventDate));
         $event->setCapacity((int) $capacity);
         $event->setMeet_link($meetLink);
 

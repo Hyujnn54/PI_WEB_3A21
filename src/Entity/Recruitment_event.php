@@ -132,6 +132,10 @@ class Recruitment_event
 
     public function setEvent_date(?\DateTimeInterface $value): void
     {
+        if ($value instanceof \DateTimeImmutable) {
+            $value = \DateTime::createFromImmutable($value);
+        }
+
         $this->event_date = $value;
     }
 
@@ -162,6 +166,10 @@ class Recruitment_event
 
     public function setCreated_at(\DateTimeInterface $value): void
     {
+        if ($value instanceof \DateTimeImmutable) {
+            $value = \DateTime::createFromImmutable($value);
+        }
+
         $this->created_at = $value;
     }
 

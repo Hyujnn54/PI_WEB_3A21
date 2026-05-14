@@ -327,7 +327,14 @@ class CandidateApplicationController extends AbstractController
             return $this->redirectToRoute('front_job_applications', ['role' => 'candidate']);
         }
 
-        $em->remove($application);
+        $application->setIs_archived(true);
+        $this->logStatusHistory(
+            $em,
+            $application,
+            $candidate,
+            $this->resolveCandidateDisplayName($candidate) . ' withdrew this application.'
+        );
+
         $em->flush();
 
         $this->addFlash('success', 'Application withdrawn successfully.');

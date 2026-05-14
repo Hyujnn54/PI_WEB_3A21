@@ -18,6 +18,17 @@ class InterviewManagerTest extends TestCase
         $this->assertTrue($manager->validate($interview));
     }
 
+    public function testInterviewStatusAliasesAreStoredAsDatabaseValues(): void
+    {
+        $interview = $this->createValidOnlineInterview();
+        $interview->setStatus('completed');
+
+        $manager = new InterviewManager();
+
+        $this->assertSame('DONE', $interview->getStatus());
+        $this->assertTrue($manager->validate($interview));
+    }
+
     public function testValidOnsiteInterview(): void
     {
         $interview = $this->createValidOnsiteInterview();
@@ -198,7 +209,7 @@ class InterviewManagerTest extends TestCase
         $interview->setDuration_minutes(60);
         $interview->setStatus('SCHEDULED');
         $interview->setNotes('Technical interview with the recruiter.');
-        $interview->setCreated_at(new \DateTimeImmutable('-1 day'));
+        $interview->setCreated_at(new \DateTime('-1 day'));
         $interview->setReminder_sent(false);
     }
 

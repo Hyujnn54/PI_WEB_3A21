@@ -9,6 +9,13 @@ class GroqCoverLetterGenerator
 {
     private const ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
     private const MODEL = 'llama-3.3-70b-versatile';
+    private const JSON_OPTIONS = \JSON_HEX_TAG
+        | \JSON_HEX_APOS
+        | \JSON_HEX_AMP
+        | \JSON_HEX_QUOT
+        | \JSON_PRESERVE_ZERO_FRACTION
+        | \JSON_INVALID_UTF8_SUBSTITUTE
+        | \JSON_THROW_ON_ERROR;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -27,26 +34,29 @@ class GroqCoverLetterGenerator
             throw new \RuntimeException('Cover letter generator is not configured. Please set GROQ_API_KEY in your local environment.');
         }
 
+        $context = $this->normalizeContext($context);
+        $payload = [
+            'model' => self::MODEL,
+            'temperature' => 0.6,
+            'max_tokens' => 700,
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => 'You are an expert career assistant. Generate one professional, concise cover letter in plain text only. No markdown, no bullet list, no extra commentary. The letter should be convincing and tailored to the job and candidate profile.',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $this->buildPrompt($context),
+                ],
+            ],
+        ];
+
         $response = $this->httpClient->request('POST', self::ENDPOINT, [
             'headers' => [
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
             ],
-            'json' => [
-                'model' => self::MODEL,
-                'temperature' => 0.6,
-                'max_tokens' => 700,
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'You are an expert career assistant. Generate one professional, concise cover letter in plain text only. No markdown, no bullet list, no extra commentary. The letter should be convincing and tailored to the job and candidate profile.',
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => $this->buildPrompt($context),
-                    ],
-                ],
-            ],
+            'body' => $this->encodePayload($payload),
             'timeout' => 45,
         ]);
 
@@ -67,6 +77,62 @@ class GroqCoverLetterGenerator
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param array{candidate_name: string, candidate_email: string, candidate_phone: string, candidate_location: string, education_level: string, experience_years: string, skills: string[], offer_title: string, offer_location: string, offer_contract: string, cv_text: string} $context
+     *
+     * @return array{candidate_name: string, candidate_email: string, candidate_phone: string, candidate_location: string, education_level: string, experience_years: string, skills: string[], offer_title: string, offer_location: string, offer_contract: string, cv_text: string}
+     */
+    private function normalizeContext(array $context): array
+    {
+        return [
+            'candidate_name' => $this->normalizeInputText($context['candidate_name']),
+            'candidate_email' => $this->normalizeInputText($context['candidate_email']),
+            'candidate_phone' => $this->normalizeInputText($context['candidate_phone']),
+            'candidate_location' => $this->normalizeInputText($context['candidate_location']),
+            'education_level' => $this->normalizeInputText($context['education_level']),
+            'experience_years' => $this->normalizeInputText($context['experience_years']),
+            'skills' => array_values(array_filter(
+                array_map(fn (string $skill): string => $this->normalizeInputText($skill), $context['skills']),
+                static fn (string $skill): bool => $skill !== ''
+            )),
+            'offer_title' => $this->normalizeInputText($context['offer_title']),
+            'offer_location' => $this->normalizeInputText($context['offer_location']),
+            'offer_contract' => $this->normalizeInputText($context['offer_contract']),
+            'cv_text' => $this->normalizeInputText($context['cv_text']),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function encodePayload(array $payload): string
+    {
+        try {
+            return json_encode($payload, self::JSON_OPTIONS, 512);
+        } catch (\JsonException $exception) {
+            throw new \RuntimeException('Could not prepare the cover letter generation request.', 0, $exception);
+        }
+    }
+
+    private function normalizeInputText(string $text): string
+    {
+        $clean = str_replace(["\r\n", "\r", "\0"], ["\n", "\n", ' '], $text);
+
+        if (!mb_check_encoding($clean, 'UTF-8')) {
+            $encoding = mb_detect_encoding($clean, ['Windows-1252', 'ISO-8859-1'], true) ?: 'Windows-1252';
+            $converted = @mb_convert_encoding($clean, 'UTF-8', $encoding);
+            if (is_string($converted) && mb_check_encoding($converted, 'UTF-8')) {
+                $clean = $converted;
+            }
+        }
+
+        $clean = preg_replace('/[^\PC\n\t]+/u', ' ', $clean) ?? $clean;
+        $clean = preg_replace('/[ \t]+/u', ' ', $clean) ?? $clean;
+        $clean = preg_replace('/\n{3,}/u', "\n\n", $clean) ?? $clean;
+
+        return trim($clean);
     }
 
     /**
