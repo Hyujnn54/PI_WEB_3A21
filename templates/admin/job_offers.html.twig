@@ -131,7 +131,7 @@
                 {% for offer in offers %}
                     {% set warningStatus = offer.warning_status|default(null) %}
                     {% set warningStatusKey = warningStatus ? warningStatus|upper : '' %}
-                    {% set isActive = warningStatusKey == 'SENT' %}
+                    {% set isActive = warningStatusKey in ['SENT', 'SEEN'] %}
                     {% set isPendingReview = warningStatusKey == 'RESOLVED' %}
                     {% set rowClass = isActive ? 'table-danger' : (isPendingReview ? 'table-warning' : '') %}
                     <tr class="{{ rowClass }} admin-offer-row"
@@ -265,6 +265,30 @@
                             <div class="small text-muted mb-1">Description</div>
                             <div class="border rounded p-2 bg-light-subtle" id="reviewOfferDescription">-</div>
                         </div>
+                        <div class="mb-3 d-none" id="reviewCorrectionBox">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="fw-semibold">Submitted Changes</div>
+                                <div class="small text-muted" id="reviewCorrectionSubmittedAt"></div>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="small text-muted mb-1">Previous Title</div>
+                                    <div class="border rounded p-2 bg-light-subtle" id="reviewOldTitle">-</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="small text-muted mb-1">New Title</div>
+                                    <div class="border rounded p-2 bg-success-lt" id="reviewNewTitle">-</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="small text-muted mb-1">Previous Description</div>
+                                    <div class="border rounded p-2 bg-light-subtle" id="reviewOldDescription">-</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="small text-muted mb-1">New Description</div>
+                                    <div class="border rounded p-2 bg-success-lt" id="reviewNewDescription">-</div>
+                                </div>
+                            </div>
+                        </div>
                         <div>
                             <div class="small text-muted mb-1">Skills</div>
                             <div id="reviewOfferSkills" class="d-flex flex-wrap gap-2"></div>
@@ -372,6 +396,7 @@
             let reviewRejectUrl = '';
             let reviewWarningUrl = '';
             let reviewAnalyzeUrl = '';
+            let currentReviewMode = 'details';
             let currentReviewOfferId = '';
             let currentWarningOfferId = '';
 
@@ -406,6 +431,7 @@
             const setReviewDetails = function (payload) {
                 const offer = payload.offer || {};
                 const skills = payload.skills || [];
+                const correction = payload.correction || null;
 
                 document.getElementById('reviewOfferTitle').textContent = offer.title || '-';
                 document.getElementById('reviewOfferStatus').textContent = offer.status || '-';
@@ -414,6 +440,20 @@
                 document.getElementById('reviewOfferDeadline').textContent = offer.deadline || '-';
                 document.getElementById('reviewOfferRecruiter').textContent = offer.recruiter_id || '-';
                 document.getElementById('reviewOfferDescription').textContent = offer.description || 'No description provided.';
+
+                const correctionBox = document.getElementById('reviewCorrectionBox');
+                if (correctionBox) {
+                    if (correction) {
+                        document.getElementById('reviewCorrectionSubmittedAt').textContent = correction.submitted_at ? ('Submitted ' + correction.submitted_at) : '';
+                        document.getElementById('reviewOldTitle').textContent = correction.old_title || '-';
+                        document.getElementById('reviewNewTitle').textContent = correction.new_title || '-';
+                        document.getElementById('reviewOldDescription').textContent = correction.old_description || '-';
+                        document.getElementById('reviewNewDescription').textContent = correction.new_description || '-';
+                        correctionBox.classList.remove('d-none');
+                    } else {
+                        correctionBox.classList.add('d-none');
+                    }
+                }
 
                 const skillsNode = document.getElementById('reviewOfferSkills');
                 skillsNode.innerHTML = '';
@@ -435,6 +475,7 @@
 
             const openReviewModal = function (offerId, detailsUrl, analyzeUrl, acceptUrl, warningUrl, rejectUrl, mode) {
                 currentReviewOfferId = (offerId || '').toString();
+                currentReviewMode = mode || 'details';
                 reviewRejectUrl = rejectUrl || '';
                 reviewWarningUrl = warningUrl || '';
                 reviewAnalyzeUrl = analyzeUrl || '';
@@ -445,11 +486,13 @@
                     reviewFooterHint.textContent = 'Approve the changes or send another warning from here.';
                     reviewActions.classList.remove('d-none');
                     reviewAcceptForm.classList.remove('d-none');
+                    reviewSendWarningBtn.innerHTML = '<i class="ti ti-x me-1"></i>Reject Changes';
                 } else {
                     reviewModalTitle.textContent = 'Job Offer Details';
                     reviewFooterHint.textContent = 'Analyze this offer or send a warning to the recruiter.';
                     reviewActions.classList.remove('d-none');
                     reviewAcceptForm.classList.add('d-none');
+                    reviewSendWarningBtn.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>Signaler';
                 }
 
                 reviewLoading.textContent = 'Loading offer details...';
@@ -517,13 +560,22 @@
             if (reviewSendWarningBtn) {
                 reviewSendWarningBtn.addEventListener('click', function (event) {
                     event.preventDefault();
-                    if (!reviewWarningUrl) return;
+                    const actionUrl = currentReviewMode === 'pending' ? reviewRejectUrl : reviewWarningUrl;
+                    if (!actionUrl) return;
                     currentWarningOfferId = currentReviewOfferId;
-                    warningModalForm.setAttribute('action', reviewWarningUrl);
-                    warningModalTitle.textContent = 'Signaler une offre';
-                    warningSubmitBtn.textContent = 'Signaler';
-                    warningSubmitBtn.classList.remove('btn-warning');
-                    warningSubmitBtn.classList.add('btn-danger');
+                    warningModalForm.setAttribute('action', actionUrl);
+
+                    if (currentReviewMode === 'pending') {
+                        warningModalTitle.textContent = 'Rejeter les changements et signaler';
+                        warningSubmitBtn.textContent = 'Rejeter les changements';
+                        warningSubmitBtn.classList.remove('btn-danger');
+                        warningSubmitBtn.classList.add('btn-warning');
+                    } else {
+                        warningModalTitle.textContent = 'Signaler une offre';
+                        warningSubmitBtn.textContent = 'Signaler';
+                        warningSubmitBtn.classList.remove('btn-warning');
+                        warningSubmitBtn.classList.add('btn-danger');
+                    }
                     if (warningType) warningType.value = '';
                     if (warningText) warningText.value = '';
                     setWarningAiStatus('', false);

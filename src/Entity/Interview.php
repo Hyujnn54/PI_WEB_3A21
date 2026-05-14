@@ -4,12 +4,13 @@ namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 
+use App\Repository\InterviewRepository;
 use App\Entity\Recruiter;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Interview_feedback;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: InterviewRepository::class)]
 class Interview
 {
     private const LOCATION_REGEX = '/^(?=.{3,120}$)[^\p{Cc}\p{Cf}<>]+$/u';
@@ -37,17 +38,17 @@ class Interview
     #[ORM\Column(type: "string")]
     private string $mode = '';
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $meeting_link = '';
+    #[ORM\Column(type: "string", length: 255, nullable: true)]
+    private ?string $meeting_link = null;
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $location = '';
+    #[ORM\Column(type: "string", length: 255, nullable: true)]
+    private ?string $location = null;
 
     #[ORM\Column(type: "string")]
     private string $status = 'SCHEDULED';
 
-    #[ORM\Column(type: "text")]
-    private string $notes = '';
+    #[ORM\Column(type: "text", nullable: true)]
+    private ?string $notes = null;
 
     #[ORM\Column(type: "datetime")]
     private ?\DateTimeInterface $created_at = null;
@@ -124,8 +125,8 @@ class Interview
         }
 
         // Fallback for legacy rows where mode is empty/invalid but location/link imply the mode.
-        $location = trim($this->location);
-        $meetingLink = trim($this->meeting_link);
+        $location = trim($this->getLocation());
+        $meetingLink = trim($this->getMeeting_link());
         if ($location !== '' && $meetingLink === '') {
             return 'onsite';
         }
@@ -142,20 +143,20 @@ class Interview
 
     public function getMeeting_link(): string
     {
-        return $this->meeting_link;
+        return $this->meeting_link ?? '';
     }
 
-    public function setMeeting_link(string $value): void
+    public function setMeeting_link(?string $value): void
     {
         $this->meeting_link = $value;
     }
 
     public function getLocation(): string
     {
-        return $this->location;
+        return $this->location ?? '';
     }
 
-    public function setLocation(string $value): void
+    public function setLocation(?string $value): void
     {
         $this->location = $value;
     }
@@ -178,10 +179,10 @@ class Interview
 
     public function getNotes(): string
     {
-        return $this->notes;
+        return $this->notes ?? '';
     }
 
-    public function setNotes(string $value): void
+    public function setNotes(?string $value): void
     {
         $this->notes = $value;
     }

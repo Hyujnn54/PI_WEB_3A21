@@ -279,10 +279,17 @@ class FrontPortalController extends AbstractController
                     'SELECT w.job_offer_id, w.reason, w.created_at, jo.title
                      FROM job_offer_warning w
                      INNER JOIN job_offer jo ON jo.id = w.job_offer_id
-                     WHERE w.recruiter_id = :recruiter_id AND w.status = :status
+                     WHERE w.recruiter_id = :recruiter_id AND w.status IN (\'SENT\', \'SEEN\')
                      ORDER BY w.created_at DESC',
-                    ['recruiter_id' => $currentRecruiterId, 'status' => 'SENT']
+                    ['recruiter_id' => $currentRecruiterId]
                 );
+                $connection->update('job_offer_warning', [
+                    'status' => 'SEEN',
+                    'seen_at' => $now->format('Y-m-d H:i:s'),
+                ], [
+                    'recruiter_id' => $currentRecruiterId,
+                    'status' => 'SENT',
+                ]);
             } catch (\Throwable $exception) {
                 $warnings = [];
             }
@@ -752,21 +759,55 @@ class FrontPortalController extends AbstractController
                             ]);
                         }
 
-                        // Keep offer edit successful even if warning schema differs in current DB.
+                        // Keep offer edit successful even if warning tables differ in current DB.
                         $hasActiveWarning = 0;
                         try {
-                            $hasActiveWarning = (int) $connection->fetchOne(
-                                'SELECT COUNT(*) FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status',
-                                ['job_offer_id' => $id, 'status' => 'SENT']
+                            $activeWarning = $connection->fetchAssociative(
+                                'SELECT id, status FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND recruiter_id = :recruiter_id AND status IN (\'SENT\', \'SEEN\') ORDER BY created_at DESC LIMIT 1',
+                                ['job_offer_id' => $id, 'recruiter_id' => $currentRecruiterId]
                             );
 
-                            if ($hasActiveWarning > 0) {
-                                $connection->update('job_offer_warning', [
-                                    'status' => 'RESOLVED',
-                                ], [
-                                    'job_offer_id' => $id,
-                                    'status' => 'SENT',
-                                ]);
+                            if ($activeWarning) {
+                                $hasActiveWarning = 1;
+                                $submittedAt = new \DateTimeImmutable();
+
+                                try {
+                                    $connection->delete('warning_correction', [
+                                        'warning_id' => (string) $activeWarning['id'],
+                                        'status' => 'PENDING',
+                                    ]);
+                                    $connection->insert('warning_correction', [
+                                        'id' => (string) ((int) round(microtime(true) * 1000) . random_int(100, 999)),
+                                        'warning_id' => (string) $activeWarning['id'],
+                                        'job_offer_id' => $id,
+                                        'recruiter_id' => $currentRecruiterId,
+                                        'correction_note' => 'Recruiter submitted an updated offer after admin warning.',
+                                        'old_title' => (string) ($offer['title'] ?? ''),
+                                        'new_title' => $formData['title'],
+                                        'old_description' => (string) ($offer['description'] ?? ''),
+                                        'new_description' => $formData['description'],
+                                        'status' => 'PENDING',
+                                        'submitted_at' => $submittedAt->format('Y-m-d H:i:s'),
+                                        'reviewed_at' => $submittedAt->format('Y-m-d H:i:s'),
+                                        'admin_note' => '',
+                                    ]);
+                                } catch (\Throwable) {
+                                    // The warning status is enough to notify admin review if correction history is unavailable.
+                                }
+
+                                $connection->executeStatement(
+                                    'UPDATE job_offer_warning
+                                     SET status = :resolved_status, resolved_at = :resolved_at
+                                     WHERE job_offer_id = :job_offer_id
+                                       AND recruiter_id = :recruiter_id
+                                       AND status IN (\'SENT\', \'SEEN\')',
+                                    [
+                                        'resolved_status' => 'RESOLVED',
+                                        'resolved_at' => $submittedAt->format('Y-m-d H:i:s'),
+                                        'job_offer_id' => $id,
+                                        'recruiter_id' => $currentRecruiterId,
+                                    ]
+                                );
                             }
                         } catch (\Throwable) {
                             $hasActiveWarning = 0;
@@ -798,7 +839,7 @@ class FrontPortalController extends AbstractController
     }
 
     #[Route('/front/job-offers/{id}/delete', name: 'front_job_offer_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function deleteJobOffer(string $id, Request $request, Connection $connection): Response
+    public function deleteJobOffer(string $id, Request $request, Connection $connection, LoggerInterface $logger): Response
     {
         $role = $this->resolveSessionRole($request);
         $currentRecruiterId = $this->resolveCurrentRecruiterId($request);
@@ -808,17 +849,70 @@ class FrontPortalController extends AbstractController
         }
 
         try {
+            $offerExists = $connection->fetchOne(
+                'SELECT id FROM job_offer WHERE id = :id AND recruiter_id = :recruiter_id LIMIT 1',
+                ['id' => $id, 'recruiter_id' => $currentRecruiterId]
+            );
+
+            if ($offerExists === false || $offerExists === null || (string) $offerExists === '') {
+                $this->addFlash('error', 'You can delete only job offers created by you.');
+
+                return $this->redirectToRoute('front_job_offers', ['role' => 'recruiter']);
+            }
+
+            $connection->beginTransaction();
+
+            $connection->executeStatement(
+                'DELETE FROM interview_feedback
+                 WHERE interview_id IN (
+                     SELECT interview.id
+                     FROM interview
+                     INNER JOIN job_application ON job_application.id = interview.application_id
+                     WHERE job_application.offer_id = :offer_id
+                 )',
+                ['offer_id' => $id]
+            );
+            $connection->executeStatement(
+                'DELETE FROM interview
+                 WHERE application_id IN (
+                     SELECT id FROM job_application WHERE offer_id = :offer_id
+                 )',
+                ['offer_id' => $id]
+            );
+            $connection->executeStatement(
+                'DELETE FROM application_status_history
+                 WHERE application_id IN (
+                     SELECT id FROM job_application WHERE offer_id = :offer_id
+                 )',
+                ['offer_id' => $id]
+            );
+            $connection->delete('job_application', ['offer_id' => $id]);
+            $connection->delete('warning_correction', ['job_offer_id' => $id]);
+            $connection->delete('job_offer_warning', ['job_offer_id' => $id]);
+            $connection->delete('offer_skill', ['offer_id' => $id]);
             $deletedRows = $connection->delete('job_offer', [
                 'id' => $id,
                 'recruiter_id' => $currentRecruiterId,
             ]);
 
             if ($deletedRows > 0) {
+                $connection->commit();
                 $this->addFlash('success', 'Job offer deleted successfully.');
             } else {
+                $connection->rollBack();
                 $this->addFlash('error', 'You can delete only job offers created by you.');
             }
         } catch (\Throwable $exception) {
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+
+            $logger->error('Job offer deletion failed.', [
+                'offer_id' => $id,
+                'recruiter_id' => $currentRecruiterId,
+                'error_message' => $exception->getMessage(),
+            ]);
+
             $this->addFlash('error', 'Unable to delete this job offer.');
         }
 
@@ -1716,8 +1810,8 @@ class FrontPortalController extends AbstractController
             return $this->redirectToRoute('recruiter_event_registrations', ['role' => 'recruiter']);
         }
 
-        $status = (string) $request->request->get('status');
-        if (in_array($status, ['confirmed', 'rejected'], true)) {
+        $status = Event_registration::normalizeAttendanceStatus((string) $request->request->get('status'));
+        if (in_array($status, [Event_registration::STATUS_CONFIRMED, Event_registration::STATUS_REJECTED], true)) {
             $registration->setAttendance_status($status);
             $entityManager->flush();
 
@@ -1864,11 +1958,15 @@ class FrontPortalController extends AbstractController
             $sort = 'date_desc';
         }
 
+        $currentCandidate = $role === 'candidate' ? $this->resolveCurrentCandidate($request) : null;
+        $currentRecruiter = $role === 'recruiter' ? $this->resolveCurrentRecruiter($request) : null;
         $interviewRepository = $this->doctrine->getRepository(Interview::class);
-        if ($interviewRepository instanceof InterviewRepository) {
-            $interviews = $interviewRepository->findBySearchFilterSort($search, $criteria, $sort);
+        if (($role === 'candidate' && !$currentCandidate instanceof Candidate) || ($role === 'recruiter' && !$currentRecruiter instanceof Recruiter)) {
+            $interviews = [];
+        } elseif ($interviewRepository instanceof InterviewRepository) {
+            $interviews = $interviewRepository->findBySearchFilterSort($search, $criteria, $sort, $currentCandidate, $currentRecruiter);
         } else {
-            $interviews = $this->doctrine->getRepository(Interview::class)->findBy([], ['scheduled_at' => 'DESC']);
+            $interviews = [];
         }
 
         $cards = [];

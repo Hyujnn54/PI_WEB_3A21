@@ -3,6 +3,8 @@
 namespace App\Repository;
 
 use App\Entity\Interview;
+use App\Entity\Candidate;
+use App\Entity\Recruiter;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -32,7 +34,13 @@ class InterviewRepository extends ServiceEntityRepository
     /**
      * @return Interview[]
      */
-    public function findBySearchFilterSort(string $search = '', string $criteria = 'all', string $sort = 'date_desc'): array
+    public function findBySearchFilterSort(
+        string $search = '',
+        string $criteria = 'all',
+        string $sort = 'date_desc',
+        ?Candidate $candidate = null,
+        ?Recruiter $recruiter = null,
+    ): array
     {
         $normalizedCriteria = in_array($criteria, self::ALLOWED_CRITERIA, true) ? $criteria : 'all';
         $normalizedSort = in_array($sort, self::ALLOWED_SORTS, true) ? $sort : 'date_desc';
@@ -41,6 +49,18 @@ class InterviewRepository extends ServiceEntityRepository
             ->leftJoin('i.application_id', 'a')
             ->leftJoin('a.offer_id', 'o')
             ->addSelect('a', 'o');
+
+        if ($candidate instanceof Candidate) {
+            $qb
+                ->andWhere('a.candidate_id = :candidate')
+                ->setParameter('candidate', $candidate);
+        }
+
+        if ($recruiter instanceof Recruiter) {
+            $qb
+                ->andWhere('i.recruiter_id = :recruiter')
+                ->setParameter('recruiter', $recruiter);
+        }
 
         $search = trim($search);
         if ($search !== '') {

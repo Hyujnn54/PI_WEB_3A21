@@ -19,6 +19,7 @@ use App\Service\CommentAnalyzerService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Knp\Snappy\Pdf;
+use Psr\Log\LoggerInterface;
 use Spiriit\Bundle\FormFilterBundle\Filter\FilterBuilderUpdaterInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -234,7 +235,7 @@ class BackOfficeController extends AbstractController
     }
 
     #[Route('/admin/user/delete/{id}', name: 'app_admin_delete_user', methods: ['POST'])]
-    public function deleteUser(int $id, UsersRepository $userRepo, EntityManagerInterface $entityManager): Response
+    public function deleteUser(int $id, UsersRepository $userRepo, EntityManagerInterface $entityManager, LoggerInterface $logger): Response
     {
         $user = $userRepo->find($id);
         if (!$user) {
@@ -242,11 +243,139 @@ class BackOfficeController extends AbstractController
             return $this->redirectToRoute('app_admin_users');
         }
 
-        $entityManager->remove($user);
-        $entityManager->flush();
+        $connection = $entityManager->getConnection();
+        $userId = (string) $id;
+
+        try {
+            $connection->beginTransaction();
+
+            $this->deleteUserDependencies($connection, $userId);
+            $deletedRows = $connection->delete('users', ['id' => $userId]);
+
+            if ($deletedRows < 1) {
+                $connection->rollBack();
+                $this->addFlash('error', 'User not found.');
+
+                return $this->redirectToRoute('app_admin_users');
+            }
+
+            $connection->commit();
+            $entityManager->clear();
+        } catch (\Throwable $exception) {
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+
+            $logger->error('Admin user deletion failed.', [
+                'user_id' => $userId,
+                'error_message' => $exception->getMessage(),
+            ]);
+
+            $this->addFlash('error', 'Unable to delete this user.');
+
+            return $this->redirectToRoute('app_admin_users');
+        }
 
         $this->addFlash('success', 'User deleted successfully.');
         return $this->redirectToRoute('app_admin_users');
+    }
+
+    private function deleteUserDependencies(Connection $connection, string $userId): void
+    {
+        $params = ['user_id' => $userId];
+
+        $connection->executeStatement(
+            'DELETE f
+             FROM interview_feedback f
+             LEFT JOIN interview i ON i.id = f.interview_id
+             LEFT JOIN job_application a ON a.id = i.application_id
+             LEFT JOIN job_offer o ON o.id = a.offer_id
+             WHERE f.recruiter_id = :user_id
+                OR i.recruiter_id = :user_id
+                OR a.candidate_id = :user_id
+                OR o.recruiter_id = :user_id',
+            $params
+        );
+        $connection->executeStatement(
+            'DELETE i
+             FROM interview i
+             LEFT JOIN job_application a ON a.id = i.application_id
+             LEFT JOIN job_offer o ON o.id = a.offer_id
+             WHERE i.recruiter_id = :user_id
+                OR a.candidate_id = :user_id
+                OR o.recruiter_id = :user_id',
+            $params
+        );
+        $connection->executeStatement(
+            'DELETE h
+             FROM application_status_history h
+             LEFT JOIN job_application a ON a.id = h.application_id
+             LEFT JOIN job_offer o ON o.id = a.offer_id
+             WHERE h.changed_by_id = :user_id
+                OR a.candidate_id = :user_id
+                OR o.recruiter_id = :user_id',
+            $params
+        );
+        $connection->executeStatement(
+            'DELETE a
+             FROM job_application a
+             LEFT JOIN job_offer o ON o.id = a.offer_id
+             WHERE a.candidate_id = :user_id
+                OR o.recruiter_id = :user_id',
+            $params
+        );
+
+        $connection->delete('candidate_skill', ['candidate_id' => $userId]);
+        $connection->executeStatement(
+            'DELETE er
+             FROM event_registration er
+             LEFT JOIN recruitment_event e ON e.id = er.event_id
+             WHERE er.candidate_id = :user_id
+                OR e.recruiter_id = :user_id',
+            $params
+        );
+        $connection->executeStatement(
+            'DELETE ev
+             FROM event_review ev
+             LEFT JOIN recruitment_event e ON e.id = ev.event_id
+             WHERE ev.candidate_id = :user_id
+                OR e.recruiter_id = :user_id',
+            $params
+        );
+        $connection->delete('recruitment_event', ['recruiter_id' => $userId]);
+
+        $connection->executeStatement(
+            'DELETE c
+             FROM warning_correction c
+             LEFT JOIN job_offer_warning w ON w.id = c.warning_id
+             LEFT JOIN job_offer o ON o.id = c.job_offer_id
+             WHERE c.recruiter_id = :user_id
+                OR w.recruiter_id = :user_id
+                OR w.admin_id = :user_id
+                OR o.recruiter_id = :user_id',
+            $params
+        );
+        $connection->executeStatement(
+            'DELETE w
+             FROM job_offer_warning w
+             LEFT JOIN job_offer o ON o.id = w.job_offer_id
+             WHERE w.recruiter_id = :user_id
+                OR w.admin_id = :user_id
+                OR o.recruiter_id = :user_id',
+            $params
+        );
+        $connection->executeStatement(
+            'DELETE s
+             FROM offer_skill s
+             INNER JOIN job_offer o ON o.id = s.offer_id
+             WHERE o.recruiter_id = :user_id',
+            $params
+        );
+        $connection->delete('job_offer', ['recruiter_id' => $userId]);
+
+        $connection->delete('admin', ['id' => $userId]);
+        $connection->delete('candidate', ['id' => $userId]);
+        $connection->delete('recruiter', ['id' => $userId]);
     }
 
     #[Route('/admin/user/edit/{id}', name: 'app_admin_edit_user', methods: ['GET', 'POST'])]
@@ -450,7 +579,7 @@ class BackOfficeController extends AbstractController
     }
 
     #[Route('/admin/job-offers/{id}/warning', name: 'app_admin_job_offer_warning', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function sendJobOfferWarning(string $id, Request $request, Connection $connection): Response
+    public function sendJobOfferWarning(string $id, Request $request, Connection $connection, LoggerInterface $logger): Response
     {
         $user = $this->getUser();
         $currentAdminId = $user instanceof Users ? (string) $user->getId() : '';
@@ -473,7 +602,7 @@ class BackOfficeController extends AbstractController
 
         $warningType = (string) $validation['warningType'];
         $warningText = (string) $validation['warningText'];
-        $reason = sprintf('[%s] %s', $warningType, $warningText);
+        $reason = $this->buildWarningReason($warningType, $warningText);
 
         try {
             $offer = $connection->fetchAssociative(
@@ -486,10 +615,10 @@ class BackOfficeController extends AbstractController
                 return $this->redirectToRoute('app_admin_job_offers');
             }
 
-            // Check if there's an active (SENT) warning
+            // Check if there's an active unresolved warning.
             $activeWarning = $connection->fetchOne(
-                'SELECT id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status LIMIT 1',
-                ['job_offer_id' => (string) $offer['id'], 'status' => 'SENT']
+                'SELECT id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status IN (\'SENT\', \'SEEN\') LIMIT 1',
+                ['job_offer_id' => (string) $offer['id']]
             );
 
             if ($activeWarning) {
@@ -502,8 +631,8 @@ class BackOfficeController extends AbstractController
             try {
                 // Re-check inside transaction to avoid duplicate active warnings on concurrent requests.
                 $activeWarningInTx = $connection->fetchOne(
-                    'SELECT id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status LIMIT 1',
-                    ['job_offer_id' => (string) $offer['id'], 'status' => 'SENT']
+                    'SELECT id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status IN (\'SENT\', \'SEEN\') LIMIT 1',
+                    ['job_offer_id' => (string) $offer['id']]
                 );
 
                 if ($activeWarningInTx) {
@@ -527,7 +656,7 @@ class BackOfficeController extends AbstractController
                     'recruiter_id' => (string) $offer['recruiter_id'],
                     'admin_id' => $currentAdminId,
                     'reason' => $reason,
-                    'message' => $reason,
+                    'message' => $warningText,
                     'status' => 'SENT',
                     'created_at' => $now->format('Y-m-d H:i:s'),
                     'seen_at' => $now->format('Y-m-d H:i:s'),
@@ -542,6 +671,12 @@ class BackOfficeController extends AbstractController
                 throw $exception;
             }
         } catch (\Throwable $exception) {
+            $logger->error('Job offer warning failed to send.', [
+                'offer_id' => $id,
+                'admin_id' => $currentAdminId,
+                'error_message' => $exception->getMessage(),
+            ]);
+
             $this->addFlash('error', 'Unable to send warning for this offer.');
         }
 
@@ -661,12 +796,23 @@ class BackOfficeController extends AbstractController
 
         $warningType = (string) $validation['warningType'];
         $warningText = (string) $validation['warningText'];
-        $reason = sprintf('[%s] %s', $warningType, $warningText);
+        $reason = $this->buildWarningReason($warningType, $warningText);
 
         try {
             $warning = $connection->fetchAssociative(
-                'SELECT id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status LIMIT 1',
-                ['job_offer_id' => $id, 'status' => 'RESOLVED']
+                'SELECT w.id
+                 FROM job_offer_warning w
+                 WHERE w.job_offer_id = :job_offer_id
+                   AND (
+                       w.status = :resolved_status
+                       OR EXISTS (
+                           SELECT 1 FROM warning_correction c
+                           WHERE c.warning_id = w.id AND c.status = :pending_status
+                       )
+                   )
+                 ORDER BY w.resolved_at DESC, w.created_at DESC
+                 LIMIT 1',
+                ['job_offer_id' => $id, 'resolved_status' => 'RESOLVED', 'pending_status' => 'PENDING']
             );
 
             if (!$warning) {
@@ -677,11 +823,23 @@ class BackOfficeController extends AbstractController
             $connection->update('job_offer_warning', [
                 'status' => 'SENT',
                 'reason' => $reason,
-                'message' => $reason,
+                'message' => $warningText,
                 'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ], [
                 'id' => (string) $warning['id'],
             ]);
+            try {
+                $connection->update('warning_correction', [
+                    'status' => 'REJECTED',
+                    'reviewed_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                    'admin_note' => $warningText,
+                ], [
+                    'warning_id' => (string) $warning['id'],
+                    'status' => 'PENDING',
+                ]);
+            } catch (\Throwable) {
+                // Keep rejection functional when correction history is unavailable.
+            }
 
             $this->addFlash('warning', 'Changes rejected. Recruiter must resolve the warning again or delete the offer.');
         } catch (\Throwable $exception) {
@@ -696,8 +854,19 @@ class BackOfficeController extends AbstractController
     {
         try {
             $warning = $connection->fetchAssociative(
-                'SELECT id, job_offer_id FROM job_offer_warning WHERE job_offer_id = :job_offer_id AND status = :status LIMIT 1',
-                ['job_offer_id' => $id, 'status' => 'RESOLVED']
+                'SELECT w.id, w.job_offer_id
+                 FROM job_offer_warning w
+                 WHERE w.job_offer_id = :job_offer_id
+                   AND (
+                       w.status = :resolved_status
+                       OR EXISTS (
+                           SELECT 1 FROM warning_correction c
+                           WHERE c.warning_id = w.id AND c.status = :pending_status
+                       )
+                   )
+                 ORDER BY w.resolved_at DESC, w.created_at DESC
+                 LIMIT 1',
+                ['job_offer_id' => $id, 'resolved_status' => 'RESOLVED', 'pending_status' => 'PENDING']
             );
 
             if (!$warning) {
@@ -710,6 +879,18 @@ class BackOfficeController extends AbstractController
             ], [
                 'id' => (string) $warning['id'],
             ]);
+            try {
+                $connection->update('warning_correction', [
+                    'status' => 'APPROVED',
+                    'reviewed_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                    'admin_note' => 'Accepted by admin.',
+                ], [
+                    'warning_id' => (string) $warning['id'],
+                    'status' => 'PENDING',
+                ]);
+            } catch (\Throwable) {
+                // Keep acceptance functional when correction history is unavailable.
+            }
 
             $this->addFlash('success', 'Changes accepted. Warning cleared for this offer.');
         } catch (\Throwable $exception) {
@@ -743,18 +924,35 @@ class BackOfficeController extends AbstractController
             $warningSql = <<<'SQL'
 SELECT status, reason, created_at
 FROM job_offer_warning
-WHERE job_offer_id = :job_offer_id AND status IN ('SENT', 'RESOLVED')
+WHERE job_offer_id = :job_offer_id AND status IN ('SENT', 'SEEN', 'RESOLVED')
 ORDER BY created_at DESC
 LIMIT 1
 SQL;
 
             $warning = $connection->fetchAssociative($warningSql, ['job_offer_id' => $id]);
+            $correction = null;
+            try {
+                $correctionSql = <<<'SQL'
+SELECT c.id, c.warning_id, c.correction_note, c.old_title, c.new_title, c.old_description, c.new_description, c.status, c.submitted_at
+FROM warning_correction c
+INNER JOIN job_offer_warning w ON w.id = c.warning_id
+WHERE c.job_offer_id = :job_offer_id
+  AND c.status = 'PENDING'
+  AND w.status = 'RESOLVED'
+ORDER BY c.submitted_at DESC
+LIMIT 1
+SQL;
+                $correction = $connection->fetchAssociative($correctionSql, ['job_offer_id' => $id]);
+            } catch (\Throwable) {
+                $correction = null;
+            }
 
             return new JsonResponse([
                 'ok' => true,
                 'offer' => $offer,
                 'skills' => $skills,
                 'warning' => $warning ?: null,
+                'correction' => $correction ?: null,
             ]);
         } catch (\Throwable) {
             return new JsonResponse(['ok' => false, 'error' => 'Unable to load offer details.'], 500);
@@ -1847,5 +2045,16 @@ SQL;
         }
 
         return $message;
+    }
+
+    private function buildWarningReason(string $warningType, string $warningText): string
+    {
+        $reason = sprintf('[%s] %s', trim($warningType), trim($warningText));
+
+        if (mb_strlen($reason) <= 255) {
+            return $reason;
+        }
+
+        return rtrim(mb_substr($reason, 0, 252)) . '...';
     }
 }

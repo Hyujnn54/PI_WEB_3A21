@@ -1,182 +1,211 @@
-# Talent Bridge HR Platform
+# Talent Bridge
 
-Talent Bridge is a Symfony-based HR and recruitment management platform designed to support multiple user roles across Front Office and Back Office workflows.
+Talent Bridge is a recruitment management platform developed as an ESPRIT integrated project. This repository contains the Symfony web extension of the Talent Bridge platform around a shared hiring workflow: job offers, applications, interviews, events, and role-based access.
 
-The project provides end-to-end recruitment features, including:
-- Job offer publishing and moderation
-- Candidate application lifecycle tracking
-- Interview scheduling and feedback
-- Recruitment events and registrations
-- User and role management
-- Admin analytics and dashboard monitoring
+## Project Scope
 
-## Table of Contents
-- Project Overview
-- Core Functional Areas
-- User Roles
-- Tech Stack
-- Project Structure
-- Getting Started
-- Database and Migrations
-- Running the Application
-- Testing
-- Key Routes and Modules
-- Development Notes
-- Troubleshooting
+- Candidate, recruiter, and administrator workflows
+- Job offer publishing and application tracking
+- Interview scheduling, feedback, and meeting-link generation
+- Recruitment events and analytics dashboards
+- AI-assisted features for screening, matching, moderation, and cover-letter support
+- Notifications and communication flows across the hiring process
 
-## Project Overview
-This application is structured around two major interaction zones:
+## Stack
 
-1. Front Office
-- Candidate, Recruiter, and Admin role-based home pages
-- Role-specific operational modules
-- Candidate-facing and recruiter-facing workflows
+- **PHP 8.2+** and **Symfony 6**
+- **Doctrine ORM** for database abstraction
+- **Twig** template engine
+- **MySQL 8** database
+- **Knp Snappy** for PDF generation
+- **Bazinga Geocoder** for location services
+- **Hotwired Stimulus** and **Asset Mapper** for frontend interactivity
+- **Docker Compose** for containerization
+- **PHPUnit** for testing
+- **PHPStan** for static analysis
 
-2. Back Office
-- Admin dashboard for platform-wide supervision
-- User administration
-- Job offer and application oversight
-- Interview monitoring and statistics
-- Reporting and system controls
+## Technical Highlights
+
+- Role-based application structure across user, job offer, application, interview, and event modules
+- Front Office and Back Office workflows with role-specific dashboards
+- Service layer handling persistence, validation, notifications, and AI-assisted features
+- Multiple external integrations for geocoding, PDF generation, and file uploads
+- Event subscribers and custom doctrine extensions for audit trails and tracking
+- Command-based operations for background tasks
+- Comprehensive form handling with validation rules
+- Email notifications for recruitment events
+
+## Repository Layout
+
+```
+src/
+  Kernel.php               Application kernel
+  Command/                 CLI commands for background operations
+  Controller/              Request handlers for routing
+  Entity/                  Domain models (User, JobOffer, Application, Interview, Event)
+  EventSubscriber/         Event listeners for doctrine and application events
+  Form/                    Form types and form builders
+  Repository/              Database queries and data access
+  Security/                Authentication and authorization logic
+  Service/                 Business logic and operations
+  Support/                 Helper utilities
+config/
+  bundles.php              Bundle configuration
+  services.yaml            Service definitions
+  routes/                  Route definitions per module
+  packages/                Third-party bundle configuration
+migrations/                Database schema migrations
+templates/
+  base.html.twig           Base layout template
+  front/                   Candidate and recruiter-facing templates
+  back/                    Administrator dashboard templates
+  emails/                  Email notification templates
+  pdf/                     PDF generation templates
+  shared/                  Reusable template components
+tests/
+  Service/                 Service layer tests
+  Entity/                  Entity tests
+public/
+  index.php                Application entry point
+  uploads/                 User-uploaded files (CVs, documents)
+  css/                     Compiled stylesheets
+```
+
+## Project Context
+
+- University project developed at ESPRIT
+- Desktop phase implemented in JavaFX with Java 17
+- Web phase extends the same platform using Symfony 6 and PHP 8
+- Designed as a multi-role system for recruitment management
+- Shared relational model across desktop and web workflows
 
 ## Core Functional Areas
 
 ### 1) Job Offers
-- Recruiters can create, edit, and manage offers
+- Recruiters can create, edit, and manage job offers
 - Admin can inspect, moderate, and view statistics
 - Offer status and deadlines are tracked
+- Candidates can search and filter available offers
 
 ### 2) Job Applications
-- Candidates apply to offers
-- Recruiters review and update statuses
+- Candidates apply to job offers
+- Recruiters review and update application statuses
 - Admin has broad visibility and management access
-- Status history tracking is supported
+- Application tracking and status history are maintained
 
 ### 3) Interviews
 - Recruiters schedule and manage interviews
-- Candidate and recruiter interview visibility
-- Interview feedback and review workflows
-- Interview statistics available for admin
+- Candidate and recruiter interview visibility with feedback workflows
+- Interview statistics and analytics available for admin
+- Interview outcomes tracking
 
 ### 4) Events and Registrations
 - Recruitment event publishing and management
-- Candidate registration/unregistration
-- Recruiter and admin registration views
+- Candidate registration and attendance tracking
+- Recruiter and admin event oversight
 
 ### 5) User Management
 - Admin user listing, creation, editing, and deletion
-- Role segmentation across Admin, Recruiter, Candidate
-- Statistics pages for user distributions
+- Role segmentation across Admin, Recruiter, and Candidate
+- User profile management and statistics
 
 ## User Roles
-- Candidate: applies to jobs, tracks applications, views interviews, manages profile
-- Recruiter: manages offers, reviews applications, manages interviews/events
-- Admin: oversees platform operations in front and back office areas
 
-## Tech Stack
-- Backend framework: Symfony 6.4
-- Language: PHP 8.1+
-- ORM and persistence: Doctrine ORM, Doctrine Migrations
-- Frontend templating: Twig
-- Frontend UI stack: Bootstrap, Tabler, custom CSS
-- Optional charting: ApexCharts (already included in admin base layout)
-- Testing: PHPUnit
-- Containerized DB support: Docker Compose with PostgreSQL
-
-## Project Structure
-High-level layout:
-- src/Controller: application controllers and role workflows
-- src/Entity: Doctrine entities
-- src/Repository: custom repositories
-- templates: Twig templates grouped by module and role
-- public: web root and built/static assets
-- config: Symfony and bundle configuration
-- migrations: Doctrine migration files
-- tests: test bootstrap and test suites
+- **Candidate**: Applies to jobs, tracks applications, views interviews, manages profile
+- **Recruiter**: Manages job offers, reviews applications, schedules interviews, manages events
+- **Admin**: Oversees platform operations, user management, system-wide analytics and reporting
 
 ## Getting Started
 
 ### Prerequisites
-- PHP 8.1 or later
+- PHP 8.2 or later
 - Composer
-- PostgreSQL (local or Docker)
-- Symfony CLI optional but recommended
+- MySQL 8 or PostgreSQL
+- Docker (optional, for containerized database)
 
 ### Installation
+
 1. Clone the repository
 2. Install dependencies:
-   - composer install
-3. Configure environment variables in your local env configuration
-4. Prepare the database
+   ```
+   composer install
+   ```
+3. Create and configure the `.env.local` file with database credentials:
+   ```
+   DATABASE_URL="mysql://user:password@127.0.0.1:3306/talent_bridge"
+   ```
+4. Create the database and run migrations:
+   ```
+   php bin/console doctrine:database:create
+   php bin/console doctrine:migrations:migrate
+   ```
+
+### Running the Application
+
+**Option A: PHP Built-in Server**
+```bash
+php -S 127.0.0.1:8000 -t public
+```
+Then navigate to `http://127.0.0.1:8000`
+
+**Option B: Symfony CLI**
+```bash
+symfony serve
+```
+
+**Option C: Docker Compose**
+```bash
+docker-compose up -d
+```
 
 ## Database and Migrations
-The project uses Doctrine ORM and migrations.
 
-Typical workflow:
-- Create database
-- Run migrations
+The project uses Doctrine ORM for database abstraction and Doctrine Migrations for schema versioning. Migrations are located in the `migrations/` directory and track all schema changes.
 
-If using Docker Compose, a PostgreSQL service is already defined in compose.yaml.
-
-## Running the Application
-
-### Option A: PHP Built-in Server
-From project root, run:
-- php -S 127.0.0.1:8000 -t public
-
-Then open:
-- http://127.0.0.1:8000
-
-### Option B: Symfony CLI
-If Symfony CLI is installed, run the standard local server command.
+To create a new migration after modifying entities:
+```bash
+php bin/console doctrine:make:migration
+php bin/console doctrine:migrations:migrate
+```
 
 ## Testing
-Run tests with:
-- php bin/phpunit
 
-PHPUnit configuration is available in phpunit.dist.xml.
+Run the test suite with PHPUnit:
+```bash
+php bin/phpunit
+```
 
-## Key Routes and Modules
-
-### Entry and Authentication
-- Root entry redirects based on authentication and role context
-- Login and registration pages are provided in templates/auth
-
-### Front Office Homes
-- Candidate home
-- Recruiter home
-- Admin front-home
-
-### Back Office
-- Admin dashboard
-- User management
-- Job offers management and statistics
-- Applications management and statistics
-- Interviews management and statistics
+PHPUnit configuration is defined in `phpunit.dist.xml`.
 
 ## Development Notes
-- Keep role-based logic explicit in controller actions
-- Preserve route names when adjusting UI to avoid breaking navigation
-- Prefer Twig template enhancements for UI improvements without affecting backend behavior
-- Use shared CSS utilities for consistent visual design across modules
+
+- Role-based logic is explicitly handled in controller actions
+- Route names should be preserved when adjusting UI to maintain navigation consistency
+- Frontend enhancements are preferred through Twig templates without backend behavior changes
+- Service layer handles business logic, persistence, and validation
+- Event subscribers track important domain events and audit trails
+- Custom Doctrine extensions support enhanced entity lifecycle management
 
 ## Troubleshooting
 
-### 1) Asset not visible
-- Verify asset path under public or assets mapping
-- Clear cache if needed
+**Asset Not Visible**
+- Verify asset paths under `public/` or asset mapping configuration
+- Clear Symfony cache: `php bin/console cache:clear`
 
-### 2) Route not found
-- Confirm route names and imported controller annotations/attributes
+**Route Not Found**
+- Confirm route names and controller attribute annotations
 
-### 3) Database errors
-- Check DB credentials and active database service
-- Ensure migrations are applied
+**Database Errors**
+- Check database credentials in `.env.local`
+- Ensure the database service is running
+- Verify all migrations have been applied: `php bin/console doctrine:migrations:status`
 
-### 4) Cache-related behavior
-- Clear Symfony cache when changing configuration:
-  - php bin/console cache:clear
+**Cache-Related Issues**
+- Clear cache when changing configuration: `php bin/console cache:clear`
+- Warm up cache for production: `php bin/console cache:warmup`
 
----
+## Notes
 
-This repository is configured as a professional Symfony project foundation for HR operations and can be extended with additional analytics, access-control policies, and workflow automations.
+- The web phase complements the desktop application (Java/JavaFX) around a shared recruitment management domain
+- This repository is part of the broader Talent Bridge platform, which includes both desktop and web applications
+- Architecture allows for shared business logic and consistent user workflows across multiple interfaces

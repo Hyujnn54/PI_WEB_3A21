@@ -111,18 +111,35 @@ class Job_offerRepository extends ServiceEntityRepository
 
         $warningRows = $connection->fetchAllAssociative(
             <<<'SQL'
-SELECT jw.job_offer_id, jw.status AS warning_status, jw.reason AS warning_reason
+SELECT
+    jw.job_offer_id,
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM warning_correction c
+            WHERE c.warning_id = jw.id
+              AND c.status = 'PENDING'
+        ) THEN 'RESOLVED'
+        ELSE jw.status
+    END AS warning_status,
+    jw.reason AS warning_reason
 FROM job_offer_warning jw
-INNER JOIN (
-    SELECT job_offer_id, MAX(created_at) AS max_created_at
-    FROM job_offer_warning
-    WHERE status IN ('SENT', 'RESOLVED')
-      AND job_offer_id IN (:offer_ids)
-    GROUP BY job_offer_id
-) latest
-    ON latest.job_offer_id = jw.job_offer_id
-   AND latest.max_created_at = jw.created_at
-WHERE jw.status IN ('SENT', 'RESOLVED')
+WHERE jw.job_offer_id IN (:offer_ids)
+  AND jw.status IN ('SENT', 'SEEN', 'RESOLVED')
+ORDER BY jw.job_offer_id ASC,
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM warning_correction c
+            WHERE c.warning_id = jw.id
+              AND c.status = 'PENDING'
+        ) THEN 0
+        WHEN jw.status = 'RESOLVED' THEN 1
+        WHEN jw.status = 'SEEN' THEN 2
+        ELSE 3
+    END ASC,
+    COALESCE(jw.resolved_at, jw.created_at) DESC,
+    jw.id DESC
 SQL,
             ['offer_ids' => $offerIds],
             ['offer_ids' => ArrayParameterType::STRING]
@@ -130,7 +147,12 @@ SQL,
 
         $warningMap = [];
         foreach ($warningRows as $warningRow) {
-            $warningMap[(string) ($warningRow['job_offer_id'] ?? '')] = [
+            $offerId = (string) ($warningRow['job_offer_id'] ?? '');
+            if ($offerId === '' || isset($warningMap[$offerId])) {
+                continue;
+            }
+
+            $warningMap[$offerId] = [
                 'warning_status' => $warningRow['warning_status'] ?? null,
                 'warning_reason' => $warningRow['warning_reason'] ?? null,
             ];

@@ -29,6 +29,18 @@ class InterviewManagerTest extends TestCase
         $this->assertTrue($manager->validate($interview));
     }
 
+    public function testNullableOptionalInterviewFieldsAreNormalized(): void
+    {
+        $interview = $this->createValidOnlineInterview();
+        $interview->setLocation(null);
+        $interview->setNotes(null);
+
+        $this->assertSame('', $interview->getLocation());
+        $this->assertSame('', $interview->getNotes());
+        $this->assertSame('online', $interview->getMode());
+        $this->assertTrue((new InterviewManager())->validate($interview));
+    }
+
     public function testValidOnsiteInterview(): void
     {
         $interview = $this->createValidOnsiteInterview();

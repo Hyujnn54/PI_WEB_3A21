@@ -9,6 +9,11 @@ use App\Entity\Candidate;
 #[ORM\Entity]
 class Event_registration
 {
+    public const STATUS_REGISTERED = 'registered';
+    public const STATUS_CONFIRMED = 'confirmed';
+    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_NO_SHOW = 'no_show';
 
     #[ORM\Id]
     #[ORM\Column(type: "bigint")]
@@ -25,8 +30,8 @@ class Event_registration
     #[ORM\Column(type: "datetime")]
     private \DateTimeInterface $registered_at;
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $attendance_status;
+    #[ORM\Column(type: "string", length: 255, nullable: true)]
+    private ?string $attendance_status = null;
 
     private ?string $candidate_name = null;
 
@@ -78,12 +83,26 @@ class Event_registration
 
     public function getAttendance_status(): string
     {
-        return $this->attendance_status;
+        return self::normalizeAttendanceStatus($this->attendance_status);
     }
 
-    public function setAttendance_status(string $value): void
+    public function setAttendance_status(?string $value): void
     {
-        $this->attendance_status = $value;
+        $this->attendance_status = self::normalizeAttendanceStatus($value);
+    }
+
+    public static function normalizeAttendanceStatus(?string $value): string
+    {
+        $normalized = strtolower(trim((string) $value));
+        $normalized = str_replace(['-', ' '], '_', $normalized);
+
+        return match ($normalized) {
+            self::STATUS_CONFIRMED, 'confirm', 'accepted', 'approved', 'validated' => self::STATUS_CONFIRMED,
+            self::STATUS_REJECTED, 'reject', 'declined', 'denied', 'refused' => self::STATUS_REJECTED,
+            self::STATUS_CANCELLED, 'canceled', 'cancel', 'unregistered' => self::STATUS_CANCELLED,
+            self::STATUS_NO_SHOW, 'noshow', 'absent' => self::STATUS_NO_SHOW,
+            default => self::STATUS_REGISTERED,
+        };
     }
 
     public function getCandidate_name(): ?string
